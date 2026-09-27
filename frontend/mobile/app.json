@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "OCTV",
+    "slug": "octv-ui",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "web": {
+      "bundler": "metro"
+    },
+    "ios": {
+      "supportsTablet": true
+    }
+  }
+}

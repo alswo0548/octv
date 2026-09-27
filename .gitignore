@@ -1,0 +1,53 @@
+# Personal environment / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*service-account*.json
+# Dependencies and generated files
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.expo/
+.metro-health-check*
+.expo-shared/
+dist/
+build/
+web-build/
+coverage/
+.vite/
+*.tsbuildinfo
+*.log
+logs/
+# ML data / outputs (the small UI asset video remains tracked)
+datasets/
+weights/
+runs/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+*.mp4
+!frontend/web/public/assets/night-traffic.mp4
+!frontend/mobile/assets/night-traffic.mp4
+*.avi
+*.mov
+# Per-machine files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.sites-runtime/

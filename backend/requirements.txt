@@ -1,0 +1,3 @@
+# Optional backend entrypoint only; UI does not install or import this environment.
+fastapi==0.117.1
+uvicorn==0.37.0

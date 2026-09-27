@@ -1,0 +1,28 @@
+{
+  "name": "@octv/mobile",
+  "private": true,
+  "version": "0.1.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --port 8081",
+    "web": "expo start --web --localhost --port 8081",
+    "typecheck": "tsc --noEmit",
+    "export:web": "expo export --platform web",
+    "export:native": "expo export --platform android --platform ios"
+  },
+  "dependencies": {
+    "@octv/shared": "*",
+    "expo": "~57.0.25",
+    "expo-status-bar": "~57.0.1",
+    "expo-video": "~57.0.5",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-svg": "^15.15.4",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}

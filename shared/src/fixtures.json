@@ -1,0 +1,3085 @@
+{
+  "incidents": [
+    {
+      "id": "SEL-001",
+      "type": "도로 침수",
+      "priority": "P1",
+      "status": "전달 완료",
+      "location": "강남구 테헤란로",
+      "time": "09:24",
+      "confidence": 89,
+      "risk": 86,
+      "score": 92,
+      "rain": 32,
+      "water": 3.2,
+      "traffic": "2개 차로 차단",
+      "facility": "병원 · 480 m",
+      "agency": "강남소방서",
+      "distance": 4.2,
+      "minutes": 9,
+      "reasons": [
+        "인명 위험",
+        "접근로 영향"
+      ],
+      "label": "FLOOD",
+      "camera": "CCTV-012",
+      "date": "2026-09-23",
+      "statusCode": "SENT",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-002",
+      "type": "쓰러진 나무",
+      "priority": "P1",
+      "status": "사건 확인",
+      "location": "서대문구 연희로",
+      "time": "08:57",
+      "confidence": 94,
+      "risk": 82,
+      "score": 88,
+      "rain": 18,
+      "water": 1.4,
+      "traffic": "1개 차로 차단",
+      "facility": "학교 · 220 m",
+      "agency": "서대문소방서",
+      "distance": 2.8,
+      "minutes": 7,
+      "reasons": [
+        "차로 점유",
+        "보행자 위험"
+      ],
+      "label": "FALLEN TREE",
+      "camera": "CCTV-028",
+      "date": "2026-09-23",
+      "statusCode": "CONFIRMED",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-003",
+      "type": "시설물 파손",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "송파구 송파대로",
+      "time": "08:42",
+      "confidence": 91,
+      "risk": 65,
+      "score": 71,
+      "rain": 12,
+      "water": 1.1,
+      "traffic": "우측 차로 주의",
+      "facility": "지하철역 · 150 m",
+      "agency": "송파소방서",
+      "distance": 3.5,
+      "minutes": 8,
+      "reasons": [
+        "낙하물 위험",
+        "보행 동선"
+      ],
+      "label": "DAMAGED FACILITY",
+      "camera": "CCTV-034",
+      "date": "2026-09-23",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-004",
+      "type": "도로 장애물",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "마포구 월드컵로",
+      "time": "08:31",
+      "confidence": 87,
+      "risk": 58,
+      "score": 64,
+      "rain": 9,
+      "water": 0.8,
+      "traffic": "1개 차로 차단",
+      "facility": "공원 · 350 m",
+      "agency": "마포소방서",
+      "distance": 3.1,
+      "minutes": 8,
+      "reasons": [
+        "차량 충돌 위험",
+        "우회 필요"
+      ],
+      "label": "ROAD OBSTACLE",
+      "camera": "CCTV-041",
+      "date": "2026-09-23",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-005",
+      "type": "도로 침수",
+      "priority": "P1",
+      "status": "전달 완료",
+      "location": "영등포구 여의대로",
+      "time": "07:18",
+      "confidence": 93,
+      "risk": 89,
+      "score": 95,
+      "rain": 41,
+      "water": 3.7,
+      "traffic": "3개 차로 차단",
+      "facility": "병원 · 620 m",
+      "agency": "영등포소방서",
+      "distance": 5.1,
+      "minutes": 12,
+      "reasons": [
+        "수위 상승",
+        "주요 도로 통제"
+      ],
+      "label": "FLOOD",
+      "camera": "CCTV-057",
+      "date": "2026-09-23",
+      "statusCode": "SENT",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-006",
+      "type": "쓰러진 나무",
+      "priority": "P2",
+      "status": "전달 완료",
+      "location": "강남구 도산대로",
+      "time": "09:24",
+      "confidence": 94,
+      "risk": 64,
+      "score": 72,
+      "rain": 32,
+      "water": 3.2,
+      "traffic": "1개 차로 차단",
+      "facility": "병원 · 480 m",
+      "agency": "강남소방서",
+      "distance": 2.8,
+      "minutes": 7,
+      "reasons": [
+        "차로 점유",
+        "보행자 위험"
+      ],
+      "label": "FALLEN TREE",
+      "camera": "CCTV-018",
+      "date": "2026-09-23",
+      "statusCode": "SENT",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-007",
+      "type": "쓰러진 나무",
+      "priority": "P1",
+      "status": "사건 확인",
+      "location": "서대문구 연희로",
+      "time": "08:57",
+      "confidence": 94,
+      "risk": 82,
+      "score": 88,
+      "rain": 18,
+      "water": 1.4,
+      "traffic": "1개 차로 차단",
+      "facility": "학교 · 220 m",
+      "agency": "서대문소방서",
+      "distance": 2.8,
+      "minutes": 7,
+      "reasons": [
+        "차로 점유",
+        "보행자 위험"
+      ],
+      "label": "FALLEN TREE",
+      "camera": "CCTV-106",
+      "date": "2026-09-23",
+      "statusCode": "CONFIRMED",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-008",
+      "type": "시설물 파손",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "송파구 송파대로",
+      "time": "08:42",
+      "confidence": 91,
+      "risk": 65,
+      "score": 71,
+      "rain": 12,
+      "water": 1.1,
+      "traffic": "우측 차로 주의",
+      "facility": "지하철역 · 150 m",
+      "agency": "송파소방서",
+      "distance": 3.5,
+      "minutes": 8,
+      "reasons": [
+        "낙하물 위험",
+        "보행 동선"
+      ],
+      "label": "DAMAGED FACILITY",
+      "camera": "CCTV-107",
+      "date": "2026-09-23",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-009",
+      "type": "도로 장애물",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "마포구 월드컵로",
+      "time": "08:31",
+      "confidence": 87,
+      "risk": 58,
+      "score": 64,
+      "rain": 9,
+      "water": 0.8,
+      "traffic": "1개 차로 차단",
+      "facility": "공원 · 350 m",
+      "agency": "마포소방서",
+      "distance": 3.1,
+      "minutes": 8,
+      "reasons": [
+        "차량 충돌 위험",
+        "우회 필요"
+      ],
+      "label": "ROAD OBSTACLE",
+      "camera": "CCTV-049",
+      "date": "2026-09-23",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-010",
+      "type": "도로 침수",
+      "priority": "P3",
+      "status": "전달 완료",
+      "location": "영등포구 여의대로",
+      "time": "07:18",
+      "confidence": 93,
+      "risk": 36,
+      "score": 42,
+      "rain": 41,
+      "water": 3.7,
+      "traffic": "3개 차로 차단",
+      "facility": "병원 · 620 m",
+      "agency": "영등포소방서",
+      "distance": 5.1,
+      "minutes": 12,
+      "reasons": [
+        "수위 상승",
+        "주요 도로 통제"
+      ],
+      "label": "FLOOD",
+      "camera": "CCTV-066",
+      "date": "2026-09-23",
+      "statusCode": "SENT",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-011",
+      "type": "시설물 파손",
+      "priority": "P2",
+      "status": "전달 완료",
+      "location": "강남구 봉은사로",
+      "time": "09:24",
+      "confidence": 91,
+      "risk": 68,
+      "score": 75,
+      "rain": 32,
+      "water": 3.2,
+      "traffic": "우측 차로 주의",
+      "facility": "병원 · 480 m",
+      "agency": "강남소방서",
+      "distance": 3.5,
+      "minutes": 8,
+      "reasons": [
+        "낙하물 위험",
+        "보행 동선"
+      ],
+      "label": "DAMAGED FACILITY",
+      "camera": "CCTV-023",
+      "date": "2026-09-23",
+      "statusCode": "SENT",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-012",
+      "type": "쓰러진 나무",
+      "priority": "P1",
+      "status": "사건 확인",
+      "location": "서대문구 연희로",
+      "time": "08:57",
+      "confidence": 94,
+      "risk": 82,
+      "score": 88,
+      "rain": 18,
+      "water": 1.4,
+      "traffic": "1개 차로 차단",
+      "facility": "학교 · 220 m",
+      "agency": "서대문소방서",
+      "distance": 2.8,
+      "minutes": 7,
+      "reasons": [
+        "차로 점유",
+        "보행자 위험"
+      ],
+      "label": "FALLEN TREE",
+      "camera": "CCTV-039",
+      "date": "2026-09-23",
+      "statusCode": "CONFIRMED",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-013",
+      "type": "시설물 파손",
+      "priority": "P3",
+      "status": "탐지됨",
+      "location": "송파구 송파대로",
+      "time": "08:42",
+      "confidence": 91,
+      "risk": 36,
+      "score": 42,
+      "rain": 12,
+      "water": 1.1,
+      "traffic": "우측 차로 주의",
+      "facility": "지하철역 · 150 m",
+      "agency": "송파소방서",
+      "distance": 3.5,
+      "minutes": 8,
+      "reasons": [
+        "낙하물 위험",
+        "보행 동선"
+      ],
+      "label": "DAMAGED FACILITY",
+      "camera": "CCTV-046",
+      "date": "2026-09-21",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-014",
+      "type": "도로 장애물",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "마포구 월드컵로",
+      "time": "08:31",
+      "confidence": 87,
+      "risk": 58,
+      "score": 64,
+      "rain": 9,
+      "water": 0.8,
+      "traffic": "1개 차로 차단",
+      "facility": "공원 · 350 m",
+      "agency": "마포소방서",
+      "distance": 3.1,
+      "minutes": 8,
+      "reasons": [
+        "차량 충돌 위험",
+        "우회 필요"
+      ],
+      "label": "ROAD OBSTACLE",
+      "camera": "CCTV-054",
+      "date": "2026-09-21",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-015",
+      "type": "도로 침수",
+      "priority": "P1",
+      "status": "전달 완료",
+      "location": "영등포구 여의대로",
+      "time": "07:18",
+      "confidence": 93,
+      "risk": 89,
+      "score": 95,
+      "rain": 41,
+      "water": 3.7,
+      "traffic": "3개 차로 차단",
+      "facility": "병원 · 620 m",
+      "agency": "영등포소방서",
+      "distance": 5.1,
+      "minutes": 12,
+      "reasons": [
+        "수위 상승",
+        "주요 도로 통제"
+      ],
+      "label": "FLOOD",
+      "camera": "CCTV-071",
+      "date": "2026-09-21",
+      "statusCode": "SENT",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-016",
+      "type": "도로 침수",
+      "priority": "P3",
+      "status": "전달 완료",
+      "location": "강남구 테헤란로",
+      "time": "09:24",
+      "confidence": 89,
+      "risk": 36,
+      "score": 42,
+      "rain": 32,
+      "water": 3.2,
+      "traffic": "2개 차로 차단",
+      "facility": "병원 · 480 m",
+      "agency": "강남소방서",
+      "distance": 4.2,
+      "minutes": 9,
+      "reasons": [
+        "인명 위험",
+        "접근로 영향"
+      ],
+      "label": "FLOOD",
+      "camera": "CCTV-027",
+      "date": "2026-09-21",
+      "statusCode": "SENT",
+      "riskLabel": "보통"
+    },
+    {
+      "id": "SEL-017",
+      "type": "쓰러진 나무",
+      "priority": "P1",
+      "status": "사건 확인",
+      "location": "서대문구 연희로",
+      "time": "08:57",
+      "confidence": 94,
+      "risk": 82,
+      "score": 88,
+      "rain": 18,
+      "water": 1.4,
+      "traffic": "1개 차로 차단",
+      "facility": "학교 · 220 m",
+      "agency": "서대문소방서",
+      "distance": 2.8,
+      "minutes": 7,
+      "reasons": [
+        "차로 점유",
+        "보행자 위험"
+      ],
+      "label": "FALLEN TREE",
+      "camera": "CCTV-044",
+      "date": "2026-09-10",
+      "statusCode": "CONFIRMED",
+      "riskLabel": "높음"
+    },
+    {
+      "id": "SEL-018",
+      "type": "시설물 파손",
+      "priority": "P2",
+      "status": "탐지됨",
+      "location": "송파구 송파대로",
+      "time": "08:42",
+      "confidence": 91,
+      "risk": 65,
+      "score": 71,
+      "rain": 12,
+      "water": 1.1,
+      "traffic": "우측 차로 주의",
+      "facility": "지하철역 · 150 m",
+      "agency": "송파소방서",
+      "distance": 3.5,
+      "minutes": 8,
+      "reasons": [
+        "낙하물 위험",
+        "보행 동선"
+      ],
+      "label": "DAMAGED FACILITY",
+      "camera": "CCTV-051",
+      "date": "2026-09-10",
+      "statusCode": "DETECTED",
+      "riskLabel": "보통"
+    }
+  ],
+  "cctvs": [
+    {
+      "id": "CCTV-001",
+      "name": "구리역 사거리 CCTV",
+      "region": "구리시",
+      "road": "경춘로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-002",
+      "name": "왕숙천 진입로 CCTV",
+      "region": "구리시",
+      "road": "왕숙천로",
+      "connected": true,
+      "active": false,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-003",
+      "name": "강변북로 CCTV",
+      "region": "구리시",
+      "road": "강변북로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-004",
+      "name": "장자호수공원 CCTV",
+      "region": "구리시",
+      "road": "장자대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-005",
+      "name": "갈매역 교차로 CCTV",
+      "region": "구리시",
+      "road": "경춘북로",
+      "connected": false,
+      "active": false,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-006",
+      "name": "돌다리 사거리 CCTV",
+      "region": "구리시",
+      "road": "검배로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-012",
+      "name": "강남구 테헤란로 CCTV",
+      "region": "강남구",
+      "road": "테헤란로",
+      "connected": true,
+      "active": true,
+      "mode": "특보 감시"
+    },
+    {
+      "id": "CCTV-028",
+      "name": "서대문구 연희로 CCTV",
+      "region": "서대문구",
+      "road": "연희로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-034",
+      "name": "송파구 송파대로 CCTV",
+      "region": "송파구",
+      "road": "송파대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-041",
+      "name": "마포구 월드컵로 CCTV",
+      "region": "마포구",
+      "road": "월드컵로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-057",
+      "name": "영등포구 여의대로 CCTV",
+      "region": "영등포구",
+      "road": "여의대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-018",
+      "name": "강남구 도산대로 CCTV",
+      "region": "강남구",
+      "road": "도산대로",
+      "connected": true,
+      "active": true,
+      "mode": "집중 검증"
+    },
+    {
+      "id": "CCTV-106",
+      "name": "서대문구 연희로 CCTV",
+      "region": "서대문구",
+      "road": "연희로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-107",
+      "name": "송파구 송파대로 CCTV",
+      "region": "송파구",
+      "road": "송파대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-049",
+      "name": "마포구 월드컵로 CCTV",
+      "region": "마포구",
+      "road": "월드컵로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-066",
+      "name": "영등포구 여의대로 CCTV",
+      "region": "영등포구",
+      "road": "여의대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-023",
+      "name": "강남구 봉은사로 CCTV",
+      "region": "강남구",
+      "road": "봉은사로",
+      "connected": false,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-039",
+      "name": "서대문구 연희로 CCTV",
+      "region": "서대문구",
+      "road": "연희로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-046",
+      "name": "송파구 송파대로 CCTV",
+      "region": "송파구",
+      "road": "송파대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-054",
+      "name": "마포구 월드컵로 CCTV",
+      "region": "마포구",
+      "road": "월드컵로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-071",
+      "name": "영등포구 여의대로 CCTV",
+      "region": "영등포구",
+      "road": "여의대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-027",
+      "name": "강남구 테헤란로 CCTV",
+      "region": "강남구",
+      "road": "테헤란로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-044",
+      "name": "서대문구 연희로 CCTV",
+      "region": "서대문구",
+      "road": "연희로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    },
+    {
+      "id": "CCTV-051",
+      "name": "송파구 송파대로 CCTV",
+      "region": "송파구",
+      "road": "송파대로",
+      "connected": true,
+      "active": true,
+      "mode": "기본 감시"
+    }
+  ],
+  "agencies": {
+    "AG-001": {
+      "id": "AG-001",
+      "name": "강남소방서",
+      "type": "소방",
+      "score": 95,
+      "distance": 4.2
+    },
+    "AG-002": {
+      "id": "AG-002",
+      "name": "강남구청 도로관리과",
+      "type": "도로관리",
+      "score": 82,
+      "distance": 3.6
+    },
+    "AG-003": {
+      "id": "AG-003",
+      "name": "역삼소방서",
+      "type": "소방",
+      "score": 71,
+      "distance": 5.1
+    },
+    "AG-004": {
+      "id": "AG-004",
+      "name": "서대문소방서",
+      "type": "소방",
+      "score": 95,
+      "distance": 2.8
+    },
+    "AG-005": {
+      "id": "AG-005",
+      "name": "서대문구청 도로관리과",
+      "type": "도로관리",
+      "score": 82,
+      "distance": 2.2
+    },
+    "AG-006": {
+      "id": "AG-006",
+      "name": "서대문구 119안전센터",
+      "type": "소방",
+      "score": 71,
+      "distance": 3.7
+    },
+    "AG-007": {
+      "id": "AG-007",
+      "name": "송파소방서",
+      "type": "소방",
+      "score": 95,
+      "distance": 3.5
+    },
+    "AG-008": {
+      "id": "AG-008",
+      "name": "송파구청 도로관리과",
+      "type": "도로관리",
+      "score": 82,
+      "distance": 2.9
+    },
+    "AG-009": {
+      "id": "AG-009",
+      "name": "송파구 119안전센터",
+      "type": "소방",
+      "score": 71,
+      "distance": 4.4
+    },
+    "AG-010": {
+      "id": "AG-010",
+      "name": "마포소방서",
+      "type": "소방",
+      "score": 95,
+      "distance": 3.1
+    },
+    "AG-011": {
+      "id": "AG-011",
+      "name": "마포구청 도로관리과",
+      "type": "도로관리",
+      "score": 82,
+      "distance": 2.5
+    },
+    "AG-012": {
+      "id": "AG-012",
+      "name": "마포구 119안전센터",
+      "type": "소방",
+      "score": 71,
+      "distance": 4
+    },
+    "AG-013": {
+      "id": "AG-013",
+      "name": "영등포소방서",
+      "type": "소방",
+      "score": 95,
+      "distance": 5.1
+    },
+    "AG-014": {
+      "id": "AG-014",
+      "name": "영등포구청 도로관리과",
+      "type": "도로관리",
+      "score": 82,
+      "distance": 4.5
+    },
+    "AG-015": {
+      "id": "AG-015",
+      "name": "영등포구 119안전센터",
+      "type": "소방",
+      "score": 71,
+      "distance": 6
+    },
+    "AG-016": {
+      "id": "AG-016",
+      "name": "강남구 119안전센터",
+      "type": "소방",
+      "score": 71,
+      "distance": 5.1
+    }
+  },
+  "recommendations": {
+    "SEL-001": [
+      {
+        "agencyId": "AG-001",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 침수 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-002",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-003",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-002": [
+      {
+        "agencyId": "AG-004",
+        "rank": 1,
+        "score": 95,
+        "reason": "쓰러진 나무 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-005",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-006",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-003": [
+      {
+        "agencyId": "AG-007",
+        "rank": 1,
+        "score": 95,
+        "reason": "시설물 파손 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-008",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-009",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-004": [
+      {
+        "agencyId": "AG-010",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 장애물 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-011",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-012",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-005": [
+      {
+        "agencyId": "AG-013",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 침수 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-014",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-015",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-006": [
+      {
+        "agencyId": "AG-001",
+        "rank": 1,
+        "score": 95,
+        "reason": "쓰러진 나무 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-002",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-016",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-007": [
+      {
+        "agencyId": "AG-004",
+        "rank": 1,
+        "score": 95,
+        "reason": "쓰러진 나무 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-005",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-006",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-008": [
+      {
+        "agencyId": "AG-007",
+        "rank": 1,
+        "score": 95,
+        "reason": "시설물 파손 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-008",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-009",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-009": [
+      {
+        "agencyId": "AG-010",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 장애물 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-011",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-012",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-010": [
+      {
+        "agencyId": "AG-013",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 침수 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-014",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-015",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-011": [
+      {
+        "agencyId": "AG-001",
+        "rank": 1,
+        "score": 95,
+        "reason": "시설물 파손 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-002",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-016",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-012": [
+      {
+        "agencyId": "AG-004",
+        "rank": 1,
+        "score": 95,
+        "reason": "쓰러진 나무 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-005",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-006",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-013": [
+      {
+        "agencyId": "AG-007",
+        "rank": 1,
+        "score": 95,
+        "reason": "시설물 파손 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-008",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-009",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-014": [
+      {
+        "agencyId": "AG-010",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 장애물 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-011",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-012",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-015": [
+      {
+        "agencyId": "AG-013",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 침수 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-014",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-015",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-016": [
+      {
+        "agencyId": "AG-001",
+        "rank": 1,
+        "score": 95,
+        "reason": "도로 침수 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-002",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-016",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-017": [
+      {
+        "agencyId": "AG-004",
+        "rank": 1,
+        "score": 95,
+        "reason": "쓰러진 나무 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-005",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-006",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ],
+    "SEL-018": [
+      {
+        "agencyId": "AG-007",
+        "rank": 1,
+        "score": 95,
+        "reason": "시설물 파손 대응 장비 · 현장 접근 안전성 우수"
+      },
+      {
+        "agencyId": "AG-008",
+        "rank": 2,
+        "score": 82,
+        "reason": "도로 관리·통제 협조 · 현장 인접 접근로 확보"
+      },
+      {
+        "agencyId": "AG-009",
+        "rank": 3,
+        "score": 71,
+        "reason": "인근 소방 지원 · 통제 구간 우회 가능"
+      }
+    ]
+  },
+  "routes": {
+    "SEL-001|AG-001": [
+      {
+        "id": "A",
+        "distance": "4.2",
+        "minutes": 9,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.6",
+        "minutes": 7,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.1",
+        "minutes": 12,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-001|AG-002": [
+      {
+        "id": "A",
+        "distance": "3.6",
+        "minutes": 11,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.0",
+        "minutes": 9,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.5",
+        "minutes": 14,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-001|AG-003": [
+      {
+        "id": "A",
+        "distance": "5.1",
+        "minutes": 13,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "4.5",
+        "minutes": 11,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.0",
+        "minutes": 16,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-002|AG-004": [
+      {
+        "id": "A",
+        "distance": "2.8",
+        "minutes": 7,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.2",
+        "minutes": 5,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.7",
+        "minutes": 10,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-002|AG-005": [
+      {
+        "id": "A",
+        "distance": "2.2",
+        "minutes": 9,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.6",
+        "minutes": 7,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.1",
+        "minutes": 12,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-002|AG-006": [
+      {
+        "id": "A",
+        "distance": "3.7",
+        "minutes": 11,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.1",
+        "minutes": 9,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.6",
+        "minutes": 14,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-003|AG-007": [
+      {
+        "id": "A",
+        "distance": "3.5",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.9",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.4",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-003|AG-008": [
+      {
+        "id": "A",
+        "distance": "2.9",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.3",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.8",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-003|AG-009": [
+      {
+        "id": "A",
+        "distance": "4.4",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.8",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.3",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-004|AG-010": [
+      {
+        "id": "A",
+        "distance": "3.1",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.5",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.0",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-004|AG-011": [
+      {
+        "id": "A",
+        "distance": "2.5",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.9",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.4",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-004|AG-012": [
+      {
+        "id": "A",
+        "distance": "4.0",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.4",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.9",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-005|AG-013": [
+      {
+        "id": "A",
+        "distance": "5.1",
+        "minutes": 12,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "4.5",
+        "minutes": 10,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.0",
+        "minutes": 15,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-005|AG-014": [
+      {
+        "id": "A",
+        "distance": "4.5",
+        "minutes": 14,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.9",
+        "minutes": 12,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.4",
+        "minutes": 17,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-005|AG-015": [
+      {
+        "id": "A",
+        "distance": "6.0",
+        "minutes": 16,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "5.4",
+        "minutes": 14,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.9",
+        "minutes": 19,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-006|AG-001": [
+      {
+        "id": "A",
+        "distance": "2.8",
+        "minutes": 7,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.2",
+        "minutes": 5,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.7",
+        "minutes": 10,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-006|AG-002": [
+      {
+        "id": "A",
+        "distance": "2.2",
+        "minutes": 9,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.6",
+        "minutes": 7,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.1",
+        "minutes": 12,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-006|AG-016": [
+      {
+        "id": "A",
+        "distance": "3.7",
+        "minutes": 11,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.1",
+        "minutes": 9,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.6",
+        "minutes": 14,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-007|AG-004": [
+      {
+        "id": "A",
+        "distance": "2.8",
+        "minutes": 7,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.2",
+        "minutes": 5,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.7",
+        "minutes": 10,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-007|AG-005": [
+      {
+        "id": "A",
+        "distance": "2.2",
+        "minutes": 9,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.6",
+        "minutes": 7,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.1",
+        "minutes": 12,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-007|AG-006": [
+      {
+        "id": "A",
+        "distance": "3.7",
+        "minutes": 11,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.1",
+        "minutes": 9,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.6",
+        "minutes": 14,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-008|AG-007": [
+      {
+        "id": "A",
+        "distance": "3.5",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.9",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.4",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-008|AG-008": [
+      {
+        "id": "A",
+        "distance": "2.9",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.3",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.8",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-008|AG-009": [
+      {
+        "id": "A",
+        "distance": "4.4",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.8",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.3",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-009|AG-010": [
+      {
+        "id": "A",
+        "distance": "3.1",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.5",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.0",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-009|AG-011": [
+      {
+        "id": "A",
+        "distance": "2.5",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.9",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.4",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-009|AG-012": [
+      {
+        "id": "A",
+        "distance": "4.0",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.4",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.9",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-010|AG-013": [
+      {
+        "id": "A",
+        "distance": "5.1",
+        "minutes": 12,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "4.5",
+        "minutes": 10,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.0",
+        "minutes": 15,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-010|AG-014": [
+      {
+        "id": "A",
+        "distance": "4.5",
+        "minutes": 14,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.9",
+        "minutes": 12,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.4",
+        "minutes": 17,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-010|AG-015": [
+      {
+        "id": "A",
+        "distance": "6.0",
+        "minutes": 16,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "5.4",
+        "minutes": 14,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.9",
+        "minutes": 19,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-011|AG-001": [
+      {
+        "id": "A",
+        "distance": "3.5",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.9",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.4",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-011|AG-002": [
+      {
+        "id": "A",
+        "distance": "2.9",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.3",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.8",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-011|AG-016": [
+      {
+        "id": "A",
+        "distance": "4.4",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.8",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.3",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-012|AG-004": [
+      {
+        "id": "A",
+        "distance": "2.8",
+        "minutes": 7,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.2",
+        "minutes": 5,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.7",
+        "minutes": 10,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-012|AG-005": [
+      {
+        "id": "A",
+        "distance": "2.2",
+        "minutes": 9,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.6",
+        "minutes": 7,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.1",
+        "minutes": 12,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-012|AG-006": [
+      {
+        "id": "A",
+        "distance": "3.7",
+        "minutes": 11,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.1",
+        "minutes": 9,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.6",
+        "minutes": 14,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-013|AG-007": [
+      {
+        "id": "A",
+        "distance": "3.5",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.9",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.4",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-013|AG-008": [
+      {
+        "id": "A",
+        "distance": "2.9",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.3",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.8",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-013|AG-009": [
+      {
+        "id": "A",
+        "distance": "4.4",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.8",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.3",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-014|AG-010": [
+      {
+        "id": "A",
+        "distance": "3.1",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.5",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.0",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-014|AG-011": [
+      {
+        "id": "A",
+        "distance": "2.5",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.9",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.4",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-014|AG-012": [
+      {
+        "id": "A",
+        "distance": "4.0",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.4",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.9",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-015|AG-013": [
+      {
+        "id": "A",
+        "distance": "5.1",
+        "minutes": 12,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "4.5",
+        "minutes": 10,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.0",
+        "minutes": 15,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-015|AG-014": [
+      {
+        "id": "A",
+        "distance": "4.5",
+        "minutes": 14,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.9",
+        "minutes": 12,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.4",
+        "minutes": 17,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-015|AG-015": [
+      {
+        "id": "A",
+        "distance": "6.0",
+        "minutes": 16,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "5.4",
+        "minutes": 14,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.9",
+        "minutes": 19,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-016|AG-001": [
+      {
+        "id": "A",
+        "distance": "4.2",
+        "minutes": 9,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.6",
+        "minutes": 7,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.1",
+        "minutes": 12,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-016|AG-002": [
+      {
+        "id": "A",
+        "distance": "3.6",
+        "minutes": 11,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.0",
+        "minutes": 9,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.5",
+        "minutes": 14,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-016|AG-016": [
+      {
+        "id": "A",
+        "distance": "5.1",
+        "minutes": 13,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "4.5",
+        "minutes": 11,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "6.0",
+        "minutes": 16,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-017|AG-004": [
+      {
+        "id": "A",
+        "distance": "2.8",
+        "minutes": 7,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.2",
+        "minutes": 5,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.7",
+        "minutes": 10,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-017|AG-005": [
+      {
+        "id": "A",
+        "distance": "2.2",
+        "minutes": 9,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "1.6",
+        "minutes": 7,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.1",
+        "minutes": 12,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-017|AG-006": [
+      {
+        "id": "A",
+        "distance": "3.7",
+        "minutes": 11,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.1",
+        "minutes": 9,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.6",
+        "minutes": 14,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ],
+    "SEL-018|AG-007": [
+      {
+        "id": "A",
+        "distance": "3.5",
+        "minutes": 8,
+        "score": 95,
+        "verdict": "추천",
+        "reason": "통제 회피 · 접근 안전성 우수",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.9",
+        "minutes": 6,
+        "score": 55,
+        "verdict": "제외",
+        "reason": "전면 통제 구간 포함 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "4.4",
+        "minutes": 11,
+        "score": 71,
+        "verdict": "대체",
+        "reason": "우회 가능 · 주변 위험 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-018|AG-008": [
+      {
+        "id": "A",
+        "distance": "2.9",
+        "minutes": 10,
+        "score": 91,
+        "verdict": "추천",
+        "reason": "간선도로 진입 · 통제 구간 우회",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "2.3",
+        "minutes": 8,
+        "score": 58,
+        "verdict": "제외",
+        "reason": "침수 도로 경유 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "3.8",
+        "minutes": 13,
+        "score": 76,
+        "verdict": "대체",
+        "reason": "이면도로 경유 · 보행자 주의",
+        "blocked": false
+      }
+    ],
+    "SEL-018|AG-009": [
+      {
+        "id": "A",
+        "distance": "4.4",
+        "minutes": 12,
+        "score": 88,
+        "verdict": "추천",
+        "reason": "현장 접근 용이 · 교차로 통과 최소",
+        "blocked": false
+      },
+      {
+        "id": "B",
+        "distance": "3.8",
+        "minutes": 10,
+        "score": 61,
+        "verdict": "제외",
+        "reason": "차량 진입 통제 · 선택 불가",
+        "blocked": true
+      },
+      {
+        "id": "C",
+        "distance": "5.3",
+        "minutes": 15,
+        "score": 79,
+        "verdict": "대체",
+        "reason": "거리 증가 · 안전한 우회 가능",
+        "blocked": false
+      }
+    ]
+  },
+  "webRows": [
+    "SEL-001",
+    "SEL-002",
+    "SEL-003",
+    "SEL-004",
+    "SEL-005"
+  ],
+  "urgentIds": [
+    "SEL-001",
+    "SEL-002",
+    "SEL-005"
+  ],
+  "mobileIds": [
+    "SEL-001",
+    "SEL-006",
+    "SEL-011"
+  ],
+  "notificationIds": [
+    "SEL-001",
+    "SEL-011",
+    "SEL-006",
+    "SEL-016"
+  ],
+  "notificationTimes": [
+    "방금 전",
+    "10분 전",
+    "25분 전",
+    "어제 18:20"
+  ],
+  "profile": {
+    "name": "홍길동",
+    "email": "responder@example.com",
+    "role": "현장대응 담당자",
+    "agency": "강남소방서",
+    "agencyId": "AG-001"
+  },
+  "stats": {
+    "summary": [
+      [
+        "확정 사건 수",
+        "11",
+        "건"
+      ],
+      [
+        "기관 전달 사건 수",
+        "7",
+        "건"
+      ],
+      [
+        "미전달 사건 수",
+        "4",
+        "건"
+      ],
+      [
+        "평균 탐지 신뢰도",
+        "92.5",
+        "%"
+      ]
+    ],
+    "types": [
+      [
+        "도로 침수",
+        5,
+        100
+      ],
+      [
+        "쓰러진 나무",
+        5,
+        100
+      ],
+      [
+        "시설물 파손",
+        1,
+        20
+      ],
+      [
+        "도로 장애물",
+        0,
+        0
+      ],
+      [
+        "기타 위험",
+        0,
+        0
+      ]
+    ],
+    "confidence": [
+      [
+        "90% 이상",
+        "9건",
+        "82%"
+      ],
+      [
+        "80% 이상 ~ 90% 미만",
+        "2건",
+        "18%"
+      ],
+      [
+        "80% 미만",
+        "0건",
+        "0%"
+      ]
+    ],
+    "cctv": [
+      [
+        "전체",
+        "24대"
+      ],
+      [
+        "연결 정상",
+        "22대"
+      ],
+      [
+        "연결 오류",
+        "2대"
+      ],
+      [
+        "분석 중",
+        "21대"
+      ],
+      [
+        "분석 중지 / 오류",
+        "3대"
+      ]
+    ]
+  },
+  "settings": [
+    {
+      "title": "분석 주기 · 초",
+      "items": [
+        [
+          "기본 분석 주기",
+          "5"
+        ],
+        [
+          "특보 분석 주기",
+          "3"
+        ],
+        [
+          "집중 검증 분석 주기",
+          "2"
+        ]
+      ]
+    },
+    {
+      "title": "위험 후보 / 사건 확정",
+      "items": [
+        [
+          "위험 후보 신뢰도",
+          "70%"
+        ],
+        [
+          "후보 최소 탐지 횟수",
+          "3회"
+        ],
+        [
+          "시간 연속성 검증",
+          "5초"
+        ],
+        [
+          "사건 확정 신뢰도",
+          "85%"
+        ]
+      ]
+    },
+    {
+      "title": "연결 복구 · 영상 품질",
+      "items": [
+        [
+          "재연결 주기",
+          "10초"
+        ],
+        [
+          "최대 재연결 시도",
+          "3회"
+        ],
+        [
+          "영상 품질 임계값",
+          "0.60"
+        ]
+      ]
+    }
+  ],
+  "support": {
+    "type": "장비 지원",
+    "message": "수위 상승으로 추가 통제 인력과 배수 장비 지원이 필요합니다.",
+    "title": "현장 배수 장비 요청",
+    "time": "09.23 14:38",
+    "options": [
+      "인력 지원",
+      "장비 지원",
+      "교통 통제",
+      "기타"
+    ]
+  },
+  "mapPaths": [
+    [
+      "M145 340 L425 255 L690 105",
+      "M145 340 L620 340 L690 105",
+      "M145 340 L280 90 L690 105"
+    ],
+    [
+      "M110 295 L390 200 L690 105",
+      "M110 295 L560 315 L690 105",
+      "M110 295 L225 65 L620 65 L690 105"
+    ],
+    [
+      "M175 365 L480 235 L690 105",
+      "M175 365 L710 365 L690 105",
+      "M175 365 L315 130 L600 60 L690 105"
+    ]
+  ],
+  "uiSnapshot": {
+    "overviewCards": [
+      [
+        "감시 CCTV",
+        "22",
+        "대",
+        "monitor"
+      ],
+      [
+        "확정 사건",
+        "12",
+        "건",
+        "incidents"
+      ],
+      [
+        "연결 오류",
+        "2",
+        "대",
+        "monitor"
+      ],
+      [
+        "기상특보",
+        "2",
+        "건",
+        "settings/integrations"
+      ]
+    ],
+    "monitorCards": [
+      [
+        "감시 CCTV",
+        "22"
+      ],
+      [
+        "정상 연결 CCTV",
+        "22"
+      ],
+      [
+        "연결 오류 CCTV",
+        "2"
+      ]
+    ],
+    "weather": {
+      "title": "서울 전역 호우주의보",
+      "summary": "14:00 발효 · 특보 지역 CCTV 집중 감시 중",
+      "watchCount": "12대",
+      "collectedAt": "2026.09.23 09:25"
+    },
+    "header": {
+      "date": "2026.09.23",
+      "time": "09:24:36",
+      "incidentBadge": "05"
+    },
+    "cameraStatus": {
+      "lastFrame": "09:25:36",
+      "interval": "3초",
+      "candidate": "연속 탐지 검증 중 (예시)",
+      "online": "정상 · 예시",
+      "quality": "양호",
+      "analysis": "RUNNING · 목업"
+    },
+    "settings": {
+      "activeCount": "22",
+      "integrations": [
+        [
+          "기상 / 수위",
+          "정상 / 정상"
+        ],
+        [
+          "교통 / 경로",
+          "정상 / 정상"
+        ],
+        [
+          "최종 수정",
+          "관리자 · 2026.09.23 14:00"
+        ]
+      ],
+      "services": [
+        "기상",
+        "수위",
+        "교통",
+        "경로"
+      ]
+    },
+    "pagination": {
+      "incidents": "총 12건 · 페이지당 5건 · 고정 목업 목록",
+      "targets": "총 24대 · 페이지당 6대 · 고정 목업 목록",
+      "pages": [
+        "이전",
+        "1",
+        "2",
+        "3",
+        "4",
+        "다음"
+      ]
+    },
+    "mobile": {
+      "total": "전체 3건",
+      "segments": [
+        "전체 3",
+        "P1 긴급",
+        "P2 주의",
+        "P3 일반"
+      ],
+      "notificationSegments": [
+        "전체 4",
+        "읽지 않음 3"
+      ],
+      "accountStatus": "활성 · 예시",
+      "agencyAddress": "서울특별시 강남구 테헤란로",
+      "appVersion": "v0.1 · UI"
+    },
+    "incidentCount": "12"
+  },
+  "targetIds": [
+    "CCTV-001",
+    "CCTV-002",
+    "CCTV-003",
+    "CCTV-004",
+    "CCTV-005",
+    "CCTV-006"
+  ]
+}
