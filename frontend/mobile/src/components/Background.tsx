@@ -53,9 +53,9 @@ export function Background() {
         resizeMode="cover"
         style={[
           StyleSheet.absoluteFill,
-          { width: "100%", height: "100%", opacity: 0.48 },
+          { width: "100%", height: "100%", opacity: 0.8 },
         ]}
-        blurRadius={18}
+        blurRadius={2}
       />
       {!reduce && (
         <VideoView
@@ -65,7 +65,7 @@ export function Background() {
             {
               width: "100%",
               height: "100%",
-              opacity: ready && playing ? 0.82 : 0,
+              opacity: ready && playing ? 0.94 : 0,
             },
           ]}
           nativeControls={false}
@@ -76,7 +76,7 @@ export function Background() {
       <View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: "rgba(4,10,17,.46)" },
+          { backgroundColor: "rgba(4,10,17,.32)" },
         ]}
       />
     </View>
