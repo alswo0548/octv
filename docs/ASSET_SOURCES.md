@@ -18,3 +18,7 @@
 - existing transparent stop is unchanged.
 
 No panel, logo, text, CCTV image, bounding-box or interaction styles were changed.
+
+# Round 2 CCTV display attribution
+
+CCTV mock display areas now use the shared caption `기존 위치 / 경찰청(UTIC) 제공`; existing timestamps remain. The decorative Pexels background described above is not CCTV and does not receive a UTIC label. The source label is requested UI copy; this change does not connect or verify a live UTIC feed. Current WEB assets are in `frontend/web/public/assets`, and MOBILE uses its existing local assets. The `dist` references above document the original asset preparation.

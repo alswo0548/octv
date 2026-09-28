@@ -90,9 +90,6 @@ export function WebLayout({
           </div>
         </header>
         {children}
-        <footer>
-          <span>OCTV · 재난 대응 의사결정 지원</span>
-        </footer>
       </main>
     </>
   );

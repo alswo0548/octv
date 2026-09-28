@@ -27,3 +27,22 @@
 
 ## 인수인계 재확인
 기존 사본 2개를 실제 열어 사건관리 기관 탭·추천 1개·지원요청·CCTV 버튼과 모바일 제외 경로·회색 네비 버튼·Description을 확인했습니다. 이번에는 페이지·보드·공유 요소를 수정하거나 중복 복제하지 않았습니다. 이번 캡처는 screenshots/recheck-penpot-web.jpg 및 recheck-penpot-mobile.jpg입니다. 위 레이어/연결 개수와 원본 보존 설명은 이전 작업 기록이며, 전체 프로토타입을 다시 끝까지 클릭한 검사는 아닙니다.
+
+## 2차 UI 수정 반영 · 2026-09-28
+
+위 인수인계 재확인 다음에 수행한 작업입니다. 기존 사본을 그대로 사용했고 원본 페이지·공유 요소·페이지 수는 유지했습니다.
+
+- [01 · WEB · 최종수정본 0928](https://design.penpot.app/#/workspace?team-id=d8ac01df-6646-81d2-8008-ac44f628bb56&file-id=d8ac01df-6646-81d2-8008-ac4abdee3ed7&page-id=51c1e37d-020a-80ac-8008-b4cdadf8b0be&board-id=51c1e37d-020a-80ac-8008-b4d742adac10)
+- [02 · MOBILE · 최종수정본 0928](https://design.penpot.app/#/workspace?team-id=d8ac01df-6646-81d2-8008-ac44f628bb56&file-id=d8ac01df-6646-81d2-8008-ac4abdee3ed7&page-id=51c1e37d-020a-80ac-8008-b4d39671b27f&board-id=51c1e37d-020a-80ac-8008-b4d53408b7b1)
+
+W06-1 감시 안내 5상태와 특보 OFF 제한 팝업 대표 상태, 시스템 설정의 해제 후 수동 OFF 기준, 두 도로 아이콘·CCTV 출처·역할 명칭·회원가입 중복 조회 안내를 관련 화면과 Description에 반영했습니다. 통합관제 레이아웃·하단 목록과 필터 기준선의 설명도 갱신했습니다. 정확한 보드명과 확인 범위는 [2차 반영표](ROUND2_VERIFICATION.md)를 참고하세요.
+
+새로고침 후 저장된 화면 및 핵심 보드의 텍스트를 다시 확인했습니다. 위의 이전 텍스트/연결 개수는 1차 기록이며 이번 개수로 주장하지 않습니다. 팝업은 W06-1 안의 정적 대표 상태이며 전체 프로토타입 클릭 검사는 미수행입니다.
+
+![WEB CCTV 설정](screenshots/round2-penpot-targets.jpg)
+
+![MOBILE CCTV 실시간 대표 화면](screenshots/round2-penpot-mobile.jpg)
+
+## 중단 후 재개 확인
+
+이번 재개에서는 기존 사본의 WEB W06-1과 MOBILE 실시간 영상·로그인·설정·회원가입 안내를 실제 열어 확인했습니다. 5상태·POST_ALERT·OFF 제한 팝업·CCTV 출처·현장 담당자 문구가 저장되어 있습니다. 새 편집이나 원본 변경 없이 보존했습니다. 이번 캡처는 `screenshots/resume-penpot-targets.jpg`, `screenshots/resume-penpot-mobile.jpg`입니다. 전체 프로토타입 클릭 검사는 수행하지 않았습니다. 신규 캡처는 최종 ZIP에만 포함하며, GitHub 이미지 업로드는 자동 승인 검토의 전송 승인 요구로 진행하지 못했습니다.

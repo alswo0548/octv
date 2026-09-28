@@ -2937,7 +2937,7 @@
   "profile": {
     "name": "홍길동",
     "email": "responder@example.com",
-    "role": "현장대응 담당자",
+    "role": "현장 담당자",
     "agency": "강남소방서",
     "agencyId": "AG-001"
   },

@@ -30,14 +30,31 @@ export function AuthPage({
               <input placeholder="이름" autoComplete="off" />
             </label>
           )}
-          <label>이메일</label>
+          <label htmlFor="auth-email">이메일</label>
           <div className="input-action">
             <input
+              id="auth-email"
               aria-label="이메일"
               type="text"
               placeholder="name@example.com"
               autoComplete="off"
             />
+            {signup && (
+              <button
+                type="button"
+                className="secondary email-check"
+                onClick={() =>
+                  show({
+                    title: "이메일 중복 확인",
+                    body: "이 화면에서는 이메일 중복 여부를 조회하지 않습니다.",
+                    confirm: "확인",
+                    cancel: "",
+                  })
+                }
+              >
+                이메일 중복 확인
+              </button>
+            )}
           </div>
           <label>
             비밀번호
@@ -55,7 +72,7 @@ export function AuthPage({
               </label>
               <Select
                 label="계정 유형"
-                options={["기관 담당자", "출동대원", "상황실 관리자"]}
+                options={["기관 담당자", "현장 담당자", "상황실 관리자"]}
               />
               <div className="form-grid">
                 <Select label="시·도" options={["서울특별시", "경기도"]} />
@@ -83,7 +100,7 @@ export function AuthPage({
                     title: "회원가입 완료",
                     body: (
                       <>
-                        <p>홍길동 · 현장대응 담당자 · 강남소방서</p>
+                        <p>홍길동 · 현장 담당자 · 강남소방서</p>
                         <p>등록 정보를 확인해주세요.</p>
                       </>
                     ),

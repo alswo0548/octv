@@ -1,3 +1,5 @@
+> 이전 인수인계 검증 기록입니다. 2차 최신 결과는 [ROUND2_VERIFICATION.md](ROUND2_VERIFICATION.md)를 확인하세요.
+
 # 최종 수정·재검증 결과 · 2026-09-28
 
 이전 저장본을 보존하고 이어받았습니다. 아래 PPT 14쪽의 반영 소스·캡처 표시 영역을 대조했으며 주요 UI 흐름을 새 빌드로 다시 실행했습니다. 이전 작업의 상세 기록은 VERIFICATION_PREVIOUS.md, 이번 실행 결과와 제한은 HANDOVER_RECHECK.md를 기준으로 합니다.

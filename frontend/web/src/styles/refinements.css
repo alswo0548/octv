@@ -51,9 +51,178 @@ select {
 }
 .overview-incident-list {
   flex: 1;
-  max-height: 420px;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
   padding-right: 4px;
+}
+/* Round 2: one layout width governs the sidebar, header and content. */
+:root {
+  --sidebar-width: clamp(240px, 17.5vw, 344px);
+}
+aside {
+  width: var(--sidebar-width);
+}
+main {
+  margin-left: var(--sidebar-width);
+  max-width: none;
+  min-width: 0;
+  padding-bottom: 34px;
+}
+.ambient {
+  left: var(--sidebar-width);
+  overflow: hidden;
+}
+.ambient-fill {
+  object-fit: cover;
+  filter: blur(18px) saturate(0.6);
+  transform: scale(1.04);
+}
+.ambient-fill.is-playing {
+  opacity: 0.5;
+}
+.cctv-credit {
+  color: #c2d4df;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-shadow: 0 1px 3px #000;
+}
+.camera-bottom {
+  gap: 10px;
+  align-items: flex-end;
+}
+.camera-bottom > div {
+  min-width: 0;
+}
+.camera-bottom > div > .cctv-credit {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.camera-bottom > button {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.input-action .email-check {
+  margin: 0;
+  padding: 0 12px;
+  min-height: 44px;
+  font-size: 12px;
+}
+.overview-layout > .panel {
+  height: clamp(460px, calc(100dvh - 280px), 620px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.overview-layout .map-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.overview-layout .road-map {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+}
+.overview-layout .map-caption,
+.overview-list-panel .section-title,
+.overview-pagination {
+  flex-shrink: 0;
+}
+.overview-incident-list {
+  display: flex;
+  flex-direction: column;
+}
+.overview-incident-list .incident-card {
+  flex: 1 0 auto;
+  min-height: 83px;
+}
+.overview-incident-list .incident-card:last-child {
+  margin-bottom: 0;
+}
+.road-icon {
+  flex: none;
+  vertical-align: middle;
+}
+.incident-routes > .primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.route-symbol .road-icon {
+  width: 28px;
+  height: 28px;
+}
+.filters > label,
+.filters > .priority-filter {
+  display: grid;
+  grid-template-rows: auto 36px;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  align-content: start;
+}
+.priority-filter > label {
+  margin: 0;
+}
+.filters input,
+.filters select,
+.filters .segments {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+}
+.filters .segments button {
+  flex: 1;
+  min-width: 0;
+  padding-inline: 4px;
+  white-space: nowrap;
+}
+.targets-table {
+  min-width: 940px;
+}
+.targets-table .monitoring-notice {
+  min-width: 190px;
+  white-space: nowrap;
+  color: #a9d8e5;
+}
+.monitoring-notice[data-mode="OFF"] {
+  color: var(--muted);
+}
+@media (max-width: 1250px) {
+  .filters {
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1000px) {
+  :root {
+    --sidebar-width: 72px;
+  }
+}
+@media (max-width: 700px) {
+  :root {
+    --sidebar-width: 58px;
+  }
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters > .priority-filter {
+    grid-column: 1 / -1;
+  }
+  .input-action {
+    gap: 7px;
+  }
+  .input-action .email-check {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
 }
 .overview-incident-list .incident-card {
   padding: 11px 13px;
