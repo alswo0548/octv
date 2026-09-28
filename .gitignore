@@ -51,7 +51,7 @@ checkpoints/
 .DS_Store
 Thumbs.db
 .sites-runtime/
-# Local PostgreSQL data and backups (schema.sql stays tracked)
+# Local PostgreSQL data and backups (schema and migrations stay tracked)
 .pgdata/
 postgres-data/
 database/backups/

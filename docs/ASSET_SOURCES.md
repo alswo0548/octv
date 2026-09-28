@@ -1,24 +1,9 @@
-# Background video
+# 자산 출처
 
-- Source: **Busy Night Traffic on City Highway**, Şeyhmus Kino / Pexels, video 34435020.
-- Page: https://www.pexels.com/video/busy-night-traffic-on-city-highway-34435020/
-- Download: https://www.pexels.com/download/video/34435020/
-- License: https://www.pexels.com/license/ (free website use and modification; attribution optional; checked 2026-09-23).
-- Used only as decorative, prerecorded footage. Not a live CCTV source or evidence of the displayed incidents.
-- Local derivative: `dist/night-traffic.mp4`, silent H.264, 1280×720, 24 fps.
-- Processing: landscape crop from the high-resolution original; camera stabilization with static crop; 0.6× scene speed; restrained cool/dark footage color matching; 1.2-second end/start crossfade for a continuous loop; compressed with fast-start metadata.
-- `dist/road.jpg` is unchanged and remains the loading / unavailable-playback / reduced-motion background and the original incident CCTV image.
-
-# Background-only overlay adjustment
-
-`dist/style.css`, `.shade`: each existing nonzero dark gradient alpha reduced by exactly 0.03:
-
-- horizontal: 0.76 → 0.73, 0.35 → 0.32, 0.45 → 0.42
-- vertical: 0.69 → 0.66, 0.25 → 0.22
-- existing transparent stop is unchanged.
-
-No panel, logo, text, CCTV image, bounding-box or interaction styles were changed.
-
-# Round 2 CCTV display attribution
-
-CCTV mock display areas now use the shared caption `기존 위치 / 경찰청(UTIC) 제공`; existing timestamps remain. The decorative Pexels background described above is not CCTV and does not receive a UTIC label. The source label is requested UI copy; this change does not connect or verify a live UTIC feed. Current WEB assets are in `frontend/web/public/assets`, and MOBILE uses its existing local assets. The `dist` references above document the original asset preparation.
+- 장식용 배경 영상: Şeyhmus Kino, Pexels [Busy Night Traffic on City Highway](https://www.pexels.com/video/busy-night-traffic-on-city-highway-34435020/).
+  [Pexels 라이선스](https://www.pexels.com/license/). 기존 가공본은 무음·색상 보정·반복 재생용 영상입니다.
+- 사용 위치: WEB `frontend/web/public/assets/`, MOBILE `frontend/mobile/assets/`의 `night-traffic.mp4`.
+- `road.jpg`와 `octv-symbol.png`는 기존 OCTV 프로젝트에서 제공받은 이미지·로고입니다. 원본 출처/사용권 추가 확인은 팀에서 관리합니다.
+- CCTV 영역의 `경찰청(UTIC) 제공`은 요청된 UI 출처 문구입니다. 현재 목업 이미지가 실제 UTIC 영상인지 확인되었다는 뜻은 아닙니다. 실제 연동 시 공급원/이용 조건을 확인합니다.
+- Pexels 장식 배경은 실시간 CCTV가 아닙니다. CCTV 출처 문구를 붙이지 않습니다.
+- `database/ERD.png`는 팀에서 제공한 초기 관계도입니다. 최신 컬럼 정의는 SQL을 확인합니다.

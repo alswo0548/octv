@@ -12,8 +12,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - type: bind
-        source: ./database/schema.sql
-        target: /docker-entrypoint-initdb.d/001-schema.sql
+        source: ./database
+        target: /docker-entrypoint-initdb.d
         read_only: true
         bind:
           create_host_path: false

@@ -1,0 +1,2 @@
+# 현재 골격은 Python 표준 라이브러리만 사용합니다.
+# 실제 장비에서 검증 후 YOLO/OpenCV/PyTorch/LangGraph/MCP 버전을 고정하세요.

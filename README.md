@@ -1,52 +1,67 @@
-# OCTV 개발용 UI · 2026-09-28 2차 최종 수정본
+# OCTV
 
-React WEB / React Native·Expo MOBILE의 UI와 개발 준비 파일입니다. 로그인·회원가입·검증·저장·기관 전달·AI·외부 API·DB 연결은 팀 구현 영역입니다. 화면 이동·선택·팝업과 목업 페이지 전환만 동작합니다.
+CCTV 기반 재난 대응 의사결정 지원 프로젝트. WEB은 통합관제, MOBILE은 현장 담당자 화면입니다.
+
+**현재:** 프론트엔드는 목업 UI입니다. 백엔드는 서버·API 골격만, AI는 작업 함수만 준비되어 있습니다.
+실제 인증·DB 연결·추천·기관 전달은 앞으로 구현합니다. 업무 API의 `501`은 **아직 미구현**이라는 응답입니다.
+
+## 읽는 순서
+
+1. 이 README: 설치·실행·협업
+2. [개발 기준](docs/DEVELOPMENT.md): 확정 정책과 다음 구현 순서
+3. [폴더·파일 설명](docs/STRUCTURE.md): 어느 파일에서 작업하는지
+4. [DB 안내](docs/DATABASE.md): Docker·SQL 적용
+
+[자산 출처](docs/ASSET_SOURCES.md)는 영상·이미지 출처 확인용입니다. 수정 과정과 검증 이력은 Git/PR에서 확인합니다.
+
+## 처음 실행 — Windows CMD, 프로젝트 루트
+
+Git, Node.js **24.19.0**(npm 11), Python **3.12**, Docker Desktop(Linux 컨테이너)을 준비합니다.
+UI만 실행할 때 Python·Docker·API 키는 필요 없습니다.
 
 ```cmd
 npm ci
 npm run dev:web
 ```
-WEB: http://localhost:4173
-새 CMD에서 `npm run dev:mobile:web` → MOBILE: http://localhost:8081
-UI 실행에는 DB·API 키가 필요 없습니다.
 
-- [실행·포맷](docs/UI_RUN.md) · [Docker DB](docs/DATABASE.md)
-- [기존 GitHub 협업](docs/GITHUB.md) · [화면 흐름](docs/SCREENS.md)
-- [수정·검증 결과](docs/VERIFICATION.md) · [변경 파일](docs/CHANGED_FILES.md)
-- [구조](docs/STRUCTURE.md) · [후속 개발](docs/TODO.md)
+WEB: http://localhost:4173. 새 터미널에서 `npm run dev:mobile:web` → MOBILE: http://localhost:8081.
+휴대폰 Expo 실행은 `npm run dev:mobile`이며 실제 기기·네트워크 설정은 별도로 확인합니다.
 
-## 재개 확인
-
-최신 저장본은 [PR #3](https://github.com/alswo0548/octv/pull/3)의 `fix/octv-ui-round2-0928`입니다. 176개 파일을 대조해 복구하고 타입·포맷·범위 검사와 WEB/MOBILE 빌드를 다시 통과했습니다. 이번 브라우저 화면 재검증은 로컬 서버 접근 제한으로 완료하지 못했습니다. 이전 화면 기록과 이번 결과를 [재개 검증표](docs/ROUND2_RESUME_VERIFICATION.md)에서 구분합니다.
-
-## 2차 수정 결과
-
-PPT 7페이지와 CCTV 출처, 감시 상태·특보 제한 목업, WEB·MOBILE 회원가입 버튼 및 역할 명칭을 반영했습니다. 실행 방식과 Docker/DDL은 유지합니다.
-
-- [PPT별 반영표·실제 검증·미검증 항목](docs/ROUND2_VERIFICATION.md)
-- [이번 변경 파일](docs/ROUND2_CHANGED_FILES.md) · [진행 상태](docs/ROUND2_STATUS.md)
-
-## 이전 배포본 링크 (최신 ZIP과 구분)
-
-- WEB: https://octv-ui-revision-0928.alswo0548.chatgpt.site
-- MOBILE 웹: https://octv-ui-revision-0928.alswo0548.chatgpt.site/mobile.html
-- [Penpot 수정 사본과 캡처](docs/PENPOT.md)
-
-이 링크는 이전 작업에서 배포한 본인 전용 사이트입니다. 이번 재개에서는 재배포하지 않았습니다. 최신 소스는 이 패키지와 PR #3을 기준으로 합니다. 이전 2차 화면 검증 기록과 이번 재개 빌드 결과는 구분해서 읽어주세요.
-
-## 이전 1차 변경 (이력)
-PPT 1~14쪽 UI 수정, 기관 조회·전달 선택 분리, 최신 지원요청 목록, 영상 배경 비율 유지, 소스 포맷 설정, PostgreSQL만 실행하는 Compose를 반영했습니다.
-개인 `.env`는 덮어쓰지 않습니다. DB를 처음 사용할 때 루트 `.env.example`의 키를 본인의 `.env`에 준비하세요.
-
-기존 저장소: https://github.com/alswo0548/octv.git · 기준 브랜치 `main`.
-이전 PR #1·#2 반영 후의 main을 기준으로, 이번 2차 변경은 `fix/octv-ui-round2-0928` 브랜치에서 PR로 제출합니다. `main` 반영은 PR 검토·병합 후 이루어지며, PC 파일은 이후 `git pull`로 갱신합니다. 브랜치 확인 방법과 상태는 [협업 가이드](docs/GITHUB.md)와 [인수인계 보고](docs/HANDOVER_RECHECK.md)를 확인하세요. 원본 ZIP·참고 문서는 보존했습니다.
-
-## 빌드 결과로 확인
+백엔드 골격은 새 CMD에서:
 
 ```cmd
-npm ci
+py -3.12 -m venv .venv
+.venv\Scripts\python -m pip install -r backend\requirements.txt
+.venv\Scripts\python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+http://127.0.0.1:8000/docs 에서 API 작업 목록, `/health`에서 서버 기동을 확인합니다.
+DB와 AI 연결 성공을 뜻하지 않습니다. 프론트는 아직 이 서버를 호출하지 않습니다.
+macOS/Linux는 `python3 -m venv .venv`, 이후 `.venv/bin/python`을 사용합니다.
+
+DB는 [DB 안내](docs/DATABASE.md)의 `.env` 준비 → Compose 실행 순서로 진행합니다.
+루트 `.env`는 Docker용입니다. `backend/.env.example`은 향후 연동용이며 현재 서버는 읽지 않습니다.
+
+## 작업 전후
+
+기존 작업이 있으면 먼저 커밋합니다. 작업이 없는 상태에서:
+
+```cmd
+git switch main
+git pull --ff-only origin main
+git switch -c feature/작업이름
+```
+
+기능별로 작은 커밋 → 작업 브랜치 push → GitHub PR → 상대방 확인 후 merge.
+`main` 강제 푸시·기존 변경 삭제는 하지 않습니다. 두 사람의 로컬 DB 데이터는 서로 공유되지 않습니다.
+
+```cmd
+npm run typecheck
+npm run format:check
 npm run build:web
 npm run build:mobile:web
-npm run preview:web
+.venv\Scripts\python -m unittest discover -s tests -p "test_*.py"
 ```
-WEB: http://localhost:4173. 새 CMD에서 `npm run preview:mobile:web` → MOBILE: http://localhost:8081. 종료는 각 창에서 Ctrl+C. DB 없이 동작합니다. Windows 자체 실행은 미검증이며 Linux 빌드·브라우저 검증과 구분합니다.
+
+종료는 각 서버 창에서 Ctrl+C, DB는 `docker compose stop db`.
+개인 `.env`, `.venv`, `node_modules`, 모델·데이터·빌드 결과는 Git에 올리지 않습니다.
