@@ -1,15 +1,70 @@
-# PostgreSQL DDL
+# PostgreSQL Docker 개발환경 (Windows CMD)
 
-## 실행
-UI와 DB는 연결되어 있지 않다. PostgreSQL 서버·사용자 생성은 팀에서 수행한다.
-**빈 개발 DB**를 지정하고, octv 루트 CMD에서 실행한다. 아래 `octv_dev`는 이미 존재하지 않는 새 DB 이름이어야 한다. `createdb`·`psql` 명령을 찾지 못하면 PostgreSQL 설치 폴더의 `bin`이 PATH에 있는지 확인한다.
+PostgreSQL만 Docker로 실행합니다. UI·FastAPI는 로컬 실행이며 DB 연결 코드는 없습니다.
+공식 `postgres:17.11-bookworm`과 `/var/lib/postgresql/data` 전용 named volume을 사용합니다. 개발 포트는 `127.0.0.1`에만 공개합니다. `database/schema.sql` 원본을 읽기 전용 마운트하며 SQL 내용은 변경하지 않았습니다.
+
+## 처음 실행
+Docker Desktop을 실행한 뒤 프로젝트 루트 CMD에서 한 줄씩 실행합니다.
 
 ```cmd
-createdb -U postgres octv_dev
-psql -U postgres -d octv_dev -v ON_ERROR_STOP=1 -f "database\schema.sql"
+docker --version
+docker compose version
+docker info
+cd /d "D:\프로젝트경로\octv"
+if not exist .env copy .env.example .env
+notepad .env
 ```
-기존 DB 이름으로 바꾸어 무심코 실행하지 않는다. 스크립트에는 DROP·TRUNCATE·초기화가 없다.
-중복 실행하면 기존 타입/테이블로 오류가 나며 트랜잭션이 롤백된다.
+기존 `.env`가 있으면 유지하고 아래 누락 키만 추가합니다. 비밀번호는 개인 개발용으로 직접 입력합니다. 실제 값은 Git·메신저·프론트엔드에 넣지 않습니다.
+
+```dotenv
+POSTGRES_DB=octv_dev
+POSTGRES_USER=octv_dev
+POSTGRES_PASSWORD=본인만_사용하는_개발용_비밀번호
+POSTGRES_PORT=5432
+```
+
+```cmd
+docker compose config --quiet
+docker compose up -d db
+docker compose ps
+docker compose logs --tail 100 db
+```
+기본 DB·사용자를 유지한 경우 다음 명령으로 접속합니다. 변경한 경우 `-U`·`-d`도 본인 값으로 바꿉니다.
+
+```cmd
+docker compose exec db psql -U octv_dev -d octv_dev
+```
+컨테이너 내부 psql에서:
+
+```sql
+\dt
+SELECT count(*) AS tables FROM information_schema.tables
+WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+SELECT count(*) AS foreign_keys FROM information_schema.table_constraints
+WHERE table_schema = 'public' AND constraint_type = 'FOREIGN KEY';
+\q
+```
+기대값: 테이블 **14개**, FK **20개**. healthcheck가 healthy여도 이 조회와 초기화 로그로 DDL 적용을 확인합니다. 호스트에 PostgreSQL 서버나 psql을 설치할 필요는 없습니다.
+
+## 종료·재실행·데이터 보존
+
+```cmd
+docker compose stop db
+docker compose start db
+```
+컨테이너를 정리할 때 `docker compose down`을 사용해도 named volume은 남습니다. 다음 실행은 `docker compose up -d db`입니다.
+`down -v`는 DB 전체 데이터 삭제이므로 평소 종료에 사용하지 않습니다. 이번 패키지는 볼륨 삭제 명령·자동 초기화 스크립트를 제공하지 않습니다.
+
+- 빈 볼륨 최초 실행에만 DDL이 적용됩니다. 기존 볼륨은 다시 초기화하지 않습니다.
+- schema.sql 수정 후 재시작해도 기존 스키마는 갱신되지 않습니다. 팀이 백업·변경 SQL을 검토해야 합니다.
+- 초기화 실패 시 로그와 테이블 목록을 확인합니다. 일부 초기화된 볼륨은 재시작해도 SQL이 재실행되지 않을 수 있습니다. 기존 볼륨을 자동 삭제하지 마세요.
+- 두 팀원은 각 PC의 독립된 DB를 사용합니다. Compose 파일이 같아도 데이터는 자동 공유되지 않습니다.
+- 포트 충돌: 다른 서비스를 중지하지 말고 `.env`의 POSTGRES_PORT를 5433 등 비어 있는 포트로 변경 후 `up -d db`. 향후 백엔드 연결 URL에도 같은 포트 반영.
+- 비밀번호·DB명·사용자 변경은 기존 볼륨의 계정을 자동으로 바꾸지 않습니다.
+- Windows·Docker 미실행: Docker Desktop의 Linux 컨테이너 상태와 프로젝트 위치, `.env` 빈 값, schema.sql 파일 존재를 확인합니다.
+
+## 향후 FastAPI 연결 예시
+`backend/.env.example` 참고. 로컬 FastAPI이므로 호스트는 `127.0.0.1`입니다. 루트 DB명·사용자·포트와 맞추고 비밀번호의 특수문자는 URL 인코딩합니다. `DATABASE_URL`을 프론트엔드 VITE_/EXPO_PUBLIC_ 변수로 옮기지 않습니다.
 
 ## 기준·생성 순서
 첨부 `references/ERD.png`만 기준으로 14개 테이블·134개 컬럼·20개 FK를 전사했다.
@@ -38,7 +93,8 @@ route_candidates, notifications, incident_support_requests.
 - `updated_at`은 생성 기본값만 있다. 갱신 트리거는 작성하지 않았다.
 - 프론트의 `SEL-001`, `CCTV-012`, 점수 퍼센트 등은 화면 표시용이다. DB BIGINT ID와 0~1 DECIMAL 값을 그대로 대체하지 않는다.
 
-검증: 빈 PGlite(PostgreSQL 18.3 WASM) DB에서 생성, FK·NOT NULL·ENUM·IDENTITY 확인.
-네이티브 PostgreSQL 서버 및 사용자 PC의 psql 실행은 미검증. 계정·사건 seed는 제공하지 않는다.
-PostgreSQL 변환 참고: https://www.postgresql.org/docs/current/ddl-identity-columns.html,
-https://www.postgresql.org/docs/current/datatype-enum.html, https://www.postgresql.org/docs/current/datatype-datetime.html
+
+## 이번 검증 범위
+Docker 실행 도구가 없어 Compose 구조·공식 경로·환경변수·DDL 원본 동일성만 정적 점검했습니다. 컨테이너 초기화·테이블 생성·재시작 후 보존은 이번 환경에서 미검증입니다. 기존 문서의 PGlite 검증 이력은 Docker 검증으로 간주하지 않습니다.
+
+공식 참고: https://hub.docker.com/_/postgres (17 계열 데이터 경로·빈 볼륨 초기화·17.11-bookworm 태그), https://www.postgresql.org/support/versioning/ (17 지원 정책).

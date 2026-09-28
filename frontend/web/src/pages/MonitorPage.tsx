@@ -42,7 +42,7 @@ export function MonitorPage({
         </label>
       </div>
       <div className="monitor-layout">
-        <Panel title="CCTV 목록">
+        <Panel title="CCTV 목록" className="monitor-list-panel">
           <div className="camera-list">
             {mock.cctvs.map((c) => (
               <button
@@ -64,7 +64,10 @@ export function MonitorPage({
             ))}
           </div>
         </Panel>
-        <Panel title="선택 CCTV 영상 및 분석 상태">
+        <Panel
+          title="선택 CCTV 영상 및 분석 상태"
+          className="monitor-detail-panel"
+        >
           <Camera incident={d} connected={c.connected} />
           <div className="status-grid">
             <dl>
@@ -99,9 +102,6 @@ export function MonitorPage({
               감시 기준 변경
             </button>
           </div>
-          <p className="content-footnote">
-            연결과 분석 상태는 고정 목업입니다.
-          </p>
         </Panel>
       </div>
     </>

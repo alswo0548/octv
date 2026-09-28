@@ -1,125 +1,56 @@
-# UI 실행 (Windows CMD)
+# UI 실행·포맷 (Windows CMD)
 
-## 준비
-- 명령어는 Windows **CMD(명령 프롬프트)** 기준이다. Node 24 LTS / npm 11을 사용한다. 실행 검증은 Linux에서 Node **24.19.0**, npm **11.9.0**로 수행했다. Windows CMD 자체 실행은 미검증이다.
-- 모든 명령은 압축 해제한 **octv 폴더**에서 실행한다.
-- Python·PostgreSQL·GPU·API 키·실제 계정은 필요 없다.
-
-## 1. VS Code와 CMD 열기
-
-VS Code에서 `frontend`만 열지 말고 루트 `package.json`과 `package-lock.json`이 있는 **octv 폴더 전체**를 연다.
-이미 CMD 터미널을 사용 중이면 그대로 진행한다. 변경하려면 `Ctrl+Shift+P` → `Terminal: Select Default Profile` → `Command Prompt`를 선택하고 **새 터미널**을 연다.
-
-아래 경로는 예시다. 실제 폴더 위치로 바꾼다. `cd /d`는 드라이브와 폴더를 함께 이동하며, 공백이 있는 경로도 큰따옴표로 감싼다.
+Node 24 / npm 11을 사용합니다. 모든 명령은 루트 package.json이 있는 octv 폴더에서 실행합니다. DB·API 키·실제 계정 없이 UI만 실행할 수 있습니다.
 
 ```cmd
 cd /d "D:\프로젝트경로\octv"
-dir package.json
 node --version
 npm --version
-git --version
-```
-
-Node/npm은 설치·실행에, Git은 이후 팀 공유에 필요하다. 명령을 찾지 못하면 해당 프로그램 설치와 PATH를 확인한 뒤 VS Code를 다시 연다.
-
-## 2. 패키지 설치와 빨간 줄 확인
-
-**octv 루트에서** 아래 명령을 한 줄씩 실행한다. `npm ci`가 오류 없이 끝난 다음 타입 검사를 진행한다.
-
-```cmd
 npm ci
 npm run typecheck
-```
-
-압축에는 `node_modules`가 없으므로 설치 전에는 React·Expo 등의 모듈을 찾지 못해 빨간 줄이 나타날 수 있다. 실제 오류 원인은 오류 메시지를 보고 판단한다.
-
-- 타입 검사까지 통과했는데 에디터에만 빨간 줄이 남으면 `.tsx` 파일을 열고 `Ctrl+Shift+P` → `TypeScript: Select TypeScript Version` → `Use Workspace Version`을 선택한다. 이어서 `TypeScript: Restart TS Server`를 실행한다.
-- 타입 검사에 실패하면 터미널의 첫 오류 메시지와 해당 파일을 확인한다. 빨간 줄만 보고 패키지 버전이나 `tsconfig.json`을 임의로 바꾸지 않는다.
-- 설치 오류가 나면 첫 오류 내용을 확인한다. 설치 실패 상태에서 서버를 실행해도 누락된 모듈 문제는 해결되지 않는다.
-
-## 3. WEB
-
-```cmd
 npm run dev:web
 ```
-`http://localhost:4173` → 로그인 화면. 아무 값이나 입력하거나 비워 두고 로그인 버튼으로 이동한다.
-메뉴로 9개 화면을 확인한다. 직접 경로는 `SCREENS.md` 참고.
+WEB: http://localhost:4173. 인증 없이 로그인 버튼으로 화면 이동합니다.
 
-## 4. MOBILE 브라우저
-
-WEB 서버를 켜 둔 채 **새 CMD 터미널**을 열고 같은 octv 폴더로 이동한다.
+새 CMD 창을 열어 같은 폴더에서:
 
 ```cmd
 npm run dev:mobile:web
 ```
-`http://localhost:8081` → 출동대원 로그인 화면. 개발자 도구의 기기 모드로 폭 390~460px을 선택한다.
-Expo가 포트 변경을 제안하면 터미널에 표시된 주소를 사용한다. 브라우저용 명령은 localhost로 바인딩한다.
+MOBILE: http://localhost:8081. 개발자 도구에서 390/430px 폭 또는 PC 크기로 확인합니다. 모바일 콘텐츠의 최대 폭은 460px이며 배경은 브라우저 전체 크기에 맞춥니다.
 
-개발 서버 대신 정적 UI만 확인하려면:
+Expo 개발 서버 대신 빌드 결과를 보려면:
+
 ```cmd
 npm run build:mobile:web
 npm run preview:mobile:web
 ```
-접속 주소는 같은 `http://localhost:8081`. 코드를 수정하면 다시 빌드한다. Android/iOS 번들 검사를 실행한 뒤에는 웹 빌드를 다시 만든다.
+같은 8081 포트이므로 이미 실행 중인 자신의 모바일 개발 서버는 먼저 Ctrl+C로 종료합니다. 배포용 빌드 검사는 `npm run build:web`, `npm run build:mobile:web`입니다.
+네이티브 Android/iOS: `npm run dev:mobile` 후 Expo 안내를 따릅니다. 이번 수정의 실제 기기 실행은 미검증입니다.
 
-## MOBILE Android / iPhone
-```cmd
-npm run dev:mobile
-```
-PC와 휴대폰을 같은 Wi-Fi에 연결하고 SDK 57과 호환되는 Expo Go로 QR 코드를 연다.
-Android는 Expo Go의 QR 스캔, iPhone은 카메라로 열 수 있다. 호환 버전은 https://expo.dev/go 에서 확인한다.
-현재 버전의 Expo Go가 SDK 57을 지원하지 않으면 팀에서 개발 빌드 환경을 준비해야 한다. 이 패키지는 APK/IPA나 서명 설정을 포함하지 않는다.
-실기기·에뮬레이터 실행은 이번 환경에서 미검증이다. 웹에서 성공해도 실기기 성공을 의미하지 않는다.
-
-## 종료·검사
-서버를 실행한 각 CMD 터미널에서 `Ctrl+C`. 일괄 작업 종료 확인이 나오면 `Y`를 입력한다.
+## 포맷과 검사
 
 ```cmd
+npm run format
+npm run format:check
 npm run typecheck
+npm run check:scope
 npm run build:web
 npm run build:mobile:web
-npm run build:mobile:native
-npm run check:scope
 ```
-`build:mobile:native`는 Android/iOS 번들 생성 검사이며 설치형 앱 제작이 아니다.
+Prettier 3.6.2를 lockfile로 고정했습니다. CSS·TSX의 줄바꿈·들여쓰기를 정리하며 import나 CSS 속성 순서를 정렬하지 않습니다.
+대상은 frontend의 편집 소스·설정과 shared/src입니다. node_modules·dist·.expo·생성물·package-lock.json은 포맷에서 제외합니다.
+패키지 설치 전 빨간 밑줄은 모듈 미설치 때문일 수 있습니다. 타입 검사 통과 후에도 남으면 VS Code의 TypeScript 버전을 Workspace로 선택하고 TS 서버를 재시작합니다.
 
-## CMD 실행 보조 파일
+배경 영상은 재생 이벤트 이후 표시되며 오류·재생 차단·움직임 줄이기 설정에서는 기존 이미지가 남습니다. 강한 크롭 대신 contain을 사용하므로 화면 비율에 따라 흐린 보조 배경이 보입니다.
+시연 문구는 제거했지만 데이터·동작은 UI 목업입니다. 실제 업무 기능을 구현한 상태로 해석하지 마세요.
 
-`npm ci`를 마친 뒤 octv 루트의 CMD에서 아래 중 필요한 명령을 실행해도 된다. 각 파일은 스스로 octv 루트로 이동한다. WEB과 MOBILE을 함께 띄우려면 터미널을 각각 사용한다.
-
-| CMD 명령 | 실행 대상 |
-|---|---|
-| `scripts\start-web.cmd` | WEB 개발 서버 (`npm run dev:web`) |
-| `scripts\start-mobile-web.cmd` | MOBILE 브라우저 개발 서버 (`npm run dev:mobile:web`) |
-| `scripts\start-mobile.cmd` | MOBILE 실기기용 Expo 서버 (`npm run dev:mobile`) |
-
-## 5. GitHub에 올리고 팀원 공유
-
-로컬 UI 실행을 확인한 다음 [GITHUB.md](GITHUB.md)의 순서대로 빈 저장소 생성 → 최초 업로드 → 팀원 초대 → 팀원 clone을 진행한다.
-
-## 최소 오류 대응
-| 증상 | 조치 |
-|---|---|
-| node/npm/git 명령을 찾을 수 없음 | 해당 프로그램 설치·PATH 확인 후 VS Code와 CMD 다시 열기 |
-| package.json을 찾을 수 없음 / ENOENT | `cd /d "실제 경로\octv"`로 루트 이동. `dir package.json`으로 확인 |
-| 모듈을 찾을 수 없음 | octv 루트에서 `npm ci` 재실행 |
-| lockfile 불일치 | package.json 변경 여부 확인 후 팀과 합의해 `npm install`, lockfile 함께 커밋 |
-| 제한된 실행환경에서 Expo Bonjour/DevTools 오류 | 위의 정적 UI 빌드·미리보기 사용. 실기기는 일반 PC 환경에서 확인 |
-| 포트 사용 중 | 먼저 띄운 개발 서버 창에서 Ctrl+C |
-| 휴대폰 연결 실패 | 같은 Wi-Fi·방화벽 허용 여부 확인. 우선 웹 실행으로 소스 오류 구분 |
-| 모바일 번들 캐시 문제 | 모바일 서버를 종료한 뒤 아래 캐시 초기화 명령 실행 |
-
-캐시를 초기화하며 MOBILE 브라우저 서버를 시작하려면 octv 루트에서 실행한다.
+## 이번 환경에서 검증한 빌드 확인 방식
 
 ```cmd
-cd frontend\mobile
-npx expo start --web --localhost --port 8081 --clear
+npm run build:web
+npm run build:mobile:web
+npm run preview:web
 ```
-
-실기기용은 두 번째 줄 대신 `npx expo start --port 8081 --clear`를 사용한다. 서버 종료 후 `cd ..\..`로 octv 루트에 돌아온다.
-
-## 환경변수
-현재 UI는 환경변수를 읽지 않는다. 포함된 `.env`는 빈 값만 있고 `.env.example`은 Git 양식이다.
-`VITE_`·`EXPO_PUBLIC_` 이름은 클라이언트에 노출된다. 비밀키는 향후 서버 `.env`에만 둔다.
-
-VS Code 참고: [터미널 프로필](https://code.visualstudio.com/docs/terminal/profiles), [TypeScript 버전 선택](https://code.visualstudio.com/docs/typescript/typescript-transpiling).
+WEB http://localhost:4173. 새 CMD에서 `npm run preview:mobile:web`, MOBILE http://localhost:8081.
+실제 화면 검증은 같은 빌드 결과를 내부 미리보기에서 열어 수행했습니다. 개발 서버는 이 환경의 네트워크 인터페이스 제한을 받으므로 Windows 실행 검증과 구분합니다.

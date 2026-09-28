@@ -1,5 +1,6 @@
 import { mock } from "@octv/shared";
 import { type ReactNode } from "react";
+import { Background } from "../components/Background";
 import { Brand, type ShowModal } from "../components/Primitives";
 import { go } from "../routing/useRoute";
 const menu = [
@@ -22,20 +23,7 @@ export function WebLayout({
 }) {
   return (
     <>
-      <div className="ambient" aria-hidden="true">
-        <video
-          className="ambient-video"
-          src="/assets/night-traffic.mp4"
-          poster="/assets/road.jpg"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          tabIndex={-1}
-        />
-      </div>
-      <div className="shade" />
+      <Background />
       <aside>
         <Brand />
         <div className="navlabel">WORKSPACE</div>
@@ -54,9 +42,6 @@ export function WebLayout({
             >
               <span>{icon}</span>
               {name}
-              {id === "incidents" && (
-                <i>{mock.uiSnapshot.header.incidentBadge}</i>
-              )}
             </button>
           ))}
         </nav>
@@ -76,7 +61,7 @@ export function WebLayout({
             onClick={() =>
               show({
                 title: "로그아웃",
-                body: "로그인 UI로 이동할까요?",
+                body: "로그인 화면으로 이동할까요?",
                 confirm: "로그아웃",
                 onConfirm: () => go("login"),
               })
@@ -95,7 +80,6 @@ export function WebLayout({
             <h1>{title}</h1>
           </div>
           <div className="header-right">
-            <span className="demo">UI 미리보기 · 목업</span>
             <time>
               {mock.uiSnapshot.header.date} <b>{mock.uiSnapshot.header.time}</b>
             </time>
@@ -108,7 +92,6 @@ export function WebLayout({
         {children}
         <footer>
           <span>OCTV · 재난 대응 의사결정 지원</span>
-          <span>UI 미리보기 · 실제 기능 미구현</span>
         </footer>
       </main>
     </>

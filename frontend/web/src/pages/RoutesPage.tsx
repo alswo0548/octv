@@ -14,13 +14,11 @@ export function RoutesPage({
   state,
   set,
   open,
-  show,
 }: {
   incident: Incident;
   state: AgencyUI;
   set: (s: AgencyUI) => void;
   open: () => void;
-  show: ShowModal;
 }) {
   const [active, setActive] = useState("A"),
     recs = recommendationsFor(d.id),
@@ -40,10 +38,9 @@ export function RoutesPage({
             {d.location} · {d.camera}
           </p>
         </div>
-        <span className="demo">시연용 경로</span>
       </div>
       <h2>기관별 추천경로</h2>
-      <AgencyEntry incident={d} state={state} open={open} show={show} />
+      <AgencyEntry state={state} open={open} />
       <div
         className="agency-tabs"
         role="tablist"
@@ -129,11 +126,8 @@ export function RoutesPage({
           </table>
         </div>
         <p className="route-feedback">
-          지도 강조 {active} · 준비된 평가 정보
-          {active === "B" ? " · B는 제외 사유 확인용" : ""}
-        </p>
-        <p className="content-footnote">
-          각 기관 기준 경로 후보 A/B/C와 평가 정보의 표시 예시입니다.
+          지도 강조 {active} ·{" "}
+          {routesFor(d.id, a.id).find((route) => route.id === active)?.verdict}
         </p>
       </section>
       <button className="secondary" onClick={() => go("incidents")}>

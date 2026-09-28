@@ -1,8 +1,11 @@
+import { useState } from "react";
 import {
   mock,
   incidentById,
   agencyById,
-  routesFor,
+  recommendedRouteFor,
+  recommendationsFor,
+  supportRequestsFor,
   type Incident,
 } from "@octv/shared";
 import {
@@ -14,29 +17,34 @@ import {
   type ShowModal,
 } from "../components/Primitives";
 import { Camera } from "../components/Camera";
-import { AgencyEntry, type AgencyUI } from "../components/AgencyPicker";
+import { type AgencyUI } from "../components/AgencyPicker";
 import { go } from "../routing/useRoute";
 export function IncidentsPage({
   incident: d,
   select,
   state,
-  open,
+  set,
   show,
 }: {
   incident: Incident;
   select: (id: string) => void;
   state: AgencyUI;
-  open: () => void;
+  set: (value: AgencyUI) => void;
   show: ShowModal;
 }) {
+  const [page, setPage] = useState(0);
+  const rows = mock.webIncidentIds.slice(page * 5, page * 5 + 5);
   const a = agencyById(state.viewing),
-    r = routesFor(d.id, a.id)[0];
+    r = recommendedRouteFor(d.id, a.id);
+  const requests = supportRequestsFor(d.id),
+    latest = requests[0];
   return (
     <>
       <section className="panel list-panel">
         <div className="section-title">
           <h2>
-            확정 사건 목록 <span className="count">{mock.uiSnapshot.incidentCount}</span>
+            확정 사건 목록{" "}
+            <span className="count">{mock.uiSnapshot.incidentCount}</span>
           </h2>
           <span className="subtle">서울특별시 · 탐지 시각 기준</span>
         </div>
@@ -82,7 +90,7 @@ export function IncidentsPage({
               </tr>
             </thead>
             <tbody>
-              {mock.webRows.map((id) => {
+              {rows.map((id) => {
                 const row = incidentById(id);
                 return (
                   <tr
@@ -111,7 +119,11 @@ export function IncidentsPage({
             </tbody>
           </table>
         </div>
-        <Pagination />
+        <Pagination
+          page={page}
+          onChange={setPage}
+          total={mock.webIncidentIds.length}
+        />
       </section>
       <section className="selected-heading">
         <div>
@@ -138,10 +150,9 @@ export function IncidentsPage({
           />
           <div className="camera-caption">
             <span>대상 탐지 · 추적 중</span>
-            <small>생성 이미지 · 탐지 애니메이션 시연</small>
           </div>
           <button
-            className="text-button"
+            className="primary camera-live-button"
             onClick={() => go("monitor/" + d.camera)}
           >
             실시간 CCTV 영상
@@ -175,7 +186,6 @@ export function IncidentsPage({
         <section className="panel risk">
           <div className="section-title">
             <h2>위험도 · 우선순위</h2>
-            <span className="subtle">목업 분석 결과</span>
           </div>
           <div className="scores">
             <div>
@@ -249,71 +259,110 @@ export function IncidentsPage({
           </div>
         </section>
       </div>
-      <section className="panel route-panel">
-        <div className="route-title">
-          <span className="route-symbol">↗</span>
-          <div>
-            <h2>출동 및 접근 경로</h2>
-            <small>후보 기관별 추천 · 최종 출동 판단은 기관에서 진행</small>
-          </div>
-        </div>
-        <div className="route-data">
-          <span className="recommend">추천 A</span>
-          <div>
-            <strong>
-              {r.minutes}
-              <small>분</small>
-            </strong>
-            <span>예상 소요</span>
-          </div>
-          <div>
-            <strong>
-              {r.distance}
-              <small>km</small>
-            </strong>
-            <span>이동 거리</span>
-          </div>
-          <div className="agency">
-            <b>{a.name}</b>
-            <span>현재 경로 조회 기관</span>
-          </div>
-        </div>
+      <section className="panel incident-routes">
         <button className="primary" onClick={() => go("routes/" + d.id)}>
           경로 비교 상세 ↗
         </button>
+        <div
+          className="agency-tabs"
+          role="tablist"
+          aria-label="현재 경로 조회 기관"
+        >
+          {recommendationsFor(d.id).map((rec) => {
+            const agency = agencyById(rec.agencyId);
+            return (
+              <button
+                role="tab"
+                key={agency.id}
+                aria-selected={state.viewing === agency.id}
+                onClick={() => set({ ...state, viewing: agency.id })}
+              >
+                {agency.name}
+                <small>기관 추천 {rec.rank}순위</small>
+              </button>
+            );
+          })}
+        </div>
+        <div className="route-panel route-summary">
+          <div className="route-title">
+            <span className="route-symbol">↗</span>
+            <div>
+              <h2>출동 및 접근 경로</h2>
+              <small>후보 기관별 추천 · 최종 출동 판단은 기관에서 진행</small>
+            </div>
+          </div>
+          {r ? (
+            <div className="route-data">
+              <span className="recommend">추천 {r.id}</span>
+              <div>
+                <strong>
+                  {r.minutes}
+                  <small>분</small>
+                </strong>
+                <span>예상 소요</span>
+              </div>
+              <div>
+                <strong>
+                  {r.distance}
+                  <small>km</small>
+                </strong>
+                <span>이동 거리</span>
+              </div>
+              <div className="agency">
+                <b>{a.name}</b>
+                <span>현재 경로 조회 기관</span>
+              </div>
+            </div>
+          ) : (
+            <p>이용 가능한 추천경로가 없습니다.</p>
+          )}
+        </div>
       </section>
-      <AgencyEntry incident={d} state={state} open={open} show={show} />
       <section className="panel support-panel">
         <div className="section-title">
-          <h2>현장 상황 · 추가 대응 요청</h2>
-          <span className="subtle">고정 예시</span>
+          <h2>현장 상황 · 추가 지원요청</h2>
         </div>
-        <div className="support-summary-row">
-          <div>
-            <span className="status check">추가 지원 필요</span>
-            <h3>{mock.support.title}</h3>
-            <p>
-              {mock.profile.agency} · {mock.profile.name} · {mock.support.time}
-            </p>
+        {latest ? (
+          <div className="support-summary-row">
+            <div>
+              <span className="status check">추가 지원 필요</span>
+              <h3>{latest.title}</h3>
+              <p>{latest.message}</p>
+              <p>
+                {latest.agency} · {latest.requester} · {latest.time}
+              </p>
+            </div>
+            <button
+              className="secondary"
+              onClick={() =>
+                show({
+                  title: "추가 지원요청 목록 · " + d.id,
+                  body: (
+                    <ol className="support-request-list">
+                      {requests.map((request) => (
+                        <li key={request.id}>
+                          <h3>{request.title}</h3>
+                          <p>{request.message}</p>
+                          <p className="subtle">
+                            {request.agency} · {request.requester} ·{" "}
+                            <time dateTime={request.requestedAt}>
+                              {request.time}
+                            </time>
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  ),
+                  cancel: "",
+                })
+              }
+            >
+              요청 내용 확인
+            </button>
           </div>
-          <button
-            className="secondary"
-            onClick={() =>
-              show({
-                title: "추가 대응 요청 확인",
-                body: (
-                  <>
-                    <p>{mock.support.message}</p>
-                    <p className="demo-note">준비된 요청 예시입니다.</p>
-                  </>
-                ),
-                cancel: "",
-              })
-            }
-          >
-            요청 내용 확인
-          </button>
-        </div>
+        ) : (
+          <p className="subtle">접수된 추가 지원요청이 없습니다.</p>
+        )}
         <p className="content-footnote">
           대응완료 보고·사건 종결은 기관의 기존 체계에서 진행합니다.
         </p>

@@ -44,17 +44,26 @@ export const Button = ({
   children,
   onPress,
   secondary = false,
+  disabled = false,
 }: {
   children: ReactNode;
   onPress: () => void;
   secondary?: boolean;
+  disabled?: boolean;
 }) => (
   <Pressable
     accessibilityRole="button"
+    accessibilityState={{ disabled }}
+    disabled={disabled}
     onPress={onPress}
     style={({ pressed }) => [
       s.button,
       secondary && s.secondary,
+      disabled && {
+        backgroundColor: "#39434c",
+        borderColor: "#59636b",
+        opacity: 0.65,
+      },
       pressed && { opacity: 0.7 },
     ]}
   >
@@ -140,9 +149,19 @@ export function Choice({
         accessibilityRole="button"
         accessibilityLabel={label + " 선택"}
         onPress={() => toggle(!open)}
-        style={[s.input, { marginBottom: 0 }]}
+        accessibilityState={{ expanded: open }}
+        style={[
+          s.input,
+          {
+            marginBottom: 0,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          },
+        ]}
       >
-        <T>{selected} ⌄</T>
+        <Text style={[s.text, { flex: 1 }]}>{selected}</Text>
+        <Text style={{ color: color.muted, marginLeft: 12 }}>⌄</Text>
       </Pressable>
       {open && (
         <View style={[s.panel, { marginBottom: 0, padding: 8 }]}>
@@ -235,5 +254,3 @@ export function Dialog({
     </Modal>
   );
 }
-export const previewOnly =
-  "화면 확인용입니다. 실제 저장·전송·외부 앱 실행은 수행하지 않습니다.";

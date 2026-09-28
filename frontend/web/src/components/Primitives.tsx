@@ -20,10 +20,12 @@ export const Brand = () => (
 );
 export const Panel = ({
   title,
+  action,
   children,
   className = "",
 }: {
   title?: string;
+  action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) => (
@@ -31,6 +33,7 @@ export const Panel = ({
     {title && (
       <div className="section-title">
         <h2>{title}</h2>
+        {action}
       </div>
     )}
     {children}
@@ -89,10 +92,45 @@ export function Segments({
 }
 export function Pagination({
   kind = "incidents",
+  page,
+  onChange,
+  total,
 }: {
   kind?: "incidents" | "targets";
+  page?: number;
+  onChange?: (page: number) => void;
+  total?: number;
 }) {
-  const [page, set] = useState("1");
+  const [displayPage, set] = useState("1");
+  if (page !== undefined && onChange && total !== undefined) {
+    const pages = Math.ceil(total / 5);
+    return (
+      <div className="table-footer">
+        <span>총 {total}건</span>
+        <nav className="pagination" aria-label="사건관리 목록 페이지">
+          <button disabled={page === 0} onClick={() => onChange(page - 1)}>
+            이전
+          </button>
+          {Array.from({ length: pages }, (_, index) => (
+            <button
+              key={index}
+              className={page === index ? "current" : ""}
+              aria-current={page === index ? "page" : undefined}
+              onClick={() => onChange(index)}
+            >
+              {index + 1}
+            </button>
+          ))}
+          <button
+            disabled={page === pages - 1}
+            onClick={() => onChange(page + 1)}
+          >
+            다음
+          </button>
+        </nav>
+      </div>
+    );
+  }
   return (
     <div className="table-footer">
       <span>{mock.uiSnapshot.pagination[kind]}</span>
@@ -100,7 +138,7 @@ export function Pagination({
         {mock.uiSnapshot.pagination.pages.map((v) => (
           <button
             key={v}
-            className={page === v ? "current" : ""}
+            className={displayPage === v ? "current" : ""}
             onClick={() => set(v)}
           >
             {v}
@@ -159,8 +197,7 @@ export function Modal({
   );
 }
 export type ShowModal = (spec: ModalSpec) => void;
-export const previewMessage =
-  "UI 확인 화면입니다. 입력값 검사·저장·전송은 수행하지 않습니다.";
+export const actionMessage = "선택한 내용을 확인해주세요.";
 export function ActionPreview({
   label,
   show,
@@ -171,7 +208,7 @@ export function ActionPreview({
   return (
     <button
       className="secondary"
-      onClick={() => show({ title: label, body: previewMessage, cancel: "" })}
+      onClick={() => show({ title: label, body: actionMessage, cancel: "" })}
     >
       {label}
     </button>

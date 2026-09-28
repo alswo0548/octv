@@ -4,7 +4,7 @@ import {
   Panel,
   Pair,
   type ShowModal,
-  previewMessage,
+  actionMessage,
 } from "../components/Primitives";
 import { go } from "../routing/useRoute";
 export function SettingsPage({
@@ -77,9 +77,6 @@ export function SettingsPage({
               <button className="text-button" onClick={() => go("monitor")}>
                 CCTV 모니터링 보기 →
               </button>
-              <p className="content-footnote">
-                표시값은 목업입니다. 실제 연결·설정 저장은 수행하지 않습니다.
-              </p>
             </Panel>
           </div>
           <div className="action-row right">
@@ -88,7 +85,7 @@ export function SettingsPage({
               onClick={() =>
                 show({
                   title: "변경 취소",
-                  body: "입력 중인 화면 값을 고정 목업 초기값으로 되돌릴까요?",
+                  body: "입력 중인 화면 값을 초기 표시값으로 되돌릴까요?",
                   onConfirm: () => setReset((x) => x + 1),
                 })
               }
@@ -100,8 +97,8 @@ export function SettingsPage({
               onClick={() =>
                 show({
                   title: "설정 저장 확인",
-                  body: previewMessage,
-                  confirm: "확인 (미리보기)",
+                  body: actionMessage,
+                  confirm: "확인",
                 })
               }
             >
@@ -120,9 +117,7 @@ export function SettingsPage({
               />
             ))}
           </dl>
-          <p className="content-footnote">
-            고정 연결 상태 예시 · 실제 외부 API 연결 없음
-          </p>
+          <p className="content-footnote">영상 연결 상태를 확인해주세요.</p>
           <button className="text-button" onClick={() => go("monitor")}>
             CCTV 모니터링 보기 →
           </button>

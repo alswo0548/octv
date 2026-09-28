@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { mock, incidentById, type Incident } from "@octv/shared";
 export function RoadMap({
   incident: d,
@@ -6,6 +7,7 @@ export function RoadMap({
   onRoute,
   onIncident,
   overview = false,
+  incidentIds = [],
 }: {
   incident: Incident;
   index?: number;
@@ -13,7 +15,9 @@ export function RoadMap({
   onRoute?: (id: string) => void;
   onIncident?: (id: string) => void;
   overview?: boolean;
+  incidentIds?: string[];
 }) {
+  const [hovered, setHovered] = useState<string | null>(null);
   return (
     <div className="map-shell">
       <svg
@@ -44,29 +48,63 @@ export function RoadMap({
           </text>
         </g>
         {overview ? (
-          mock.webRows.map((id, i) => {
+          incidentIds.map((id) => {
             const v = incidentById(id),
-              x = [675, 245, 565, 145, 425][i],
-              y = [100, 150, 300, 330, 225][i];
+              { x, y } = v.mapPoint;
+            const color =
+              v.priority === "P1"
+                ? "#f49caa"
+                : v.priority === "P2"
+                  ? "#ffcf8d"
+                  : "#78cae7";
             return (
               <g
                 key={id}
                 role="button"
                 tabIndex={0}
                 aria-label={`${id} 사건 상세`}
+                data-incident-id={id}
+                transform={`translate(${x} ${y})`}
+                className={
+                  "incident-pin" +
+                  (hovered === id ? " pin-active" : "") +
+                  (hovered && hovered !== id ? " pin-paused" : "")
+                }
+                style={{ color }}
+                onMouseEnter={() => setHovered(id)}
+                onMouseLeave={() => setHovered(null)}
+                onFocus={() => setHovered(id)}
+                onBlur={() => setHovered(null)}
                 onClick={() => onIncident?.(id)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") onIncident?.(id);
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onIncident?.(id);
+                  }
                 }}
               >
-                <circle cx={x} cy={y} r="22" fill="#ff8b9c" opacity=".15" />
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="11"
-                  fill={v.priority === "P1" ? "#f49caa" : "#ffcf8d"}
+                <ellipse className="pin-ripple" cx="0" cy="0" rx="21" ry="8" />
+                <ellipse
+                  className="pin-ripple ripple-late"
+                  cx="0"
+                  cy="0"
+                  rx="21"
+                  ry="8"
                 />
-                <text x={x + 18} y={y + 5} fill="#d9e7f1" fontSize="13">
+                <g className="pin-body">
+                  <path
+                    d="M0 0 C-4 -7 -13 -17 -13 -25 A13 13 0 1 1 13 -25 C13 -17 4 -7 0 0Z"
+                    fill="currentColor"
+                  />
+                  <circle cx="0" cy="-25" r="5" fill="#102332" />
+                </g>
+                <text
+                  x={x > 630 ? -18 : 18}
+                  y="-10"
+                  textAnchor={x > 630 ? "end" : "start"}
+                  fill="#d9e7f1"
+                  fontSize="13"
+                >
                   {v.priority} · {id}
                 </text>
               </g>
@@ -125,7 +163,6 @@ export function RoadMap({
       </svg>
       <div className="map-caption">
         <span>{overview ? "사건 위치 · 우선순위" : d.location}</span>
-        <span>시연 지도 · 실제 지리와 무관</span>
       </div>
     </div>
   );

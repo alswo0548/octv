@@ -56,7 +56,7 @@ export default function App() {
         ) : page === "overview" ? (
           <OverviewPage select={setSelected} />
         ) : page === "incidents" ? (
-          <IncidentsPage {...common} select={setSelected} />
+          <IncidentsPage {...common} select={setSelected} set={set} />
         ) : page === "routes" ? (
           <RoutesPage key={incident.id} {...common} set={set} />
         ) : page === "monitor" ? (

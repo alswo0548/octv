@@ -1,0 +1,249 @@
+{
+  "overview": [
+    {
+      "page": "3",
+      "pinIds": [
+        "SEL-011",
+        "SEL-010"
+      ],
+      "cardIds": [
+        "시설물 파손 · SEL-011",
+        "도로 침수 · SEL-010"
+      ]
+    },
+    {
+      "page": "2",
+      "pinIds": [
+        "SEL-003",
+        "SEL-004",
+        "SEL-006",
+        "SEL-008",
+        "SEL-009"
+      ],
+      "cardIds": [
+        "시설물 파손 · SEL-003",
+        "도로 장애물 · SEL-004",
+        "쓰러진 나무 · SEL-006",
+        "시설물 파손 · SEL-008",
+        "도로 장애물 · SEL-009"
+      ]
+    },
+    {
+      "page": "1",
+      "pinIds": [
+        "SEL-001",
+        "SEL-002",
+        "SEL-005",
+        "SEL-007",
+        "SEL-012"
+      ],
+      "cardIds": [
+        "도로 침수 · SEL-001",
+        "쓰러진 나무 · SEL-002",
+        "도로 침수 · SEL-005",
+        "쓰러진 나무 · SEL-007",
+        "쓰러진 나무 · SEL-012"
+      ]
+    }
+  ],
+  "video": [
+    {
+      "app": "web",
+      "size": "1920×1080",
+      "fit": "contain",
+      "height": 1080,
+      "opacity": "0.82",
+      "paused": false,
+      "time": 19.96492,
+      "width": 1905,
+      "client": 1905,
+      "scroll": 1905
+    },
+    {
+      "app": "web",
+      "size": "1440×900",
+      "fit": "contain",
+      "height": 900,
+      "opacity": "0.82",
+      "paused": false,
+      "time": 20.985448,
+      "width": 1425,
+      "client": 1425,
+      "scroll": 1425
+    },
+    {
+      "app": "web",
+      "size": "1280×800",
+      "fit": "contain",
+      "height": 800,
+      "opacity": "0.82",
+      "paused": false,
+      "time": 22.001345,
+      "width": 1265,
+      "client": 1265,
+      "scroll": 1265
+    },
+    {
+      "app": "mobile-web",
+      "size": "390×844",
+      "fit": "contain",
+      "height": 844,
+      "loop": true,
+      "muted": true,
+      "opacity": "1",
+      "paused": false,
+      "time": 20.106741,
+      "width": 390,
+      "client": 390,
+      "contentWidth": 390,
+      "scroll": 390
+    },
+    {
+      "app": "mobile-web",
+      "size": "430×932",
+      "fit": "contain",
+      "height": 932,
+      "loop": true,
+      "muted": true,
+      "opacity": "1",
+      "paused": false,
+      "time": 20.452166,
+      "width": 430,
+      "client": 430,
+      "contentWidth": 430,
+      "scroll": 430
+    },
+    {
+      "app": "mobile-web",
+      "size": "1920×1080",
+      "fit": "contain",
+      "height": 1080,
+      "loop": true,
+      "muted": true,
+      "opacity": "1",
+      "paused": false,
+      "time": 21.269469,
+      "width": 1920,
+      "client": 1920,
+      "contentWidth": 460,
+      "scroll": 1920
+    },
+    {
+      "app": "mobile-web",
+      "size": "1440×900",
+      "fit": "contain",
+      "height": 900,
+      "loop": true,
+      "muted": true,
+      "opacity": "1",
+      "paused": false,
+      "time": 22.290181,
+      "width": 1440,
+      "client": 1440,
+      "contentWidth": 460,
+      "scroll": 1440
+    },
+    {
+      "app": "mobile-web",
+      "size": "1280×800",
+      "fit": "contain",
+      "height": 800,
+      "loop": true,
+      "muted": true,
+      "opacity": "1",
+      "paused": false,
+      "time": 23.287733,
+      "width": 1280,
+      "client": 1280,
+      "contentWidth": 460,
+      "scroll": 1280
+    }
+  ],
+  "actions": [
+    {
+      "support": "본문 최신 요청과 팝업 첫 항목 동일; 14:38,14:21 내림차순"
+    },
+    {
+      "agencyNoneDisabled": true
+    },
+    {
+      "agencyTwoEnabled": true,
+      "checked": 2
+    },
+    {
+      "viewingPreserved": true
+    },
+    {
+      "mobileBlocked": true
+    },
+    {
+      "mobileAvailableEnabled": true
+    },
+    {
+      "privacyRemoved": true
+    },
+    {
+      "mobileAfterRefresh": {
+        "opacity": "0.82",
+        "paused": false,
+        "time": 14.38876
+      }
+    }
+  ],
+  "monitor": [
+    {
+      "size": "1920×1080",
+      "panels": [
+        {
+          "bottom": 1094,
+          "height": 752
+        },
+        {
+          "bottom": 1094,
+          "height": 752
+        }
+      ],
+      "list": {
+        "client": 662,
+        "overflow": "auto",
+        "scroll": 3630
+      }
+    },
+    {
+      "size": "1440×900",
+      "panels": [
+        {
+          "bottom": 909,
+          "height": 572
+        },
+        {
+          "bottom": 909,
+          "height": 572
+        }
+      ],
+      "list": {
+        "client": 482,
+        "overflow": "auto",
+        "scroll": 3630
+      }
+    },
+    {
+      "size": "1280×800",
+      "panels": [
+        {
+          "bottom": 809,
+          "height": 472
+        },
+        {
+          "bottom": 809,
+          "height": 472
+        }
+      ],
+      "list": {
+        "client": 382,
+        "overflow": "auto",
+        "scroll": 3630
+      }
+    }
+  ]
+}

@@ -1,44 +1,41 @@
-# OCTV
+# OCTV 개발용 UI · 2026-09-28 인수인계 최종본
 
-**슬기로운 출동생활 · 이민재, 박수연**
-
-샘플 디자인을 옮긴 WEB·MOBILE UI와 개발 준비 패키지다.
-화면 이동·탭·모달·선택 표시만 동작한다. 실제 인증·저장·추천·전달은 팀 구현 영역이다.
-
-## 빠른 실행 (Windows CMD)
-
-Node 24 LTS / npm 11 설치 후, 압축을 풀어 `octv` 폴더에서 실행한다.
+React WEB / React Native·Expo MOBILE의 UI와 개발 준비 파일입니다. 로그인·회원가입·검증·저장·기관 전달·AI·외부 API·DB 연결은 팀 구현 영역입니다. 화면 이동·선택·팝업과 목업 페이지 전환만 동작합니다.
 
 ```cmd
 npm ci
-npm run typecheck
 npm run dev:web
 ```
+WEB: http://localhost:4173
+새 CMD에서 `npm run dev:mobile:web` → MOBILE: http://localhost:8081
+UI 실행에는 DB·API 키가 필요 없습니다.
 
-WEB: `http://localhost:4173` → 빈 입력으로 로그인 버튼을 눌러 UI 이동.
-별도 CMD 터미널에서 같은 `octv` 폴더로 이동한 뒤 MOBILE 브라우저 확인:
+- [실행·포맷](docs/UI_RUN.md) · [Docker DB](docs/DATABASE.md)
+- [기존 GitHub 협업](docs/GITHUB.md) · [화면 흐름](docs/SCREENS.md)
+- [수정·검증 결과](docs/VERIFICATION.md) · [변경 파일](docs/CHANGED_FILES.md)
+- [구조](docs/STRUCTURE.md) · [후속 개발](docs/TODO.md)
+
+## 이전 배포본 링크 (최신 ZIP과 구분)
+
+- WEB: https://octv-ui-revision-0928.alswo0548.chatgpt.site
+- MOBILE 웹: https://octv-ui-revision-0928.alswo0548.chatgpt.site/mobile.html
+- [Penpot 수정 사본과 캡처](docs/PENPOT.md)
+
+이 링크는 이전 작업에서 배포한 본인 전용 사이트입니다. 이번 세션에서는 로그인 화면까지만 접속했으며 최신화는 연결 오류로 완료하지 못했습니다. 최신 소스는 이 패키지와 작업 브랜치를 기준으로 합니다. 최신 빌드의 실제 화면은 별도 내부 미리보기에서 검증했습니다.
+
+## 이번 변경
+PPT 1~14쪽 UI 수정, 기관 조회·전달 선택 분리, 최신 지원요청 목록, 영상 배경 비율 유지, 소스 포맷 설정, PostgreSQL만 실행하는 Compose를 반영했습니다.
+개인 `.env`는 덮어쓰지 않습니다. DB를 처음 사용할 때 루트 `.env.example`의 키를 본인의 `.env`에 준비하세요.
+
+기존 저장소: https://github.com/alswo0548/octv.git · 기준 브랜치 `main`.
+사용자 승인에 따라 `chore/octv-ui-docker-handover-0928` 브랜치에서 최종 수정본을 PR로 제출합니다. `main` 반영은 PR 검토·병합 후 이루어지며, PC 파일은 이후 `git pull`로 갱신합니다. 브랜치 확인 방법과 상태는 [협업 가이드](docs/GITHUB.md)와 [인수인계 보고](docs/HANDOVER_RECHECK.md)를 확인하세요. 원본 ZIP·참고 문서는 보존했습니다.
+
+## 빌드 결과로 확인
 
 ```cmd
-npm run dev:mobile:web
+npm ci
+npm run build:web
+npm run build:mobile:web
+npm run preview:web
 ```
-
-MOBILE: `http://localhost:8081`. 실제 기기는 `npm run dev:mobile` 후 Expo 안내를 따른다.
-Backend·DB·API 키는 UI 실행에 필요하지 않다.
-
-처음 받은 순서: **VS Code에서 octv 열기 → CMD 선택 → npm ci → 타입 검사 → WEB/MOBILE 실행 → GitHub 업로드·팀원 초대**.
-폴더 이동, 빨간 줄 확인, 실행 보조 파일은 [UI 실행 안내](docs/UI_RUN.md), 저장소 생성과 팀원 공유는 [GitHub 안내](docs/GITHUB.md)를 따른다.
-
-## 문서
-
-| 목적 | 파일 |
-|---|---|
-| 정책 / 작업 범위 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) |
-| 설치·브라우저·실기기·종료 | [docs/UI_RUN.md](docs/UI_RUN.md) |
-| 2인 GitHub 협업 | [docs/GITHUB.md](docs/GITHUB.md) |
-| 폴더·패키지 역할 | [docs/STRUCTURE.md](docs/STRUCTURE.md) |
-| DB 생성·변환·확인사항 | [docs/DATABASE.md](docs/DATABASE.md) |
-| 기능 인수인계 | [docs/TODO.md](docs/TODO.md) |
-| 화면·코드·이동 | [docs/SCREENS.md](docs/SCREENS.md) |
-| 검증·불일치·제한사항 | [docs/VERIFICATION.md](docs/VERIFICATION.md) |
-
-DDL: `database/schema.sql` / 흐름도: `docs/OCTV_페이지흐름도.pptx` / 원본: `docs/references/`.
+WEB: http://localhost:4173. 새 CMD에서 `npm run preview:mobile:web` → MOBILE: http://localhost:8081. 종료는 각 창에서 Ctrl+C. DB 없이 동작합니다. Windows 자체 실행은 미검증이며 Linux 빌드·브라우저 검증과 구분합니다.
