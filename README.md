@@ -56,6 +56,12 @@ AI까지 개발할 때는 **Python 3.12, Windows/Linux 64비트 x86_64** 환경�
 .venv\Scripts\python scripts\check-python-env.py
 ```
 
+설치 중 `UnicodeDecodeError: 'cp949'`가 나오면 UTF-8 모드로 다시 실행합니다.
+
+```cmd
+.venv\Scripts\python -X utf8 -m pip install -r requirements.txt
+```
+
 직접 사용하는 패키지 버전을 고정했고 함께 설치되는지는 CI에서 확인합니다. 전체 간접 의존성 lock 파일은 아닙니다.
 CPU 설치로 시작하며 모델 가중치는 포함하지 않습니다. GPU 학습은 장비를 확인한 뒤 별도 가상환경을 만듭니다.
 그때 [PyTorch 공식 설치 안내](https://pytorch.org/get-started/locally/)에 맞춰 PyTorch/torchvision 조합을 정합니다.

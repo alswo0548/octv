@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Python 3.12 / Windows·Linux x86_64 / CPU 개발 기준
 # GPU 학습은 장비에 맞는 별도 환경에서 PyTorch/CUDA 조합을 검증합니다.
 # +cpu를 명시하여 CUDA 패키지가 기본 설치에 섞이지 않게 합니다.
