@@ -39,6 +39,28 @@ http://127.0.0.1:8000/docs 에서 API 작업 목록, `/health`에서 서버 기�
 DB와 AI 연결 성공을 뜻하지 않습니다. 프론트는 아직 이 서버를 호출하지 않습니다.
 macOS/Linux는 `python3 -m venv .venv`, 이후 `.venv/bin/python`을 사용합니다.
 
+## Python 패키지 설치
+
+| 파일 | 설치 범위 |
+|---|---|
+| `backend/requirements.txt` | 서버·스키마·환경설정·PostgreSQL 드라이버·인증·HTTP 호출 |
+| `ai/requirements.txt` | CPU PyTorch·YOLO·OpenCV·LangGraph·MCP·LLM 어댑터 |
+| `requirements.txt` (루트) | 위 두 목록을 함께 설치 |
+
+AI까지 개발할 때는 **Python 3.12, Windows/Linux 64비트 x86_64** 환경에서 다음을 실행합니다.
+앞에서 `.venv`를 이미 만들었다면 그대로 사용합니다. UI만 볼 때는 이 설치가 필요 없습니다.
+
+```cmd
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip check
+.venv\Scripts\python scripts\check-python-env.py
+```
+
+직접 사용하는 패키지 버전을 고정했고 함께 설치되는지는 CI에서 확인합니다. 전체 간접 의존성 lock 파일은 아닙니다.
+CPU 설치로 시작하며 모델 가중치는 포함하지 않습니다. GPU 학습은 장비를 확인한 뒤 별도 가상환경을 만듭니다.
+그때 [PyTorch 공식 설치 안내](https://pytorch.org/get-started/locally/)에 맞춰 PyTorch/torchvision 조합을 정합니다.
+패키지 설치만으로 DB 접속·로그인·AI 판단 기능이 구현되지는 않습니다.
+
 DB는 [DB 안내](docs/DATABASE.md)의 `.env` 준비 → Compose 실행 순서로 진행합니다.
 루트 `.env`는 Docker용입니다. `backend/.env.example`은 향후 연동용이며 현재 서버는 읽지 않습니다.
 

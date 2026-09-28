@@ -14,6 +14,8 @@
 | tests | 서버 기동/미구현 응답, DB 구조 검사 | 기능 구현과 함께 갱신 |
 | docs | 개발 기준·구조·DB·출처 4개 안내 | 확정 내용이 바뀔 때만 |
 | scripts/start-*.cmd | Windows에서 UI 실행 | 보통 수정 불필요 |
+| scripts/check-python-env.py | 전체 Python 패키지 import·기본 연산 확인 | 설치/버전 변경 후 실행 |
+| requirements.txt | 백엔드·AI Python 패키지 통합 설치 | 하위 목록에 추가하면 함께 적용 |
 | compose.yaml / .env.example | PostgreSQL 실행/개인 설정 예시 | DB 실행 설정 |
 | package.json / package-lock.json | npm 명령/정확한 JS 의존성 | 패키지 변경 시 함께 |
 | .nvmrc / .node-version / .python-version | 팀의 Node/Python 버전 | 버전 합의 시 |
@@ -65,13 +67,13 @@
 | mcp | server.py 도구 등록, tools.py 외부 조회 어댑터 연결 |
 | orchestration | state.py 처리 상태, pipeline.py 단계 연결·실패 처리 |
 | training | dataset.py 자료/라벨/분할, train.py 학습, evaluate.py 비교·최종 평가 |
-| requirements.txt | 현재 추가 패키지 없음. 장비 확인 후 버전 고정 |
+| requirements.txt | CPU PyTorch·YOLO·OpenCV·LangGraph·MCP·LLM 패키지 버전 |
 
 함수 본문의 `NotImplementedError`는 작업 위치 표시입니다. 실제 결과를 반환하는 코드로 구현해야 합니다.
 
 ## 데이터베이스
 
-`schema.sql`은 실행 순서만 정합니다. `schema/00_types.sql`은 공통 상태 값,
+`schema.sql`은 실행 순서만 정합니다. `schema/00_enums.sql`은 ENUM 10종의 공통 상태 값이며 테이블보다 먼저 생성합니다.
 나머지 번호 파일은 지역 → 기관 → 사용자 → CCTV → 설정 → 사건 → 특보 → 상황 → 평가 → 기관추천 → 경로평가 → 후보경로 → 알림 → 지원요청입니다.
 각 SQL의 한국어 `COMMENT`가 컬럼 설명입니다. `migrations/`는 기존 DB를 갱신할 SQL입니다.
 `ERD.png`는 초기 관계 참고용이며 최신 정의는 SQL과 [DB 안내](DATABASE.md)를 우선합니다.
