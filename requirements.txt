@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # OCTV 전체 Python 개발 환경: Python 3.12 / Windows·Linux x86_64 / CPU
 # 프로젝트 루트에서: python -m pip install -r requirements.txt
 # 웹·모바일 JavaScript 패키지는 별도로 npm ci로 설치합니다.
