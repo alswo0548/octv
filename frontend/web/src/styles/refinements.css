@@ -20,10 +20,10 @@ select {
   opacity: 0.8;
 }
 .ambient-video {
-  /* Both videos must overlap; normal flow pushes the sharp video off-screen. */
+  /* Fill every viewport ratio without letterboxing or stretching the video. */
   position: absolute;
   inset: 0;
-  object-fit: contain;
+  object-fit: cover;
   width: 100%;
   height: 100%;
   filter: saturate(0.8);
@@ -75,14 +75,6 @@ main {
 .ambient {
   left: var(--sidebar-width);
   overflow: hidden;
-}
-.ambient-fill {
-  object-fit: cover;
-  filter: blur(18px) saturate(0.6);
-  transform: scale(1.04);
-}
-.ambient-fill.is-playing {
-  opacity: 0.5;
 }
 .cctv-credit {
   color: #c2d4df;
@@ -336,8 +328,8 @@ main {
   cursor: pointer;
 }
 .monitor-layout {
-  /* The detail card grows with its content; only the CCTV list scrolls. */
-  align-items: start;
+  /* The detail sets the row height; the list stretches to the same bottom. */
+  align-items: stretch;
 }
 .monitor-list-panel,
 .monitor-detail-panel {
@@ -346,9 +338,11 @@ main {
   min-height: 0;
 }
 .monitor-list-panel .camera-list {
-  flex: 1;
+  /* Exclude list content from row sizing, then fill the stretched panel. */
+  flex: 1 1 0;
+  height: 0;
   min-height: 0;
-  max-height: clamp(360px, calc(100dvh - 390px), 670px);
+  max-height: none;
   overflow-y: auto;
 }
 .monitor-detail-panel {

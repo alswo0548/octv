@@ -69,7 +69,7 @@ export function Background() {
             },
           ]}
           nativeControls={false}
-          contentFit="contain"
+          contentFit="cover"
           playsInline
         />
       )}
