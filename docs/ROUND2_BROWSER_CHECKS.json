@@ -1,0 +1,543 @@
+[
+  {
+    "octvQA": true,
+    "width": 1920,
+    "height": 1080,
+    "route": "#/overview",
+    "videos": [
+      {
+        "time": 14.98,
+        "paused": false,
+        "fit": "cover",
+        "w": 1631.759765625,
+        "h": 1123.199951171875
+      },
+      {
+        "time": 14.73,
+        "paused": false,
+        "fit": "contain",
+        "w": 1569,
+        "h": 1080
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 336,
+      "h": 1080,
+      "scroll": 1080,
+      "client": 1080
+    },
+    "list": {
+      "x": 1323.0625,
+      "y": 335,
+      "w": 511.9375,
+      "h": 478,
+      "scroll": 487,
+      "client": 478
+    },
+    "pagination": {
+      "x": 1323.0625,
+      "y": 825,
+      "w": 511.9375,
+      "h": 30,
+      "scroll": 30,
+      "client": 30
+    },
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1280,
+    "height": 800,
+    "route": "#/incidents",
+    "videos": [
+      {
+        "time": 12.77,
+        "paused": false,
+        "fit": "cover",
+        "w": 1066,
+        "h": 832
+      },
+      {
+        "time": 12.29,
+        "paused": false,
+        "fit": "contain",
+        "w": 1025,
+        "h": 800
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 240,
+      "h": 800,
+      "scroll": 800,
+      "client": 800
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      }
+    ],
+    "cameras": 1,
+    "credits": 1,
+    "states": [],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1280,
+    "height": 800,
+    "route": "#/targets",
+    "videos": [
+      {
+        "time": 8.83,
+        "paused": false,
+        "fit": "cover",
+        "w": 1066,
+        "h": 832
+      },
+      {
+        "time": 7.45,
+        "paused": false,
+        "fit": "contain",
+        "w": 1025,
+        "h": 800
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 240,
+      "h": 800,
+      "scroll": 800,
+      "client": 800
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [
+      {
+        "mode": "BASE",
+        "checked": true
+      },
+      {
+        "mode": "OFF",
+        "checked": false
+      },
+      {
+        "mode": "ALERT",
+        "checked": true
+      },
+      {
+        "mode": "POST_ALERT",
+        "checked": true
+      },
+      {
+        "mode": "OFF",
+        "checked": false
+      },
+      {
+        "mode": "VERIFY",
+        "checked": true
+      }
+    ],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1440,
+    "height": 900,
+    "route": "#/targets",
+    "videos": [
+      {
+        "time": 16.53,
+        "paused": false,
+        "fit": "cover",
+        "w": 1235.52001953125,
+        "h": 936
+      },
+      {
+        "time": 15.15,
+        "paused": false,
+        "fit": "contain",
+        "w": 1188,
+        "h": 900
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 252,
+      "h": 900,
+      "scroll": 900,
+      "client": 900
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [
+      {
+        "mode": "BASE",
+        "checked": true
+      },
+      {
+        "mode": "OFF",
+        "checked": false
+      },
+      {
+        "mode": "ALERT",
+        "checked": true
+      },
+      {
+        "mode": "POST_ALERT",
+        "checked": true
+      },
+      {
+        "mode": "OFF",
+        "checked": false
+      },
+      {
+        "mode": "VERIFY",
+        "checked": true
+      }
+    ],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 390,
+    "height": 844,
+    "route": "",
+    "videos": [
+      {
+        "time": 5.24,
+        "paused": false,
+        "fit": "contain",
+        "w": 390,
+        "h": 844
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      390
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 320,
+    "height": 740,
+    "route": "",
+    "videos": [
+      {
+        "time": 16.44,
+        "paused": false,
+        "fit": "contain",
+        "w": 320,
+        "h": 740
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      320
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 430,
+    "height": 932,
+    "route": "",
+    "videos": [
+      {
+        "time": 16.33,
+        "paused": false,
+        "fit": "contain",
+        "w": 430,
+        "h": 932
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      430
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1280,
+    "height": 800,
+    "route": "",
+    "videos": [
+      {
+        "time": 26.72,
+        "paused": false,
+        "fit": "contain",
+        "w": 1280,
+        "h": 800
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      460
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1440,
+    "height": 900,
+    "route": "",
+    "videos": [
+      {
+        "time": 27.42,
+        "paused": false,
+        "fit": "contain",
+        "w": 1440,
+        "h": 900
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      460
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1920,
+    "height": 1080,
+    "route": "",
+    "videos": [
+      {
+        "time": 28.12,
+        "paused": false,
+        "fit": "contain",
+        "w": 1920,
+        "h": 1080
+      }
+    ],
+    "overflow": false,
+    "sidebar": null,
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [
+      460
+    ],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 390,
+    "height": 844,
+    "route": "#/signup",
+    "videos": [
+      {
+        "time": 19.96,
+        "paused": false,
+        "fit": "cover",
+        "w": 329.67999267578125,
+        "h": 877.760009765625
+      },
+      {
+        "time": 19.71,
+        "paused": false,
+        "fit": "contain",
+        "w": 317,
+        "h": 844
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 58,
+      "h": 844,
+      "scroll": 844,
+      "client": 844
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 0,
+    "credits": 0,
+    "states": [],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1280,
+    "height": 800,
+    "route": "#/incidents",
+    "videos": [
+      {
+        "time": 7.25,
+        "paused": false,
+        "fit": "cover",
+        "w": 1066,
+        "h": 832
+      },
+      {
+        "time": 7,
+        "paused": false,
+        "fit": "contain",
+        "w": 1025,
+        "h": 800
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 240,
+      "h": 800,
+      "scroll": 800,
+      "client": 800
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      },
+      {
+        "y": 199,
+        "h": 36
+      }
+    ],
+    "cameras": 1,
+    "credits": 1,
+    "states": [],
+    "content": [],
+    "errors": []
+  },
+  {
+    "octvQA": true,
+    "width": 1280,
+    "height": 800,
+    "route": "#/monitor",
+    "videos": [
+      {
+        "time": 7.74,
+        "paused": false,
+        "fit": "cover",
+        "w": 1066,
+        "h": 832
+      },
+      {
+        "time": 7.03,
+        "paused": false,
+        "fit": "contain",
+        "w": 1025,
+        "h": 800
+      }
+    ],
+    "overflow": false,
+    "sidebar": {
+      "x": 0,
+      "y": 0,
+      "w": 240,
+      "h": 800,
+      "scroll": 800,
+      "client": 800
+    },
+    "list": null,
+    "pagination": null,
+    "filters": [],
+    "cameras": 1,
+    "credits": 1,
+    "states": [],
+    "content": [],
+    "errors": []
+  }
+]

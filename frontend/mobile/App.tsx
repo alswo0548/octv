@@ -139,7 +139,7 @@ export default function App() {
             style={{ paddingHorizontal: 20, paddingTop: 20 }}
           >
             {auth ? (
-              <AuthScreens screen={screen} go={go} />
+              <AuthScreens screen={screen} go={go} show={setDialog} />
             ) : screen === "home" || screen === "incidents" ? (
               <IncidentScreens home={screen === "home"} go={go} />
             ) : screen === "detail" || screen === "live" ? (

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Image, Animated, Easing, StyleSheet } from "react-native";
-import type { Incident } from "@octv/shared";
+import { cctvCaption, type Incident } from "@octv/shared";
 import { s, color } from "../styles/theme";
 export function Camera({
   incident: d,
@@ -114,8 +114,20 @@ export function Camera({
           <Text style={s.muted}>영상 연결을 확인해주세요</Text>
         </View>
       )}
-      <View style={{ position: "absolute", bottom: 12, left: 12 }}>
-        <Text style={[s.text, { fontSize: 11 }]}>{d.location}</Text>
+      <View style={{ position: "absolute", bottom: 12, left: 12, right: 12 }}>
+        <Text
+          style={[
+            s.text,
+            {
+              fontSize: 10,
+              lineHeight: 14,
+              textShadowColor: "#000",
+              textShadowRadius: 3,
+            },
+          ]}
+        >
+          {cctvCaption(d.location)}
+        </Text>
         <Text style={[s.muted, { fontSize: 9 }]}>{d.time}:36</Text>
       </View>
     </View>

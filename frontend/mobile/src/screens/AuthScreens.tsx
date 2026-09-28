@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { mock } from "@octv/shared";
 import {
   Brand,
@@ -9,10 +9,19 @@ import {
   Field,
   Choice,
   T,
+  type ShowDialog,
 } from "../components/UI";
 import { s, color } from "../styles/theme";
 import type { Navigate, Screen } from "../navigation/types";
-export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
+export function AuthScreens({
+  screen,
+  go,
+  show,
+}: {
+  screen: Screen;
+  go: Navigate;
+  show: ShowDialog;
+}) {
   if (screen === "signup-complete")
     return (
       <>
@@ -78,7 +87,7 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
         </>
       )}
       <Text style={s.title}>
-        {signup ? "출동을 더 빠르고 안전하게," : "출동대원 로그인"}
+        {signup ? "출동을 더 빠르고 안전하게," : "현장 담당자 로그인"}
       </Text>
       <T muted>
         {signup
@@ -92,7 +101,52 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
           <Field label="이름" placeholder="이름" />
         </>
       )}
-      <Field label="이메일" placeholder="name@example.com" />
+      {signup ? (
+        <>
+          <T>이메일</T>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "stretch",
+              gap: 8,
+              marginTop: 7,
+              marginBottom: 16,
+            }}
+          >
+            <TextInput
+              accessibilityLabel="이메일"
+              placeholder="name@example.com"
+              placeholderTextColor={color.muted}
+              style={[
+                s.input,
+                { flex: 1, minWidth: 0, marginTop: 0, marginBottom: 0 },
+              ]}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                show({
+                  title: "이메일 중복 확인",
+                  body: "이 화면에서는 이메일 중복 여부를 조회하지 않습니다.",
+                  confirm: "확인",
+                  cancel: false,
+                })
+              }
+              style={[
+                s.button,
+                s.secondary,
+                { marginTop: 0, paddingHorizontal: 10 },
+              ]}
+            >
+              <Text style={[s.buttonText, { fontSize: 12 }]}>
+                이메일 중복 확인
+              </Text>
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <Field label="이메일" placeholder="name@example.com" />
+      )}
       <Field
         label="비밀번호"
         placeholder={signup ? "8~10자, 영문·숫자·특수문자 포함" : "비밀번호"}

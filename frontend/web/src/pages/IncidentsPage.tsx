@@ -17,6 +17,7 @@ import {
   type ShowModal,
 } from "../components/Primitives";
 import { Camera } from "../components/Camera";
+import { RoadIcon } from "../components/RoadIcon";
 import { type AgencyUI } from "../components/AgencyPicker";
 import { go } from "../routing/useRoute";
 export function IncidentsPage({
@@ -49,7 +50,7 @@ export function IncidentsPage({
           <span className="subtle">서울특별시 · 탐지 시각 기준</span>
         </div>
         <div className="filters">
-          <div>
+          <div className="priority-filter">
             <label>우선순위</label>
             <Segments options={["전체", "P1", "P2", "P3"]} />
           </div>
@@ -261,7 +262,7 @@ export function IncidentsPage({
       </div>
       <section className="panel incident-routes">
         <button className="primary" onClick={() => go("routes/" + d.id)}>
-          경로 비교 상세 ↗
+          경로 비교 상세 <RoadIcon />
         </button>
         <div
           className="agency-tabs"
@@ -285,7 +286,9 @@ export function IncidentsPage({
         </div>
         <div className="route-panel route-summary">
           <div className="route-title">
-            <span className="route-symbol">↗</span>
+            <span className="route-symbol">
+              <RoadIcon />
+            </span>
             <div>
               <h2>출동 및 접근 경로</h2>
               <small>후보 기관별 추천 · 최종 출동 판단은 기관에서 진행</small>

@@ -1,4 +1,4 @@
-import type { Incident } from "@octv/shared";
+import { cctvCaption, type Incident } from "@octv/shared";
 export function Camera({
   incident: d,
   connected = true,
@@ -49,7 +49,7 @@ export function Camera({
       )}
       <div className="camera-bottom">
         <div>
-          <span>{d.location}</span>
+          <span className="cctv-credit">{cctvCaption(d.location)}</span>
           <small>{d.time}:36</small>
         </div>
         {onExpand ? (

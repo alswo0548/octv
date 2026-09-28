@@ -1,4 +1,4 @@
-# OCTV 개발용 UI · 2026-09-28 인수인계 최종본
+# OCTV 개발용 UI · 2026-09-28 2차 최종 수정본
 
 React WEB / React Native·Expo MOBILE의 UI와 개발 준비 파일입니다. 로그인·회원가입·검증·저장·기관 전달·AI·외부 API·DB 연결은 팀 구현 영역입니다. 화면 이동·선택·팝업과 목업 페이지 전환만 동작합니다.
 
@@ -15,6 +15,13 @@ UI 실행에는 DB·API 키가 필요 없습니다.
 - [수정·검증 결과](docs/VERIFICATION.md) · [변경 파일](docs/CHANGED_FILES.md)
 - [구조](docs/STRUCTURE.md) · [후속 개발](docs/TODO.md)
 
+## 2차 수정 결과
+
+PPT 7페이지와 CCTV 출처, 감시 상태·특보 제한 목업, WEB·MOBILE 회원가입 버튼 및 역할 명칭을 반영했습니다. 실행 방식과 Docker/DDL은 유지합니다.
+
+- [PPT별 반영표·실제 검증·미검증 항목](docs/ROUND2_VERIFICATION.md)
+- [이번 변경 파일](docs/ROUND2_CHANGED_FILES.md) · [진행 상태](docs/ROUND2_STATUS.md)
+
 ## 이전 배포본 링크 (최신 ZIP과 구분)
 
 - WEB: https://octv-ui-revision-0928.alswo0548.chatgpt.site
@@ -23,12 +30,12 @@ UI 실행에는 DB·API 키가 필요 없습니다.
 
 이 링크는 이전 작업에서 배포한 본인 전용 사이트입니다. 이번 세션에서는 로그인 화면까지만 접속했으며 최신화는 연결 오류로 완료하지 못했습니다. 최신 소스는 이 패키지와 작업 브랜치를 기준으로 합니다. 최신 빌드의 실제 화면은 별도 내부 미리보기에서 검증했습니다.
 
-## 이번 변경
+## 이전 1차 변경 (이력)
 PPT 1~14쪽 UI 수정, 기관 조회·전달 선택 분리, 최신 지원요청 목록, 영상 배경 비율 유지, 소스 포맷 설정, PostgreSQL만 실행하는 Compose를 반영했습니다.
 개인 `.env`는 덮어쓰지 않습니다. DB를 처음 사용할 때 루트 `.env.example`의 키를 본인의 `.env`에 준비하세요.
 
 기존 저장소: https://github.com/alswo0548/octv.git · 기준 브랜치 `main`.
-사용자 승인에 따라 `chore/octv-ui-docker-handover-0928` 브랜치에서 최종 수정본을 PR로 제출합니다. `main` 반영은 PR 검토·병합 후 이루어지며, PC 파일은 이후 `git pull`로 갱신합니다. 브랜치 확인 방법과 상태는 [협업 가이드](docs/GITHUB.md)와 [인수인계 보고](docs/HANDOVER_RECHECK.md)를 확인하세요. 원본 ZIP·참고 문서는 보존했습니다.
+이전 PR #1·#2 반영 후의 main을 기준으로, 이번 2차 변경은 `fix/octv-ui-round2-0928` 브랜치에서 PR로 제출합니다. `main` 반영은 PR 검토·병합 후 이루어지며, PC 파일은 이후 `git pull`로 갱신합니다. 브랜치 확인 방법과 상태는 [협업 가이드](docs/GITHUB.md)와 [인수인계 보고](docs/HANDOVER_RECHECK.md)를 확인하세요. 원본 ZIP·참고 문서는 보존했습니다.
 
 ## 빌드 결과로 확인
 

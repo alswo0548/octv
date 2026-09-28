@@ -54,7 +54,14 @@ export function SettingsPage({
             </div>
             <dl className="section-gap">
               <Pair label="특보 지역 감시" value="특보 지역 기준 자동 매핑" />
-              <Pair label="특보 해제" value="기본 감시로 자동 복귀" />
+              <Pair
+                label="특보 발령 중"
+                value="대상 CCTV 감시 ON · 수동 OFF 불가"
+              />
+              <Pair
+                label="특보 해제"
+                value="감시 ON 유지 · 관리자 확인 후 수동 OFF"
+              />
             </dl>
           </Panel>
           <div className="settings-grid" key={reset}>

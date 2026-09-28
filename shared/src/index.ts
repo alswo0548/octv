@@ -1,4 +1,5 @@
 import fixtures from "./fixtures.json";
+export { CCTV_SOURCE, cctvCaption } from "./attribution";
 /** UI snapshots only. Values are prepared, never calculated or persisted at runtime. */
 export const mock = fixtures;
 export type Incident = (typeof fixtures.incidents)[number];
