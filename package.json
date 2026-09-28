@@ -15,7 +15,6 @@
     "build:web": "npm run build --workspace=@octv/web",
     "build:mobile:web": "npm run export:web --workspace=@octv/mobile",
     "build:mobile:native": "npm run export:native --workspace=@octv/mobile",
-    "check:scope": "node scripts/check-scope.mjs",
     "dev": "vite frontend/web",
     "preview:mobile:web": "vite preview frontend/mobile --outDir dist --host localhost --port 8081",
     "format": "prettier --write \"frontend/**/*.{ts,tsx,js,jsx,css,html,json}\" \"shared/src/**/*.{ts,json}\"",
