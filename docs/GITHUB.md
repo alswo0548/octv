@@ -66,19 +66,21 @@ git pull --ff-only origin main
 ```
 작업 브랜치에서 충돌이 생기면 `git status`로 충돌 파일을 확인하고 양쪽 작업을 비교해 함께 보존합니다. 해결 후 add·검사·커밋합니다. 진행 중인 merge를 취소하려면 `git merge --abort`로 merge 직전 상태로 돌아갑니다. `reset --hard`, `clean -fd`로 팀원·미커밋 작업을 지우지 않습니다.
 
-## 이번 원격 반영 상태
-2026-09-28 사용자 승인에 따라 `alswo0548/octv`의 `chore/octv-ui-docker-handover-0928` 브랜치에서 최종 수정본을 PR로 제출합니다. 재개 직전 main과 작업 브랜치는 원본 ZIP 기준 커밋 `a5daafa4c487d99cdc46998b907a94dc0afece93`와 같음을 확인했습니다.
-PR 생성은 main 변경이나 PC 파일 갱신을 의미하지 않습니다. 팀원 검토 후 PR을 병합하면 main에 반영되고, 각 PC는 이후 `git pull --ff-only origin main`으로 받습니다. main 직접 반영·강제 푸시·자동 병합은 하지 않습니다.
+## 현재 2차 수정 브랜치
 
-## 병합 전에 수정본 확인
-기존 작업 폴더에서 미커밋 변경을 보존하고 새 폴더에서 확인하는 방법입니다. 아래 폴더가 이미 있으면 다른 이름을 사용합니다.
+[PR #3](https://github.com/alswo0548/octv/pull/3), `fix/octv-ui-round2-0928`에 2차 수정본이 저장되어 있습니다. 기준 main은 `9fd2e6f4102e43936aed1fceddd17cccea68fe14`, 복구 기준 UI 커밋은 `835b7b0511d87de64fb51f7711fceb168d288910`입니다. 이번 재개 문서·캡처도 같은 PR에 추가합니다. main 직접 변경·강제 푸시·자동 병합은 하지 않습니다.
+
+## 병합 전에 확인
+
+기존 미커밋 작업을 건드리지 않고 새 폴더에서 확인합니다.
 
 ```cmd
-git clone --branch chore/octv-ui-docker-handover-0928 --single-branch https://github.com/alswo0548/octv.git octv-ui-review-0928
-cd octv-ui-review-0928
+git clone --branch fix/octv-ui-round2-0928 --single-branch https://github.com/alswo0548/octv.git octv-round2-review
+cd octv-round2-review
 npm ci
-npm run build:web
-npm run build:mobile:web
-npm run preview:web
+npm run dev:web
 ```
-WEB: http://localhost:4173. 같은 폴더의 새 CMD에서 `npm run preview:mobile:web` → MOBILE: http://localhost:8081. 각 창에서 Ctrl+C로 종료합니다.
+
+새 CMD에서 같은 폴더로 이동한 뒤 `npm run dev:mobile:web`을 실행합니다. WEB은 http://localhost:4173, MOBILE은 http://localhost:8081입니다. 검토 후 PR을 병합하면 각 PC에서 main을 pull하여 반영합니다.
+
+이번 실행·미검증 범위는 `ROUND2_RESUME_VERIFICATION.md`를 확인하세요.

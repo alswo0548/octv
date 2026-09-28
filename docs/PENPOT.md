@@ -42,3 +42,7 @@ W06-1 감시 안내 5상태와 특보 OFF 제한 팝업 대표 상태, 시스템
 ![WEB CCTV 설정](screenshots/round2-penpot-targets.jpg)
 
 ![MOBILE CCTV 실시간 대표 화면](screenshots/round2-penpot-mobile.jpg)
+
+## 중단 후 재개 확인
+
+이번 재개에서는 기존 사본의 WEB W06-1과 MOBILE 실시간 영상·로그인·설정·회원가입 안내를 실제 열어 확인했습니다. 5상태·POST_ALERT·OFF 제한 팝업·CCTV 출처·현장 담당자 문구가 저장되어 있습니다. 새 편집이나 원본 변경 없이 보존했습니다. 이번 캡처는 `screenshots/resume-penpot-targets.jpg`, `screenshots/resume-penpot-mobile.jpg`입니다. 전체 프로토타입 클릭 검사는 수행하지 않았습니다. 신규 캡처는 최종 ZIP에만 포함하며, GitHub 이미지 업로드는 자동 승인 검토의 전송 승인 요구로 진행하지 못했습니다.
