@@ -47,7 +47,8 @@
 
 `router.py`는 URL, `schemas.py`는 입출력 초안, `service.py`는 처리 규칙, `repository.py`는 SQL입니다.
 각 파일의 TODO를 구현하며 API 계약을 확정합니다. 현재 URL/스키마 초안이 완성된 업무 사양은 아닙니다.
-AI 패키지는 장비 확인 후 버전을 정합니다. 실제 모델·추천 규칙·학습 자료는 아직 없습니다.
+Python 직접 의존성은 각 requirements에 버전을 고정했습니다. AI는 CPU 개발 기준이며 GPU는 장비별 검증이 필요합니다.
+실제 모델·추천 규칙·학습 자료는 아직 없습니다. LLM 어댑터는 `langchain-openai`를 준비했으며 제공자를 바꾸면 의존성도 함께 바꿉니다.
 골격 검사는 `tests/test_backend.py`에 있습니다. 기능을 구현하면 해당 501 기대값을 실제 기능 테스트로 교체합니다.
 
 ## 화면 설계 링크

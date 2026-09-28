@@ -1,2 +1,19 @@
-# 현재 골격은 Python 표준 라이브러리만 사용합니다.
-# 실제 장비에서 검증 후 YOLO/OpenCV/PyTorch/LangGraph/MCP 버전을 고정하세요.
+# Python 3.12 / Windows·Linux x86_64 / CPU 개발 기준
+# GPU 학습은 장비에 맞는 별도 환경에서 PyTorch/CUDA 조합을 검증합니다.
+# +cpu를 명시하여 CUDA 패키지가 기본 설치에 섞이지 않게 합니다.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# 영상 처리·YOLO 추론/학습 (모델 가중치는 별도 준비)
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu
+ultralytics==8.4.164
+opencv-python==4.12.0.88
+numpy==2.2.6
+
+# 처리 흐름·MCP 도구. 실제 연결 코드는 팀이 구현합니다.
+langgraph==1.2.12
+fastmcp==4.0.10
+
+# LLM 어댑터 개발용. 설치만으로 외부 요청이나 과금이 발생하지 않습니다.
+# 실제 제공자를 바꾸면 해당 어댑터 의존성도 함께 변경하세요.
+langchain-openai==1.6.6

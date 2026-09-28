@@ -3,7 +3,7 @@
 \set ON_ERROR_STOP on
 BEGIN;
 SET LOCAL search_path TO public;
-\ir schema/00_types.sql
+\ir schema/00_enums.sql
 \ir schema/10_regions.sql
 \ir schema/20_agencies.sql
 \ir schema/30_users.sql

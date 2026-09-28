@@ -54,6 +54,9 @@ docker compose exec db psql -U octv_dev -d octv_dev -c "SELECT enum_range(NULL::
 14개 테이블, 134개 컬럼, 20개 FK. 기존 ERD 정의를 분리했고 `POST_ALERT` 상태만 추가했습니다.
 컬럼 설명은 SQL의 `COMMENT`를 읽습니다. `ERD.png`에는 이 추가 상태가 반영되어 있지 않습니다.
 
+ENUM 10종은 `schema/00_enums.sql`에서 별도로 관리합니다. `schema.sql`이 ENUM → 테이블 순서로 불러옵니다.
+ENUM 파일을 직접 따로 실행하지 않아도 됩니다. 기존 DB의 값 변경은 `migrations/` SQL을 사용합니다.
+
 - OFF는 `cctvs.is_monitored=false`; ON 모드는 BASE/ALERT/POST_ALERT/VERIFY.
 - `users.email`, `incidents.dedup_key` 등에 UNIQUE 제약이 아직 없습니다. 인증/중복 방지 구현 전에 정책과 변경 SQL을 합의합니다.
 - 시간은 `TIMESTAMP WITHOUT TIME ZONE`. 저장 시간대는 연동 전에 합의합니다.
