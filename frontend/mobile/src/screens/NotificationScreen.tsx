@@ -1,12 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { mock, incidentById } from "@octv/shared";
-import {
-  Segments,
-  Link,
-  T,
-  previewOnly,
-  type ShowDialog,
-} from "../components/UI";
+import { Segments, Link, T, type ShowDialog } from "../components/UI";
 import { s, color } from "../styles/theme";
 import type { Navigate } from "../navigation/types";
 export function NotificationScreen({
@@ -21,7 +15,11 @@ export function NotificationScreen({
       <Segments options={mock.uiSnapshot.mobile.notificationSegments} />
       <Link
         onPress={() =>
-          show({ title: "모두 읽음", body: previewOnly, cancel: false })
+          show({
+            title: "모두 읽음",
+            body: "알림 목록을 확인해주세요.",
+            cancel: false,
+          })
         }
       >
         모두 읽음

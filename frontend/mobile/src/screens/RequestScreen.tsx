@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { mock, type Incident } from "@octv/shared";
-import {
-  Badge,
-  T,
-  Field,
-  Button,
-  previewOnly,
-  type ShowDialog,
-} from "../components/UI";
+import { Badge, T, Field, Button, type ShowDialog } from "../components/UI";
 import { s, color } from "../styles/theme";
 import type { Navigate } from "../navigation/types";
 export function RequestScreen({
@@ -83,9 +76,9 @@ export function RequestScreen({
       <Button
         onPress={() =>
           show({
-            title: "추가 대응 요청 확인",
-            body: previewOnly,
-            confirm: "확인 (미리보기)",
+            title: "추가 지원요청 확인",
+            body: "선택한 지원요청 내용을 확인합니다.",
+            confirm: "확인",
           })
         }
       >

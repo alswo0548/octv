@@ -16,7 +16,7 @@ export function Camera({
         "camera shared-camera " + (live ? "live-camera" : "capture-camera")
       }
     >
-      <img src="/assets/road.jpg" alt="도로 CCTV 도식용 샘플 이미지" />
+      <img src="/assets/road.jpg" alt="도로 CCTV 화면" />
       <div className="camera-tint" />
       <div className="camera-top">
         <span>
@@ -44,21 +44,19 @@ export function Camera({
       ) : (
         <div className="camera-offline">
           <span>연결 끊김</span>
-          <p>연결 상태 예시</p>
+          <p>영상 연결을 확인해주세요</p>
         </div>
       )}
       <div className="camera-bottom">
         <div>
           <span>{d.location}</span>
-          <small>SIMULATED FEED · {d.time}:36</small>
+          <small>{d.time}:36</small>
         </div>
         {onExpand ? (
           <button onClick={onExpand} aria-label="CCTV 확대">
             ⛶ CCTV 확대
           </button>
-        ) : (
-          <span className="tag">시연 영상</span>
-        )}
+        ) : null}
       </div>
     </div>
   );

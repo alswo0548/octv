@@ -17,11 +17,17 @@
     "build:mobile:native": "npm run export:native --workspace=@octv/mobile",
     "check:scope": "node scripts/check-scope.mjs",
     "dev": "vite frontend/web",
-    "preview:mobile:web": "vite preview frontend/mobile --outDir dist --host localhost --port 8081"
+    "preview:mobile:web": "vite preview frontend/mobile --outDir dist --host localhost --port 8081",
+    "format": "prettier --write \"frontend/**/*.{ts,tsx,js,jsx,css,html,json}\" \"shared/src/**/*.{ts,json}\"",
+    "format:check": "prettier --check \"frontend/**/*.{ts,tsx,js,jsx,css,html,json}\" \"shared/src/**/*.{ts,json}\"",
+    "preview:web": "vite preview frontend/web --host localhost --port 4173"
   },
   "engines": {
     "node": ">=24.13.0 <25",
     "npm": ">=11 <12"
   },
-  "packageManager": "npm@11.9.0"
+  "packageManager": "npm@11.9.0",
+  "devDependencies": {
+    "prettier": "3.6.2"
+  }
 }

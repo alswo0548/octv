@@ -41,6 +41,16 @@ export const mobileScreens = [
   ["A04", "사건 상세 · 사건 정보", "detail", "DetailScreen.tsx"],
   ["A04-1", "사건 상세 · 실시간 영상", "live", "DetailScreen.tsx"],
   ["A05", "추천경로", "routes", "RoutesScreen.tsx"],
-  ["A06", "추가 대응 요청", "request", "RequestScreen.tsx"],
+  ["A06", "추가 지원요청", "request", "RequestScreen.tsx"],
   ["A07", "설정", "settings", "SettingsScreen.tsx"],
 ] as const;
+
+export const recommendedRouteFor = (incidentId: string, agencyId: string) =>
+  routesFor(incidentId, agencyId).find(
+    (route) => route.recommended && !route.blocked,
+  );
+export type SupportRequest =
+  (typeof fixtures.supportRequests)[keyof typeof fixtures.supportRequests][number];
+// Fixtures are supplied newest first, independently for each incident.
+export const supportRequestsFor = (incidentId: string): SupportRequest[] =>
+  (mock.supportRequests as Record<string, SupportRequest[]>)[incidentId] ?? [];

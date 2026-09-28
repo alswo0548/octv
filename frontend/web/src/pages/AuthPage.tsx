@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Brand, Select, type ShowModal } from "../components/Primitives";
 import { go } from "../routing/useRoute";
 export function AuthPage({
@@ -8,7 +7,6 @@ export function AuthPage({
   signup?: boolean;
   show: ShowModal;
 }) {
-  const [example, setExample] = useState("기본");
   return (
     <div className={"auth-wrap " + (signup ? "signup" : "")}>
       <section className="panel auth-panel">
@@ -18,7 +16,7 @@ export function AuthPage({
         <h2>{signup ? "회원가입" : "상황실 로그인"}</h2>
         <p className="intro">
           {signup
-            ? "입력과 선택 화면을 확인하세요."
+            ? "소속기관과 계정 정보를 입력해주세요."
             : "재난 대응 정보를 한눈에 확인하세요."}
         </p>
         <form
@@ -40,15 +38,6 @@ export function AuthPage({
               placeholder="name@example.com"
               autoComplete="off"
             />
-            {signup && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setExample("사용 가능 예시")}
-              >
-                중복 확인
-              </button>
-            )}
           </div>
           <label>
             비밀번호
@@ -85,43 +74,17 @@ export function AuthPage({
               </div>
             </>
           )}
-          <div className="preview-status">
-            <label>
-              안내 문구 미리보기
-              <select
-                value={example}
-                onChange={(e) => setExample(e.target.value)}
-              >
-                {["기본", "오류 예시", "사용 가능 예시"].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-            {example === "오류 예시" && (
-              <p className="form-error">
-                아이디 또는 비밀번호가 올바르지 않습니다. (고정 예시)
-              </p>
-            )}
-            {example === "사용 가능 예시" && (
-              <p className="field-feedback">
-                사용 가능한 이메일입니다. (입력과 무관한 고정 예시)
-              </p>
-            )}
-          </div>
           <button
             type="button"
             className="primary"
             onClick={() =>
               signup
                 ? show({
-                    title: "회원가입 완료 화면 예시",
+                    title: "회원가입 완료",
                     body: (
                       <>
                         <p>홍길동 · 현장대응 담당자 · 강남소방서</p>
-                        <p>
-                          고정 등록 정보 예시입니다. 실제 계정은 생성되지
-                          않습니다.
-                        </p>
+                        <p>등록 정보를 확인해주세요.</p>
                       </>
                     ),
                     confirm: "로그인으로 이동",
@@ -139,11 +102,6 @@ export function AuthPage({
             {signup ? "로그인" : "회원가입"}
           </a>
         </div>
-        <p className="demo-note">
-          UI 미리보기 · 어떤 입력값으로도 이동할 수 있습니다.
-          <br />
-          인증·입력 검사·계정 생성은 미구현입니다.
-        </p>
       </section>
     </div>
   );

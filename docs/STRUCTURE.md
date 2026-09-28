@@ -1,46 +1,25 @@
-# 폴더·의존성
+# 프로젝트 구조
 
-| 위치 | 용도 / 현재 상태 |
+| 경로 | 역할 |
 |---|---|
-| frontend/web/src/pages | WEB 9개 화면, JSX 컴포넌트 |
-| frontend/web/src/components | 지도 도식·CCTV 연출·기관 선택·모달 |
-| frontend/web/src/styles | 샘플 원본 CSS + React용 보정 |
-| frontend/mobile/src/screens | Expo 네이티브 화면, 웹에서도 렌더링 |
-| frontend/mobile/src/components | 공통 UI·VideoView·CCTV 연출·SVG 경로 도식 |
-| shared/src | 고정 JSON 목업, 타입, 화면 목록 |
-| backend/app | FastAPI 최소 진입점과 기능별 TODO |
-| ai | 향후 AI 기능 폴더만 있음 |
-| database | schema.sql, ERD 전사 JSON |
-| docs/references | 첨부 원본 4개. 수정하지 않음 |
-| scripts / tests | 실행 보조·범위 검사 / 향후 기능 테스트 위치 |
-| .github | PR·Issue 양식, UI 검사 CI |
+| frontend/web | React·Vite WEB UI |
+| frontend/mobile | React Native·Expo MOBILE UI |
+| shared/src/fixtures.json | 사건·기관·경로·지원요청·일별 통계 목업 |
+| shared/src/index.ts | 화면 목록·목업 조회 도우미 |
+| frontend/web/src/components/Background.tsx | 재생 상태·움직임 줄이기 처리 |
+| frontend/web/src/styles/refinements.css | 이번 UI 수정 스타일 |
+| frontend/mobile/src/components/Background.tsx | 콘텐츠 바깥 영상 배경 |
+| backend/app/main.py | FastAPI 객체만 생성, DB 연결 없음 |
+| ai/* | 팀 구현 위치 안내 |
+| database/schema.sql | 기존 ERD 기반 DDL, 변경 없음 |
+| database/erd-transcription.json | 기존 전사 기록 |
+| compose.yaml | PostgreSQL 한 서비스·볼륨·최초 SQL 마운트 |
+| .env.example / backend/.env.example | 개인 환경변수 준비용, 비밀값 없음 |
+| .prettierrc.json / .prettierignore | 소스 형식 정리 기준 |
+| .github/workflows/ui.yml | 포맷·타입·범위·빌드 검사, DB 불필요 |
+| docs/PENPOT.md / docs/screenshots | 최신 Penpot 사본 링크·브라우저/스토리보드 검증 캡처 |
+| docs/CHANGED_FILES.md / docs/VERIFICATION.md | 적용할 파일 목록·이번 검증 범위 |
+| docs/references | 기존 스토리보드·ERD·AI 자료 보존 |
+| docs/OCTV_페이지흐름도.pptx | 기존 원본 참고 파일, 이번 최신 UI 반영본 아님 |
 
-## 지금 필요한 패키지
-npm workspaces를 사용한다. **루트 package-lock.json 한 개**를 npm이 생성했다. 설치는 루트에서 `npm ci`.
-
-| 패키지 | 역할 |
-|---|---|
-| React / React DOM 19.2.3 | WEB 렌더링 |
-| Vite 8.3.1 / TypeScript 6.0 | WEB 개발 서버·빌드 / 타입 검사 |
-| Expo 57 / React Native 0.86.3 | MOBILE 앱 실행 구조 |
-| React Native Web 0.21 | MOBILE 브라우저 렌더링 |
-| react-native-svg | 편집 가능한 모바일 지도 도식 |
-| expo-video | 확보한 배경 영상 재생. 실제 CCTV 스트림 아님 |
-| @octv/shared | 이 저장소의 공통 목업·타입 |
-
-정확한 설치 버전·무결성 값은 package-lock.json이 기준이다.
-호환성 기준: Expo 공식 blank TypeScript SDK57 템플릿의 React/RN/TS 조합과 환경변수 EXPO_OFFLINE을 1로 지정한 `expo install --check`(로컬 SDK 매핑 검사). 온라인 검사는 검증 환경의 네트워크 제한으로 실행하지 못했다.
-참고: https://docs.expo.dev/versions/latest/ / https://vite.dev/guide/
-
-## 선택 설치
-Backend: Python 3.12, `backend/requirements.txt`. UI와 독립이며 FastAPI 객체 생성만 한다. octv 루트의 **CMD**에서 실행한다. 가상환경을 활성화하지 않고 그 안의 Python을 직접 사용한다.
-
-```cmd
-cd backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
-```
-종료는 `Ctrl+C`. 이 터미널에서 프론트 명령을 실행하려면 `cd ..`로 octv 루트에 돌아온다.
-업무 API가 없으므로 `/`는 404다. `/docs`에는 업무 엔드포인트가 없다.
-AI 패키지는 장비·개발 범위를 정한 뒤 별도로 추가한다. UI를 위해 설치하지 않는다.
+node_modules·dist·.expo·로그·개인 .env·DB 볼륨·백업 덤프는 ZIP·Git 대상에서 제외합니다. 기존 배경 영상 추적 예외는 유지합니다.

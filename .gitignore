@@ -51,3 +51,9 @@ checkpoints/
 .DS_Store
 Thumbs.db
 .sites-runtime/
+# Local PostgreSQL data and backups (schema.sql stays tracked)
+.pgdata/
+postgres-data/
+database/backups/
+*.dump
+*.backup

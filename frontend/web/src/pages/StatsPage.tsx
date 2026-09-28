@@ -10,8 +10,8 @@ export function StatsPage() {
         <Select label="CCTV" options={["전체 CCTV", "CCTV-012", "CCTV-023"]} />
       </div>
       <p className="stats-scope">
-        시연 기준일 {mock.uiSnapshot.header.date} · 확정 사건 기준 · 전달 여부는
-        사건 단위로 집계
+        기준일 {mock.uiSnapshot.header.date} · 확정 사건 기준 · 전달 여부는 사건
+        단위로 집계
       </p>
       <div className="stat-grid">
         {mock.stats.summary.map(([title, value, unit], i) =>
@@ -92,18 +92,81 @@ export function StatsPage() {
             현장 정·오탐 판정이나 모델 성능 평가 지표가 아닙니다.
           </p>
         </Panel>
-        <Panel title="현재 CCTV 상태">
-          <dl>
-            {mock.stats.cctv.map(([k, v]) => (
-              <Pair key={k} label={k} value={v} />
+        <Panel title="일별 확정 추이">
+          <svg
+            className="daily-chart"
+            viewBox="0 0 560 270"
+            role="img"
+            aria-label="최근 7일 날짜별 확정 사건 수 선 그래프"
+          >
+            <text x="14" y="20" fill="#9bafc0" fontSize="12">
+              확정 사건 수 (건)
+            </text>
+            {[0, 4, 8, 12].map((count) => (
+              <g key={count}>
+                <line
+                  x1="48"
+                  x2="525"
+                  y1={220 - count * 15}
+                  y2={220 - count * 15}
+                  stroke="#91cce01d"
+                />
+                <text
+                  x="35"
+                  y={224 - count * 15}
+                  textAnchor="end"
+                  fill="#9bafc0"
+                  fontSize="12"
+                >
+                  {count}
+                </text>
+              </g>
             ))}
-          </dl>
-          <button className="text-button" onClick={() => go("monitor")}>
-            연결 오류 CCTV 확인 →
-          </button>
-          <p className="content-footnote">
-            지역·CCTV 선택 표시만 변경됩니다. 통계는 고정 목업입니다.
-          </p>
+            <polyline
+              points={mock.stats.dailyConfirmed
+                .map((point, i) => `${60 + i * 76},${220 - point.count * 15}`)
+                .join(" ")}
+              fill="none"
+              stroke="#69d5e7"
+              strokeWidth="3"
+              strokeLinejoin="round"
+            />
+            {mock.stats.dailyConfirmed.map((point, i) => (
+              <g key={point.date}>
+                <circle
+                  cx={60 + i * 76}
+                  cy={220 - point.count * 15}
+                  r="4"
+                  fill="#9be9f3"
+                >
+                  <title>
+                    {point.date}: {point.count}건
+                  </title>
+                </circle>
+                <text
+                  x={60 + i * 76}
+                  y={208 - point.count * 15}
+                  fill="#dcf6ff"
+                  textAnchor="middle"
+                  fontSize="12"
+                >
+                  {point.count}
+                </text>
+                <text
+                  x={60 + i * 76}
+                  y="246"
+                  textAnchor="middle"
+                  fill="#9bafc0"
+                  fontSize="12"
+                >
+                  {point.date}
+                </text>
+              </g>
+            ))}
+            <text x="525" y="265" textAnchor="end" fill="#9bafc0" fontSize="11">
+              날짜
+            </text>
+          </svg>
         </Panel>
       </div>
     </div>

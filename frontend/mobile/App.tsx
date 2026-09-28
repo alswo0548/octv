@@ -95,9 +95,6 @@ export default function App() {
             >
               <View style={s.row}>
                 <Brand />
-                <Text style={[s.muted, { fontSize: 10, marginLeft: "auto" }]}>
-                  목업 데이터
-                </Text>
                 {!auth && (
                   <Pressable
                     accessibilityRole="button"
@@ -105,6 +102,7 @@ export default function App() {
                     onPress={() => navigate("notifications")}
                     style={{
                       padding: 8,
+                      marginLeft: "auto",
                       borderWidth: 1,
                       borderColor: color.line,
                       borderRadius: 7,

@@ -95,8 +95,7 @@ export function IncidentScreens({
         />
       ))}
       <Text style={[s.muted, { marginTop: 20, fontSize: 12 }]}>
-        기관에 전달된 사건정보와 추천경로의 고정 예시입니다. 출동 여부는 기관의
-        기존 체계에서 결정합니다.
+        출동 여부는 기관의 기존 체계에서 결정합니다.
       </Text>
     </>
   );

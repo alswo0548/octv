@@ -62,16 +62,14 @@ export function DetailScreen({
       </View>
       <Camera incident={d} live={live} connected={!live || connected} />
       <Text style={[s.muted, { fontSize: 10, marginVertical: 10 }]}>
-        {live ? "실시간 영상 시연" : "대표 탐지 캡처"} · 실제 CCTV 연결 없음
+        {live ? "실시간 영상" : "대표 탐지 캡처"}
       </Text>
       {live ? (
         <Panel title="CCTV 상태">
           <Pair
             label="연결 상태"
             value={
-              connected
-                ? mock.uiSnapshot.cameraStatus.online
-                : "연결 끊김 · 예시"
+              connected ? mock.uiSnapshot.cameraStatus.online : "연결 끊김"
             }
           />
           <Pair
@@ -82,9 +80,7 @@ export function DetailScreen({
           />
           <Pair
             label="분석 상태"
-            value={
-              connected ? mock.uiSnapshot.cameraStatus.analysis : "중지 · 목업"
-            }
+            value={connected ? mock.uiSnapshot.cameraStatus.analysis : "중지"}
           />
           <Pair
             label="마지막 프레임"
@@ -102,7 +98,7 @@ export function DetailScreen({
       )}
       <Button onPress={() => go("routes", d.id)}>경로 비교 상세</Button>
       <Button secondary onPress={() => go("request", d.id)}>
-        추가 대응 요청
+        추가 지원요청
       </Button>
     </>
   );

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { View, Text } from "react-native";
 import { mock } from "@octv/shared";
 import {
@@ -14,7 +13,6 @@ import {
 import { s, color } from "../styles/theme";
 import type { Navigate, Screen } from "../navigation/types";
 export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
-  const [example, set] = useState(false);
   if (screen === "signup-complete")
     return (
       <>
@@ -28,8 +26,8 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
         >
           ✓
         </Text>
-        <Text style={s.title}>회원가입 완료 화면 예시</Text>
-        <T muted>{mock.profile.name}님의 고정 등록 정보입니다.</T>
+        <Text style={s.title}>회원가입 완료</Text>
+        <T muted>{mock.profile.name}님의 등록 정보입니다.</T>
         <View style={{ height: 20 }} />
         <Panel title="등록 정보">
           <Pair label="이름" value={mock.profile.name} />
@@ -40,9 +38,6 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
             value={mock.uiSnapshot.mobile.accountStatus}
           />
         </Panel>
-        <View style={s.info}>
-          <T>실제 계정은 생성되지 않았습니다.</T>
-        </View>
         <Button onPress={() => go("login")}>로그인하기</Button>
       </>
     );
@@ -65,7 +60,7 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
         />
         <Panel title={mock.profile.agency}>
           <T muted>{mock.uiSnapshot.mobile.agencyAddress}</T>
-          <T muted>기관 유형 · 소방 · 고정 예시</T>
+          <T muted>기관 유형 · 소방</T>
         </Panel>
         <Button onPress={() => go("signup-complete")}>회원가입 완료</Button>
         <Button secondary onPress={() => go("signup-basic")}>
@@ -98,40 +93,33 @@ export function AuthScreens({ screen, go }: { screen: Screen; go: Navigate }) {
         </>
       )}
       <Field label="이메일" placeholder="name@example.com" />
-      {signup && (
-        <Link onPress={() => set(true)}>중복 확인 · 상태 예시 보기</Link>
-      )}
       <Field
         label="비밀번호"
         placeholder={signup ? "8~10자, 영문·숫자·특수문자 포함" : "비밀번호"}
         secureTextEntry
       />
       {signup && <Field label="비밀번호 확인" secureTextEntry />}
-      <Link onPress={() => set(!example)}>
-        안내 문구 예시 {example ? "숨기기" : "보기"}
-      </Link>
-      {example && (
-        <Text
-          style={[
-            s.muted,
-            { color: signup ? "#8cdec9" : "#f49caa", marginBottom: 12 },
-          ]}
-        >
-          {signup
-            ? "사용 가능한 이메일입니다. / 비밀번호가 일치합니다. (고정 예시)"
-            : "아이디 또는 비밀번호가 올바르지 않습니다. (고정 예시)"}
-        </Text>
-      )}
       <Button onPress={() => go(signup ? "signup-agency" : "home")}>
         {signup ? "다음: 소속기관 선택" : "로그인"}
       </Button>
-      <Button secondary onPress={() => go(signup ? "login" : "signup-basic")}>
-        {signup ? "이미 계정이 있으신가요? 로그인" : "회원가입"}
-      </Button>
-      <Text style={[s.muted, { fontSize: 12, marginTop: 24 }]}>
-        UI 미리보기 · 입력 검사와 인증 없이 이동합니다. 실제 계정정보는 필요하지
-        않습니다.
-      </Text>
+      {signup ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginTop: 12,
+          }}
+        >
+          <T muted>이미 계정이 있으신가요?</T>
+          <Link onPress={() => go("login")}>로그인</Link>
+        </View>
+      ) : (
+        <Button secondary onPress={() => go("signup-basic")}>
+          회원가입
+        </Button>
+      )}
     </View>
   );
 }

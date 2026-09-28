@@ -74,7 +74,7 @@ export function RoadMap({
           { fontSize: 10, padding: 10, backgroundColor: "#0b1925" },
         ]}
       >
-        시연 지도 · 실제 지리와 무관
+        사건 위치 · 접근 경로
       </Text>
     </View>
   );

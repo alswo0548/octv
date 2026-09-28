@@ -5,7 +5,7 @@ import {
   Select,
   Pagination,
   type ShowModal,
-  previewMessage,
+  actionMessage,
 } from "../components/Primitives";
 import { go } from "../routing/useRoute";
 export function TargetsPage({ show }: { show: ShowModal }) {
@@ -87,8 +87,8 @@ export function TargetsPage({ show }: { show: ShowModal }) {
           onClick={() =>
             show({
               title: "기본 활성 설정 저장 확인",
-              body: previewMessage,
-              confirm: "확인 (미리보기)",
+              body: actionMessage,
+              confirm: "확인",
             })
           }
         >
@@ -99,7 +99,7 @@ export function TargetsPage({ show }: { show: ShowModal }) {
           onClick={() =>
             show({
               title: "변경 취소",
-              body: "기본 활성의 화면 표시를 초기 목업으로 복원할까요?",
+              body: "기본 활성의 화면 표시를 초기 표시값으로 복원할까요?",
               onConfirm: () => setReset((x) => x + 1),
             })
           }

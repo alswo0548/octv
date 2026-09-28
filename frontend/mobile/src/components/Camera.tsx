@@ -111,14 +111,12 @@ export function Camera({
           ]}
         >
           <Text style={{ color: "#e0a6b1", fontSize: 20 }}>연결 끊김</Text>
-          <Text style={s.muted}>연결 상태 예시</Text>
+          <Text style={s.muted}>영상 연결을 확인해주세요</Text>
         </View>
       )}
       <View style={{ position: "absolute", bottom: 12, left: 12 }}>
         <Text style={[s.text, { fontSize: 11 }]}>{d.location}</Text>
-        <Text style={[s.muted, { fontSize: 9 }]}>
-          SIMULATED FEED · {d.time}:36
-        </Text>
+        <Text style={[s.muted, { fontSize: 9 }]}>{d.time}:36</Text>
       </View>
     </View>
   );

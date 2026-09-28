@@ -61,17 +61,6 @@ export function SettingsScreen({
       </Panel>
       <Panel title="앱 정보">
         <Pair label="버전" value={mock.uiSnapshot.mobile.appVersion} />
-        <Link
-          onPress={() =>
-            show({
-              title: "개인정보 처리방침",
-              body: "정책 문구 준비 위치입니다. 정식 정책은 팀에서 작성합니다.",
-              cancel: false,
-            })
-          }
-        >
-          개인정보 처리방침 ›
-        </Link>
       </Panel>
       <Button
         secondary
@@ -86,11 +75,6 @@ export function SettingsScreen({
       >
         로그아웃
       </Button>
-      <Text
-        style={[s.muted, { fontSize: 12, marginTop: 18, color: color.muted }]}
-      >
-        프로필은 고정 목업이며 토글 값은 현재 화면에만 표시됩니다.
-      </Text>
     </>
   );
 }
