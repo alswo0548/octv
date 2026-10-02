@@ -11,7 +11,7 @@ class AgencyResponse(BaseModel):
 
 class DeliverySelection(BaseModel):
     agency_id: int
-    route_evaluation_id: int
+    route_candidate_id: int
 
 
 class DeliveryRequest(BaseModel):

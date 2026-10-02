@@ -16,5 +16,5 @@ def find_detail(connection, incident_id: int):
 
 
 def save_detection(connection, candidate: dict):
-    # TODO: 중복 사건은 last_detected_at 갱신, 신규는 등록. dedup_key 동시성 정책 먼저 합의.
+    # TODO: 중복 사건은 last_detected_at 갱신, 신규는 등록. (cctv_id, hazard_type, dedup_key)의 진행 상태 UNIQUE 충돌을 처리.
     raise FeatureNotImplemented("incidents.save_detection DB 쿼리 구현 예정")

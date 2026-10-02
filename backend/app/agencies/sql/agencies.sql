@@ -5,7 +5,7 @@ CREATE TABLE agencies (
     address VARCHAR(255),
     latitude DECIMAL(10,7) NOT NULL,
     longitude DECIMAL(10,7) NOT NULL,
-    phone VARCHAR(30) NOT NULL,
+    phone VARCHAR(30),
     region_code VARCHAR(100) NOT NULL REFERENCES region(region_code)
 );
 COMMENT ON TABLE agencies IS '대응 후보 기관';

@@ -96,5 +96,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: psql -X -v ON_ERROR_STOP=1 -f database/schema.sql
-      - run: psql -X -v ON_ERROR_STOP=1 -f database/migrations/001_post_alert.sql
       - run: psql -X -v ON_ERROR_STOP=1 -f tests/database_contract.sql
+      - run: psql -X -v ON_ERROR_STOP=1 -f tests/database_behavior.sql
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - run: python -m pip install -r backend/requirements.txt
+      - run: python scripts/check-db.py
+        env:
+          DATABASE_URL: postgresql://octv_test:local_ci_only@127.0.0.1:5432/octv_test
+
+      - run: python tests/run_migration_checks.py

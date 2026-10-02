@@ -7,8 +7,8 @@ CREATE TABLE weather_alerts (
     issued_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     ended_at TIMESTAMP WITHOUT TIME ZONE,
     status weather_status_enum NOT NULL DEFAULT 'ACTIVE',
-    raw_data_json JSON NOT NULL,
-    region_code VARCHAR(100) NOT NULL REFERENCES region(region_code)
+    region_code VARCHAR(100) NOT NULL REFERENCES region(region_code),
+    CONSTRAINT uq_weather_alerts_external_region UNIQUE (external_alert_id, region_code)
 );
 COMMENT ON TABLE weather_alerts IS '기상특보';
 COMMENT ON COLUMN weather_alerts.id IS '기상특보 ID';
@@ -19,5 +19,4 @@ COMMENT ON COLUMN weather_alerts.title IS '특보 제목';
 COMMENT ON COLUMN weather_alerts.issued_at IS '특보 발표 일시';
 COMMENT ON COLUMN weather_alerts.ended_at IS '특보 해제 일시';
 COMMENT ON COLUMN weather_alerts.status IS '특보 상태';
-COMMENT ON COLUMN weather_alerts.raw_data_json IS '원본 데이터 JSON';
 COMMENT ON COLUMN weather_alerts.region_code IS '지역코드 ID';

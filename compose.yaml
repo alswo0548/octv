@@ -12,8 +12,26 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - type: bind
-        source: ./database
+        source: ./database/init
         target: /docker-entrypoint-initdb.d
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./database
+        target: /opt/octv/database
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./backend/app
+        target: /opt/octv/backend/app
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./tests
+        target: /opt/octv/tests
         read_only: true
         bind:
           create_host_path: false

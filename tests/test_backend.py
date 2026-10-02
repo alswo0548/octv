@@ -74,7 +74,7 @@ class BackendScaffoldTests(unittest.TestCase):
     def test_health_does_not_claim_database_connection(self):
         status, body = self.request("/health")
         self.assertEqual(status, 200)
-        self.assertEqual(body["database"], "not_connected")
+        self.assertEqual(body["database"], "not_checked")
 
     def test_login_and_email_check_do_not_fake_success(self):
         for path, body in [
@@ -92,7 +92,7 @@ class BackendScaffoldTests(unittest.TestCase):
             (
                 "/api/agencies/incidents/1/deliveries",
                 "POST",
-                {"selections": [{"agency_id": 1, "route_evaluation_id": 1}]},
+                {"selections": [{"agency_id": 1, "route_candidate_id": 1}]},
             ),
             (
                 "/api/support-requests/incidents/1",

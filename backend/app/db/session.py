@@ -1,11 +1,16 @@
-"""DB 접속·트랜잭션 작업 위치. requirements에 psycopg가 있지만 접속은 미구현입니다."""
+"""psycopg 공통 연결. 정상 종료 commit, 예외 rollback, 항상 close."""
 
-from ..errors import FeatureNotImplemented
+from contextlib import contextmanager
+
+import psycopg
+from psycopg.rows import dict_row
+
+from ..config import database_connect_kwargs
 
 
+@contextmanager
 def get_connection():
-    # TODO: requirements의 psycopg 드라이버로 config의 DATABASE_URL에 연결하세요.
-    # 요청마다 연결을 빌리고 반환하며, 실패 시 rollback하도록 구현하세요.
-    # SQL은 기능별 repository.py에 작성하고 파라미터 바인딩을 사용하세요.
-    # DDL은 서버 시작 때 자동 실행하지 않습니다. SQL 정의를 중복 작성하지 마세요.
-    raise FeatureNotImplemented("PostgreSQL 연결을 구현해야 합니다.")
+    # 사용: with get_connection() as connection: repository.some_query(connection)
+    # 업무 단위 전체를 하나의 with 블록으로 묶습니다. DDL은 자동 실행하지 않습니다.
+    with psycopg.connect(**database_connect_kwargs(), row_factory=dict_row) as connection:
+        yield connection

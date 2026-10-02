@@ -13,7 +13,8 @@ CREATE TABLE cctvs (
     analysis_status analysis_status_enum,
     last_frame_at TIMESTAMP WITHOUT TIME ZONE,
     region_code VARCHAR(100) REFERENCES region(region_code),
-    monitored_mode monitored_mode_enum
+    monitored_mode monitored_mode_enum,
+    CONSTRAINT uq_cctvs_provider_external UNIQUE (provider, external_cctv_id)
 );
 COMMENT ON TABLE cctvs IS 'CCTV 기본정보·현재 상태';
 COMMENT ON COLUMN cctvs.id IS 'CCTV ID';

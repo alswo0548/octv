@@ -11,5 +11,5 @@ def list_cctvs(connection, region_code: str | None = None):
 
 
 def update_monitoring(connection, cctv_id: int, enabled: bool, mode: str | None):
-    # TODO: 특보/권한을 서비스에서 확인한 후 감시 여부·모드를 함께 저장. 동시 변경 충돌 고려.
+    # TODO: 특보/권한을 서비스에서 확인한 후 기본 감시 대상 여부와 현재 모드의 의미를 구분해 저장. 동시 변경 충돌 고려.
     raise FeatureNotImplemented("cctvs.update_monitoring DB 쿼리 구현 예정")

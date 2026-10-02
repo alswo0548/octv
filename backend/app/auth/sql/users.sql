@@ -17,3 +17,5 @@ COMMENT ON COLUMN users.role IS '역할';
 COMMENT ON COLUMN users.is_active IS '활성 여부';
 COMMENT ON COLUMN users.agency_id IS '기관 ID';
 COMMENT ON COLUMN users.notification_enabled IS '알림 수신 여부';
+
+CREATE UNIQUE INDEX uq_users_email_normalized ON users (lower(btrim(email)));
