@@ -2,9 +2,12 @@
 -- Always run with python scripts/db.py migrate (verified pg_dump backup first).
 \set ON_ERROR_STOP on
 \if :{?backup_confirmed}
+  \if :backup_confirmed
+  \else
+    DO $$ BEGIN RAISE EXCEPTION 'STOP: Run python scripts/db.py migrate to create a backup first.'; END $$;
+  \endif
 \else
-  \echo 'STOP: Run python scripts/db.py migrate to create a backup first.'
-  \quit 3
+  DO $$ BEGIN RAISE EXCEPTION 'STOP: Run python scripts/db.py migrate to create a backup first.'; END $$;
 \endif
 BEGIN;
 SET LOCAL search_path TO public;

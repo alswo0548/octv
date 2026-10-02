@@ -31,6 +31,12 @@ PGlite는 검증 환경에만 설치했으며 프로젝트 실행 방식·의존
 
 Word 검수: 폴더 안내 2쪽, Docker DB 가이드 3쪽. 모든 최종 페이지를 렌더링해 한글·표·명령어 잘림이 없는지 확인했습니다.
 
+## GitHub PostgreSQL 17 검사
+
+PR #9 첫 실행에서 실제 PostgreSQL 17.11의 신규 DDL·UNIQUE 동작·Python 연결과 14개/13개 테이블 갱신·오류 rollback이 통과했습니다.
+백업 미확인 시 psql의 종료 코드를 검사하면서 `\quit 3`이 오류 종료를 보장하지 못하는 점을 확인해 SQL 예외로 수정했습니다.
+백업 변수 누락과 false 모두 오류 종료하며, 데이터베이스 변경을 시작하지 않는 검사를 추가했습니다. 최종 커밋 결과는 PR Checks에서 확인합니다.
+
 ## 정적 검토
 
 - 최신 ERD 이미지의 테이블·컬럼·상태·PK/FK와 SQL 대조.
@@ -46,7 +52,7 @@ Word 검수: 폴더 안내 2쪽, Docker DB 가이드 3쪽. 모든 최종 페이�
 - Docker/Compose 명령과 postgres:17.11-bookworm 이미지의 실제 기동·마운트·초기화 훅.
 - Windows Docker Desktop·WSL 2·각 PC의 포트 및 볼륨 보존 동작.
 - Docker 안의 pg_dump/pg_restore 백업·복구 명령, psql 메타명령 실행.
-- 실제 PostgreSQL 17 서버를 대상으로 한 Python 접속. PR의 database 작업에서 신규 생성·psql 백업 가드·2종 기존 DB 갱신·rollback을 실행하도록 연결했습니다. 실제 원격 결과는 PR Checks를 기준으로 확인합니다.
+- 사용자 PC의 PostgreSQL 17 서버 대상 Python 접속. GitHub의 PostgreSQL 17.11 접속은 위와 같이 확인했습니다.
 - Windows UI 직접 조작, 휴대폰 네이티브 실행과 GPU/학습 환경. 이번에 학습 환경을 변경하지 않았습니다.
 
 이 검증으로 업무 기능·인증·AI·알림이 완성됐다고 판단하지 않습니다. 기존 501 골격을 유지합니다.
