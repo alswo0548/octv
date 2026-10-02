@@ -57,4 +57,5 @@ postgres-data/
 database/backups/
 *.dump
 *.backup
+*.bat
 settings.json
