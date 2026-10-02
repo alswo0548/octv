@@ -26,7 +26,7 @@ def health():
     # 서버 기동 확인만 합니다. DB/AI 연결 성공을 뜻하지 않습니다.
     return {
         "status": "ok",
-        "database": "not_connected",
+        "database": "not_checked",
         "business_api": "not_implemented",
     }
 

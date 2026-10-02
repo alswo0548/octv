@@ -3,29 +3,23 @@ CREATE TABLE route_candidates (
     route_name VARCHAR(100) NOT NULL,
     distance_m INT NOT NULL,
     duration_sec INT NOT NULL,
-    traffic_score DECIMAL(6,2),
-    control_score DECIMAL(6,2),
-    hazard_score DECIMAL(6,2),
-    accessibility_score DECIMAL(6,2),
-    distance_score DECIMAL(6,2),
     total_score DECIMAL(6,2),
-    score_breakdown_json JSON NOT NULL,
+    score_breakdown_json JSON,
     disqualify_reason VARCHAR(500),
     route_path_json JSON NOT NULL,
-    route_evaluation_id BIGINT NOT NULL REFERENCES route_evaluations(id)
+    rule_version VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    agency_recommendation_id BIGINT NOT NULL REFERENCES incident_agency_recommendations(id)
 );
 COMMENT ON TABLE route_candidates IS '후보 경로 A/B/C';
 COMMENT ON COLUMN route_candidates.id IS '후보 경로 ID';
 COMMENT ON COLUMN route_candidates.route_name IS '경로명';
 COMMENT ON COLUMN route_candidates.distance_m IS '거리(m)';
 COMMENT ON COLUMN route_candidates.duration_sec IS '예상 이동 시간(초)';
-COMMENT ON COLUMN route_candidates.traffic_score IS '교통 점수';
-COMMENT ON COLUMN route_candidates.control_score IS '통제 점수';
-COMMENT ON COLUMN route_candidates.hazard_score IS '위험 점수';
-COMMENT ON COLUMN route_candidates.accessibility_score IS '접근성 점수';
-COMMENT ON COLUMN route_candidates.distance_score IS '거리 점수';
 COMMENT ON COLUMN route_candidates.total_score IS '총점';
 COMMENT ON COLUMN route_candidates.score_breakdown_json IS '점수 세부 내역 JSON';
 COMMENT ON COLUMN route_candidates.disqualify_reason IS '후보 제외 사유';
 COMMENT ON COLUMN route_candidates.route_path_json IS '경로 좌표 JSON';
-COMMENT ON COLUMN route_candidates.route_evaluation_id IS '경로 평가 ID';
+COMMENT ON COLUMN route_candidates.rule_version IS '규칙 버전';
+COMMENT ON COLUMN route_candidates.created_at IS '생성 일시';
+COMMENT ON COLUMN route_candidates.agency_recommendation_id IS '기관 추천 ID';

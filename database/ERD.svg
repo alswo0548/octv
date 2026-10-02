@@ -1,0 +1,572 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3260" height="2440" viewBox="0 0 3260 2440">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#9aabc0"/></marker></defs>
+<style>text{font-family:"Noto Sans KR",sans-serif;fill:#172b46} .head{fill:white;font-weight:700}.field{font-family:"DejaVu Sans Mono",monospace;font-size:13px}.type{font-family:"DejaVu Sans Mono",monospace;font-size:12px;fill:#4e6076}</style>
+<rect width="3260" height="2440" fill="#f3f6fa"/>
+<text x="42" y="53" font-size="32" class="">OCTV 최종 ERD  |  PostgreSQL</text>
+<text x="42" y="85" font-size="18" class="">13 tables  ·  123 columns  ·  19 foreign keys  ·  10 ENUMs  ·  7 additional UNIQUE rules  |  2026-10-02</text>
+<text x="42" y="115" font-size="17" class="">PK 기본키   FK 외래키   NN 필수값   NULL 선택값   U1–U7 고유 규칙   •   화살표: 참조하는 테이블 → 참조 대상</text>
+<path d="M847 204 H814.5 V204 H782" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 714 H1619.5 V714 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 714 H1619.5 V204 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 204 H1619.5 V204 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M597.0 670 V510.0 H597.0 V350" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M597.0 1180 V765.0 H597.0 V350" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 1224 H1619.5 V714 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1402.0 1180 V1163.0 H1402.0 V1146" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M847 1224 H814.5 V1224 H782" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M847 714 H814.5 V714 H782" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 1224 H2022.0 V714 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 1224 H2022.0 V204 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 1224 H2424.5 V204 H2392" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 1224 H2424.5 V714 H2392" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 714 H2424.5 V714 H2392" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2457 204 H2424.5 V204 H2392" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 1734 H1619.5 V714 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M2207.0 1690 V1085.0 H2207.0 V480" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M1652 1734 H1619.5 V204 H1587" fill="none" stroke="#9aabc0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<rect x="42" y="160" width="740" height="190" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M49 160 H775 Q782 160 782 167 V215 H42 V167 Q42 160 49 160" fill="#244563"/>
+<text x="56" y="184" font-size="20" class="head">region</text>
+<text x="56" y="205" font-size="14" class="head">지역코드</text>
+<rect x="43" y="218" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="236" font-size="13" class="field">region_code</text>
+<text x="394" y="236" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="236" font-size="12" class="">PK NN</text>
+<text x="54" y="262" font-size="13" class="field">sido_name</text>
+<text x="394" y="262" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="262" font-size="12" class="">NN</text>
+<rect x="43" y="270" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="288" font-size="13" class="field">sigungu_name</text>
+<text x="394" y="288" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="288" font-size="12" class="">NN</text>
+<text x="54" y="314" font-size="13" class="field">weather_region_code</text>
+<text x="394" y="314" font-size="12" class="type">varchar(500)</text>
+<text x="693" y="314" font-size="12" class="">NULL</text>
+<rect x="847" y="160" width="740" height="294" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M854 160 H1580 Q1587 160 1587 167 V215 H847 V167 Q847 160 854 160" fill="#244563"/>
+<text x="861" y="184" font-size="20" class="head">agencies</text>
+<text x="861" y="205" font-size="14" class="head">대응 후보 기관</text>
+<rect x="848" y="218" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="236" font-size="13" class="field">id</text>
+<text x="1199" y="236" font-size="12" class="type">bigint</text>
+<text x="1498" y="236" font-size="12" class="">PK NN</text>
+<text x="859" y="262" font-size="13" class="field">name</text>
+<text x="1199" y="262" font-size="12" class="type">varchar(150)</text>
+<text x="1498" y="262" font-size="12" class="">NN</text>
+<rect x="848" y="270" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="288" font-size="13" class="field">agency_type</text>
+<text x="1199" y="288" font-size="12" class="type">agency_type_enum</text>
+<text x="1498" y="288" font-size="12" class="">NN</text>
+<text x="859" y="314" font-size="13" class="field">address</text>
+<text x="1199" y="314" font-size="12" class="type">varchar(255)</text>
+<text x="1498" y="314" font-size="12" class="">NULL</text>
+<rect x="848" y="322" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="340" font-size="13" class="field">latitude</text>
+<text x="1199" y="340" font-size="12" class="type">numeric(10,7)</text>
+<text x="1498" y="340" font-size="12" class="">NN</text>
+<text x="859" y="366" font-size="13" class="field">longitude</text>
+<text x="1199" y="366" font-size="12" class="type">numeric(10,7)</text>
+<text x="1498" y="366" font-size="12" class="">NN</text>
+<rect x="848" y="374" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="392" font-size="13" class="field">phone</text>
+<text x="1199" y="392" font-size="12" class="type">varchar(30)</text>
+<text x="1498" y="392" font-size="12" class="">NULL</text>
+<text x="859" y="418" font-size="13" class="field">region_code</text>
+<text x="1199" y="418" font-size="12" class="type">varchar(100)</text>
+<text x="1498" y="418" font-size="12" class="">FK NN</text>
+<rect x="1652" y="160" width="740" height="320" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M1659 160 H2385 Q2392 160 2392 167 V215 H1652 V167 Q1652 160 1659 160" fill="#244563"/>
+<text x="1666" y="184" font-size="20" class="head">users</text>
+<text x="1666" y="205" font-size="14" class="head">관리자·출동요원</text>
+<rect x="1653" y="218" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="236" font-size="13" class="field">id</text>
+<text x="2004" y="236" font-size="12" class="type">bigint</text>
+<text x="2303" y="236" font-size="12" class="">PK NN</text>
+<text x="1664" y="262" font-size="13" class="field">email</text>
+<text x="2004" y="262" font-size="12" class="type">varchar(255)</text>
+<text x="2303" y="262" font-size="12" class="">NN</text>
+<rect x="1653" y="270" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="288" font-size="13" class="field">password_hash</text>
+<text x="2004" y="288" font-size="12" class="type">varchar(255)</text>
+<text x="2303" y="288" font-size="12" class="">NN</text>
+<text x="1664" y="314" font-size="13" class="field">name</text>
+<text x="2004" y="314" font-size="12" class="type">varchar(100)</text>
+<text x="2303" y="314" font-size="12" class="">NN</text>
+<rect x="1653" y="322" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="340" font-size="13" class="field">role</text>
+<text x="2004" y="340" font-size="12" class="type">user_role_enum</text>
+<text x="2303" y="340" font-size="12" class="">NN</text>
+<text x="1664" y="366" font-size="13" class="field">is_active</text>
+<text x="2004" y="366" font-size="12" class="type">boolean</text>
+<text x="2303" y="366" font-size="12" class="">NN</text>
+<rect x="1653" y="374" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="392" font-size="13" class="field">agency_id</text>
+<text x="2004" y="392" font-size="12" class="type">bigint</text>
+<text x="2303" y="392" font-size="12" class="">FK NULL</text>
+<text x="1664" y="418" font-size="13" class="field">notification_enabled</text>
+<text x="2004" y="418" font-size="12" class="type">boolean</text>
+<text x="2303" y="418" font-size="12" class="">NN</text>
+<text x="1666" y="448" font-size="14" class="" style="fill:#125ca6">U1  lower(btrim(email))</text>
+<rect x="2457" y="160" width="740" height="424" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M2464 160 H3190 Q3197 160 3197 167 V215 H2457 V167 Q2457 160 2464 160" fill="#244563"/>
+<text x="2471" y="184" font-size="20" class="head">monitoring_settings</text>
+<text x="2471" y="205" font-size="14" class="head">감시·분석 기준</text>
+<rect x="2458" y="218" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="236" font-size="13" class="field">id</text>
+<text x="2809" y="236" font-size="12" class="type">bigint</text>
+<text x="3108" y="236" font-size="12" class="">PK NN</text>
+<text x="2469" y="262" font-size="13" class="field">base_analysis_interval_sec</text>
+<text x="2809" y="262" font-size="12" class="type">int</text>
+<text x="3108" y="262" font-size="12" class="">NN</text>
+<rect x="2458" y="270" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="288" font-size="13" class="field">alert_analysis_interval_sec</text>
+<text x="2809" y="288" font-size="12" class="type">int</text>
+<text x="3108" y="288" font-size="12" class="">NN</text>
+<text x="2469" y="314" font-size="13" class="field">verify_analysis_interval_sec</text>
+<text x="2809" y="314" font-size="12" class="type">int</text>
+<text x="3108" y="314" font-size="12" class="">NN</text>
+<rect x="2458" y="322" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="340" font-size="13" class="field">candidate_confidence_threshold</text>
+<text x="2809" y="340" font-size="12" class="type">numeric(5,4)</text>
+<text x="3108" y="340" font-size="12" class="">NN</text>
+<text x="2469" y="366" font-size="13" class="field">candidate_min_detection_count</text>
+<text x="2809" y="366" font-size="12" class="type">int</text>
+<text x="3108" y="366" font-size="12" class="">NN</text>
+<rect x="2458" y="374" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="392" font-size="13" class="field">temporal_validation_sec</text>
+<text x="2809" y="392" font-size="12" class="type">int</text>
+<text x="3108" y="392" font-size="12" class="">NN</text>
+<text x="2469" y="418" font-size="13" class="field">incident_confidence_threshold</text>
+<text x="2809" y="418" font-size="12" class="type">numeric(5,4)</text>
+<text x="3108" y="418" font-size="12" class="">NN</text>
+<rect x="2458" y="426" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="444" font-size="13" class="field">reconnect_interval_sec</text>
+<text x="2809" y="444" font-size="12" class="type">int</text>
+<text x="3108" y="444" font-size="12" class="">NN</text>
+<text x="2469" y="470" font-size="13" class="field">max_reconnect_attempts</text>
+<text x="2809" y="470" font-size="12" class="type">int</text>
+<text x="3108" y="470" font-size="12" class="">NN</text>
+<rect x="2458" y="478" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="496" font-size="13" class="field">quality_threshold</text>
+<text x="2809" y="496" font-size="12" class="type">numeric(5,4)</text>
+<text x="3108" y="496" font-size="12" class="">NN</text>
+<text x="2469" y="522" font-size="13" class="field">updated_by</text>
+<text x="2809" y="522" font-size="12" class="type">bigint</text>
+<text x="3108" y="522" font-size="12" class="">FK NULL</text>
+<rect x="2458" y="530" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="548" font-size="13" class="field">updated_at</text>
+<text x="2809" y="548" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="3108" y="548" font-size="12" class="">NN</text>
+<rect x="42" y="670" width="740" height="502" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M49 670 H775 Q782 670 782 677 V725 H42 V677 Q42 670 49 670" fill="#244563"/>
+<text x="56" y="694" font-size="20" class="head">cctvs</text>
+<text x="56" y="715" font-size="14" class="head">CCTV 기본정보·현재 상태</text>
+<rect x="43" y="728" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="746" font-size="13" class="field">id</text>
+<text x="394" y="746" font-size="12" class="type">bigint</text>
+<text x="693" y="746" font-size="12" class="">PK NN</text>
+<text x="54" y="772" font-size="13" class="field">external_cctv_id</text>
+<text x="394" y="772" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="772" font-size="12" class="">NN</text>
+<rect x="43" y="780" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="798" font-size="13" class="field">name</text>
+<text x="394" y="798" font-size="12" class="type">varchar(150)</text>
+<text x="693" y="798" font-size="12" class="">NN</text>
+<text x="54" y="824" font-size="13" class="field">provider</text>
+<text x="394" y="824" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="824" font-size="12" class="">NN</text>
+<rect x="43" y="832" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="850" font-size="13" class="field">address</text>
+<text x="394" y="850" font-size="12" class="type">varchar(255)</text>
+<text x="693" y="850" font-size="12" class="">NULL</text>
+<text x="54" y="876" font-size="13" class="field">latitude</text>
+<text x="394" y="876" font-size="12" class="type">numeric(10,7)</text>
+<text x="693" y="876" font-size="12" class="">NN</text>
+<rect x="43" y="884" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="902" font-size="13" class="field">longitude</text>
+<text x="394" y="902" font-size="12" class="type">numeric(10,7)</text>
+<text x="693" y="902" font-size="12" class="">NN</text>
+<text x="54" y="928" font-size="13" class="field">stream_url</text>
+<text x="394" y="928" font-size="12" class="type">varchar(500)</text>
+<text x="693" y="928" font-size="12" class="">NULL</text>
+<rect x="43" y="936" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="954" font-size="13" class="field">is_monitored</text>
+<text x="394" y="954" font-size="12" class="type">boolean</text>
+<text x="693" y="954" font-size="12" class="">NN</text>
+<text x="54" y="980" font-size="13" class="field">connection_status</text>
+<text x="394" y="980" font-size="12" class="type">connection_status_enum</text>
+<text x="693" y="980" font-size="12" class="">NN</text>
+<rect x="43" y="988" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1006" font-size="13" class="field">video_quality_status</text>
+<text x="394" y="1006" font-size="12" class="type">video_quality_enum</text>
+<text x="693" y="1006" font-size="12" class="">NULL</text>
+<text x="54" y="1032" font-size="13" class="field">analysis_status</text>
+<text x="394" y="1032" font-size="12" class="type">analysis_status_enum</text>
+<text x="693" y="1032" font-size="12" class="">NULL</text>
+<rect x="43" y="1040" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1058" font-size="13" class="field">last_frame_at</text>
+<text x="394" y="1058" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="693" y="1058" font-size="12" class="">NULL</text>
+<text x="54" y="1084" font-size="13" class="field">region_code</text>
+<text x="394" y="1084" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="1084" font-size="12" class="">FK NULL</text>
+<rect x="43" y="1092" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1110" font-size="13" class="field">monitored_mode</text>
+<text x="394" y="1110" font-size="12" class="type">monitored_mode_enum</text>
+<text x="693" y="1110" font-size="12" class="">NULL</text>
+<text x="56" y="1140" font-size="14" class="" style="fill:#125ca6">U2  provider + external_cctv_id</text>
+<rect x="847" y="670" width="740" height="476" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M854 670 H1580 Q1587 670 1587 677 V725 H847 V677 Q847 670 854 670" fill="#244563"/>
+<text x="861" y="694" font-size="20" class="head">incidents</text>
+<text x="861" y="715" font-size="14" class="head">확정 사건</text>
+<rect x="848" y="728" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="746" font-size="13" class="field">id</text>
+<text x="1199" y="746" font-size="12" class="type">bigint</text>
+<text x="1498" y="746" font-size="12" class="">PK NN</text>
+<text x="859" y="772" font-size="13" class="field">incident_no</text>
+<text x="1199" y="772" font-size="12" class="type">varchar(50)</text>
+<text x="1498" y="772" font-size="12" class="">NN</text>
+<rect x="848" y="780" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="798" font-size="13" class="field">cctv_id</text>
+<text x="1199" y="798" font-size="12" class="type">bigint</text>
+<text x="1498" y="798" font-size="12" class="">FK NN</text>
+<text x="859" y="824" font-size="13" class="field">hazard_type</text>
+<text x="1199" y="824" font-size="12" class="type">varchar(50)</text>
+<text x="1498" y="824" font-size="12" class="">NN</text>
+<rect x="848" y="832" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="850" font-size="13" class="field">confidence</text>
+<text x="1199" y="850" font-size="12" class="type">numeric(5,4)</text>
+<text x="1498" y="850" font-size="12" class="">NN</text>
+<text x="859" y="876" font-size="13" class="field">model_version</text>
+<text x="1199" y="876" font-size="12" class="type">varchar(100)</text>
+<text x="1498" y="876" font-size="12" class="">NN</text>
+<rect x="848" y="884" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="902" font-size="13" class="field">detection_image_path</text>
+<text x="1199" y="902" font-size="12" class="type">varchar(500)</text>
+<text x="1498" y="902" font-size="12" class="">NN</text>
+<text x="859" y="928" font-size="13" class="field">detection_bbox_json</text>
+<text x="1199" y="928" font-size="12" class="type">json</text>
+<text x="1498" y="928" font-size="12" class="">NN</text>
+<rect x="848" y="936" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="954" font-size="13" class="field">dedup_key</text>
+<text x="1199" y="954" font-size="12" class="type">varchar(255)</text>
+<text x="1498" y="954" font-size="12" class="">NN</text>
+<text x="859" y="980" font-size="13" class="field">status</text>
+<text x="1199" y="980" font-size="12" class="type">incident_status_enum</text>
+<text x="1498" y="980" font-size="12" class="">NN</text>
+<rect x="848" y="988" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1006" font-size="13" class="field">detected_at</text>
+<text x="1199" y="1006" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="1498" y="1006" font-size="12" class="">NN</text>
+<text x="859" y="1032" font-size="13" class="field">last_detected_at</text>
+<text x="1199" y="1032" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="1498" y="1032" font-size="12" class="">NN</text>
+<text x="861" y="1062" font-size="14" class="" style="fill:#125ca6">U3  incident_no</text>
+<text x="861" y="1088" font-size="14" class="" style="fill:#125ca6">U4  cctv_id + hazard_type + dedup_key</text>
+<text x="861" y="1114" font-size="14" class="" style="fill:#125ca6">U4  WHERE status IN (DETECTED, CONFIRMED, SENT)</text>
+<rect x="1652" y="670" width="740" height="320" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M1659 670 H2385 Q2392 670 2392 677 V725 H1652 V677 Q1652 670 1659 670" fill="#244563"/>
+<text x="1666" y="694" font-size="20" class="head">incident_agency_recommendations</text>
+<text x="1666" y="715" font-size="14" class="head">사건별 추천 기관</text>
+<rect x="1653" y="728" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="746" font-size="13" class="field">id</text>
+<text x="2004" y="746" font-size="12" class="type">bigint</text>
+<text x="2303" y="746" font-size="12" class="">PK NN</text>
+<text x="1664" y="772" font-size="13" class="field">recommendation_rank</text>
+<text x="2004" y="772" font-size="12" class="type">int</text>
+<text x="2303" y="772" font-size="12" class="">NN</text>
+<rect x="1653" y="780" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="798" font-size="13" class="field">recommendation_score</text>
+<text x="2004" y="798" font-size="12" class="type">numeric(6,2)</text>
+<text x="2303" y="798" font-size="12" class="">NN</text>
+<text x="1664" y="824" font-size="13" class="field">score_breakdown_json</text>
+<text x="2004" y="824" font-size="12" class="type">json</text>
+<text x="2303" y="824" font-size="12" class="">NN</text>
+<rect x="1653" y="832" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="850" font-size="13" class="field">rule_version</text>
+<text x="2004" y="850" font-size="12" class="type">varchar(50)</text>
+<text x="2303" y="850" font-size="12" class="">NN</text>
+<text x="1664" y="876" font-size="13" class="field">recommendation_status</text>
+<text x="2004" y="876" font-size="12" class="type">recommendation_status_enum</text>
+<text x="2303" y="876" font-size="12" class="">NN</text>
+<rect x="1653" y="884" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="902" font-size="13" class="field">incident_id</text>
+<text x="2004" y="902" font-size="12" class="type">bigint</text>
+<text x="2303" y="902" font-size="12" class="">FK NN</text>
+<text x="1664" y="928" font-size="13" class="field">agency_id</text>
+<text x="2004" y="928" font-size="12" class="type">bigint</text>
+<text x="2303" y="928" font-size="12" class="">FK NN</text>
+<text x="1666" y="958" font-size="14" class="" style="fill:#125ca6">U6  incident_id + agency_id</text>
+<rect x="2457" y="670" width="740" height="372" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M2464 670 H3190 Q3197 670 3197 677 V725 H2457 V677 Q2457 670 2464 670" fill="#244563"/>
+<text x="2471" y="694" font-size="20" class="head">route_candidates</text>
+<text x="2471" y="715" font-size="14" class="head">후보 경로 A/B/C</text>
+<rect x="2458" y="728" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="746" font-size="13" class="field">id</text>
+<text x="2809" y="746" font-size="12" class="type">bigint</text>
+<text x="3108" y="746" font-size="12" class="">PK NN</text>
+<text x="2469" y="772" font-size="13" class="field">route_name</text>
+<text x="2809" y="772" font-size="12" class="type">varchar(100)</text>
+<text x="3108" y="772" font-size="12" class="">NN</text>
+<rect x="2458" y="780" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="798" font-size="13" class="field">distance_m</text>
+<text x="2809" y="798" font-size="12" class="type">int</text>
+<text x="3108" y="798" font-size="12" class="">NN</text>
+<text x="2469" y="824" font-size="13" class="field">duration_sec</text>
+<text x="2809" y="824" font-size="12" class="type">int</text>
+<text x="3108" y="824" font-size="12" class="">NN</text>
+<rect x="2458" y="832" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="850" font-size="13" class="field">total_score</text>
+<text x="2809" y="850" font-size="12" class="type">numeric(6,2)</text>
+<text x="3108" y="850" font-size="12" class="">NULL</text>
+<text x="2469" y="876" font-size="13" class="field">score_breakdown_json</text>
+<text x="2809" y="876" font-size="12" class="type">json</text>
+<text x="3108" y="876" font-size="12" class="">NULL</text>
+<rect x="2458" y="884" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="902" font-size="13" class="field">disqualify_reason</text>
+<text x="2809" y="902" font-size="12" class="type">varchar(500)</text>
+<text x="3108" y="902" font-size="12" class="">NULL</text>
+<text x="2469" y="928" font-size="13" class="field">route_path_json</text>
+<text x="2809" y="928" font-size="12" class="type">json</text>
+<text x="3108" y="928" font-size="12" class="">NN</text>
+<rect x="2458" y="936" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="954" font-size="13" class="field">rule_version</text>
+<text x="2809" y="954" font-size="12" class="type">varchar(50)</text>
+<text x="3108" y="954" font-size="12" class="">NN</text>
+<text x="2469" y="980" font-size="13" class="field">created_at</text>
+<text x="2809" y="980" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="3108" y="980" font-size="12" class="">NN</text>
+<rect x="2458" y="988" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="1006" font-size="13" class="field">agency_recommendation_id</text>
+<text x="2809" y="1006" font-size="12" class="type">bigint</text>
+<text x="3108" y="1006" font-size="12" class="">FK NN</text>
+<rect x="42" y="1180" width="740" height="346" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M49 1180 H775 Q782 1180 782 1187 V1235 H42 V1187 Q42 1180 49 1180" fill="#244563"/>
+<text x="56" y="1204" font-size="20" class="head">weather_alerts</text>
+<text x="56" y="1225" font-size="14" class="head">기상특보</text>
+<rect x="43" y="1238" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1256" font-size="13" class="field">id</text>
+<text x="394" y="1256" font-size="12" class="type">bigint</text>
+<text x="693" y="1256" font-size="12" class="">PK NN</text>
+<text x="54" y="1282" font-size="13" class="field">external_alert_id</text>
+<text x="394" y="1282" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="1282" font-size="12" class="">NN</text>
+<rect x="43" y="1290" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1308" font-size="13" class="field">alert_type</text>
+<text x="394" y="1308" font-size="12" class="type">varchar(50)</text>
+<text x="693" y="1308" font-size="12" class="">NN</text>
+<text x="54" y="1334" font-size="13" class="field">alert_level</text>
+<text x="394" y="1334" font-size="12" class="type">varchar(50)</text>
+<text x="693" y="1334" font-size="12" class="">NN</text>
+<rect x="43" y="1342" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1360" font-size="13" class="field">title</text>
+<text x="394" y="1360" font-size="12" class="type">varchar(255)</text>
+<text x="693" y="1360" font-size="12" class="">NN</text>
+<text x="54" y="1386" font-size="13" class="field">issued_at</text>
+<text x="394" y="1386" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="693" y="1386" font-size="12" class="">NN</text>
+<rect x="43" y="1394" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1412" font-size="13" class="field">ended_at</text>
+<text x="394" y="1412" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="693" y="1412" font-size="12" class="">NULL</text>
+<text x="54" y="1438" font-size="13" class="field">status</text>
+<text x="394" y="1438" font-size="12" class="type">weather_status_enum</text>
+<text x="693" y="1438" font-size="12" class="">NN</text>
+<rect x="43" y="1446" width="738" height="26" fill="#f4f7fa"/>
+<text x="54" y="1464" font-size="13" class="field">region_code</text>
+<text x="394" y="1464" font-size="12" class="type">varchar(100)</text>
+<text x="693" y="1464" font-size="12" class="">FK NN</text>
+<text x="56" y="1494" font-size="14" class="" style="fill:#125ca6">U5  external_alert_id + region_code</text>
+<rect x="847" y="1180" width="740" height="398" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M854 1180 H1580 Q1587 1180 1587 1187 V1235 H847 V1187 Q847 1180 854 1180" fill="#244563"/>
+<text x="861" y="1204" font-size="20" class="head">incident_contexts</text>
+<text x="861" y="1225" font-size="14" class="head">외부 상황 스냅샷</text>
+<rect x="848" y="1238" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1256" font-size="13" class="field">id</text>
+<text x="1199" y="1256" font-size="12" class="type">bigint</text>
+<text x="1498" y="1256" font-size="12" class="">PK NN</text>
+<text x="859" y="1282" font-size="13" class="field">incident_id</text>
+<text x="1199" y="1282" font-size="12" class="type">bigint</text>
+<text x="1498" y="1282" font-size="12" class="">FK NN</text>
+<rect x="848" y="1290" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1308" font-size="13" class="field">weather_alert_id</text>
+<text x="1199" y="1308" font-size="12" class="type">bigint</text>
+<text x="1498" y="1308" font-size="12" class="">FK NULL</text>
+<text x="859" y="1334" font-size="13" class="field">rainfall_mm</text>
+<text x="1199" y="1334" font-size="12" class="type">numeric(7,2)</text>
+<text x="1498" y="1334" font-size="12" class="">NULL</text>
+<rect x="848" y="1342" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1360" font-size="13" class="field">water_level_m</text>
+<text x="1199" y="1360" font-size="12" class="type">numeric(7,2)</text>
+<text x="1498" y="1360" font-size="12" class="">NULL</text>
+<text x="859" y="1386" font-size="13" class="field">traffic_level</text>
+<text x="1199" y="1386" font-size="12" class="type">varchar(30)</text>
+<text x="1498" y="1386" font-size="12" class="">NULL</text>
+<rect x="848" y="1394" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1412" font-size="13" class="field">blocked_lane_count</text>
+<text x="1199" y="1412" font-size="12" class="type">int</text>
+<text x="1498" y="1412" font-size="12" class="">NULL</text>
+<text x="859" y="1438" font-size="13" class="field">road_type</text>
+<text x="1199" y="1438" font-size="12" class="type">varchar(50)</text>
+<text x="1498" y="1438" font-size="12" class="">NULL</text>
+<rect x="848" y="1446" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1464" font-size="13" class="field">nearby_facility_type</text>
+<text x="1199" y="1464" font-size="12" class="type">varchar(100)</text>
+<text x="1498" y="1464" font-size="12" class="">NULL</text>
+<text x="859" y="1490" font-size="13" class="field">nearby_facility_distance_m</text>
+<text x="1199" y="1490" font-size="12" class="type">int</text>
+<text x="1498" y="1490" font-size="12" class="">NULL</text>
+<rect x="848" y="1498" width="738" height="26" fill="#f4f7fa"/>
+<text x="859" y="1516" font-size="13" class="field">past_disaster_count</text>
+<text x="1199" y="1516" font-size="12" class="type">int</text>
+<text x="1498" y="1516" font-size="12" class="">NULL</text>
+<text x="859" y="1542" font-size="13" class="field">captured_at</text>
+<text x="1199" y="1542" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="1498" y="1542" font-size="12" class="">NN</text>
+<rect x="1652" y="1180" width="740" height="320" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M1659 1180 H2385 Q2392 1180 2392 1187 V1235 H1652 V1187 Q1652 1180 1659 1180" fill="#244563"/>
+<text x="1666" y="1204" font-size="20" class="head">incident_assessments</text>
+<text x="1666" y="1225" font-size="14" class="head">위험도·우선순위</text>
+<rect x="1653" y="1238" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1256" font-size="13" class="field">id</text>
+<text x="2004" y="1256" font-size="12" class="type">bigint</text>
+<text x="2303" y="1256" font-size="12" class="">PK NN</text>
+<text x="1664" y="1282" font-size="13" class="field">incident_id</text>
+<text x="2004" y="1282" font-size="12" class="type">bigint</text>
+<text x="2303" y="1282" font-size="12" class="">FK NN</text>
+<rect x="1653" y="1290" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1308" font-size="13" class="field">risk_score</text>
+<text x="2004" y="1308" font-size="12" class="type">numeric(6,2)</text>
+<text x="2303" y="1308" font-size="12" class="">NN</text>
+<text x="1664" y="1334" font-size="13" class="field">risk_level</text>
+<text x="2004" y="1334" font-size="12" class="type">varchar(30)</text>
+<text x="2303" y="1334" font-size="12" class="">NN</text>
+<rect x="1653" y="1342" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1360" font-size="13" class="field">risk_breakdown_json</text>
+<text x="2004" y="1360" font-size="12" class="type">json</text>
+<text x="2303" y="1360" font-size="12" class="">NN</text>
+<text x="1664" y="1386" font-size="13" class="field">priority_score</text>
+<text x="2004" y="1386" font-size="12" class="type">numeric(6,2)</text>
+<text x="2303" y="1386" font-size="12" class="">NN</text>
+<rect x="1653" y="1394" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1412" font-size="13" class="field">priority</text>
+<text x="2004" y="1412" font-size="12" class="type">varchar(30)</text>
+<text x="2303" y="1412" font-size="12" class="">NN</text>
+<text x="1664" y="1438" font-size="13" class="field">priority_breakdown_json</text>
+<text x="2004" y="1438" font-size="12" class="type">json</text>
+<text x="2303" y="1438" font-size="12" class="">NN</text>
+<rect x="1653" y="1446" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1464" font-size="13" class="field">rule_version</text>
+<text x="2004" y="1464" font-size="12" class="type">varchar(50)</text>
+<text x="2303" y="1464" font-size="12" class="">NN</text>
+<rect x="2457" y="1180" width="740" height="294" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M2464 1180 H3190 Q3197 1180 3197 1187 V1235 H2457 V1187 Q2457 1180 2464 1180" fill="#244563"/>
+<text x="2471" y="1204" font-size="20" class="head">notifications</text>
+<text x="2471" y="1225" font-size="14" class="head">사용자별 알림</text>
+<rect x="2458" y="1238" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="1256" font-size="13" class="field">id</text>
+<text x="2809" y="1256" font-size="12" class="type">bigint</text>
+<text x="3108" y="1256" font-size="12" class="">PK NN</text>
+<text x="2469" y="1282" font-size="13" class="field">read_at</text>
+<text x="2809" y="1282" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="3108" y="1282" font-size="12" class="">NULL</text>
+<rect x="2458" y="1290" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="1308" font-size="13" class="field">created_at</text>
+<text x="2809" y="1308" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="3108" y="1308" font-size="12" class="">NN</text>
+<text x="2469" y="1334" font-size="13" class="field">incidents_id</text>
+<text x="2809" y="1334" font-size="12" class="type">bigint</text>
+<text x="3108" y="1334" font-size="12" class="">FK NN</text>
+<rect x="2458" y="1342" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="1360" font-size="13" class="field">agency_id</text>
+<text x="2809" y="1360" font-size="12" class="type">bigint</text>
+<text x="3108" y="1360" font-size="12" class="">FK NN</text>
+<text x="2469" y="1386" font-size="13" class="field">user_id</text>
+<text x="2809" y="1386" font-size="12" class="type">bigint</text>
+<text x="3108" y="1386" font-size="12" class="">FK NN</text>
+<rect x="2458" y="1394" width="738" height="26" fill="#f4f7fa"/>
+<text x="2469" y="1412" font-size="13" class="field">agency_recommendation_id</text>
+<text x="2809" y="1412" font-size="12" class="type">bigint</text>
+<text x="3108" y="1412" font-size="12" class="">FK NN</text>
+<text x="2471" y="1442" font-size="14" class="" style="fill:#125ca6">U7  agency_recommendation_id + user_id</text>
+<rect x="1652" y="1690" width="740" height="268" rx="7" fill="white" stroke="#cad5e2"/>
+<path d="M1659 1690 H2385 Q2392 1690 2392 1697 V1745 H1652 V1697 Q1652 1690 1659 1690" fill="#244563"/>
+<text x="1666" y="1714" font-size="20" class="head">incident_support_requests</text>
+<text x="1666" y="1735" font-size="14" class="head">추가 지원 요청</text>
+<rect x="1653" y="1748" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1766" font-size="13" class="field">id</text>
+<text x="2004" y="1766" font-size="12" class="type">bigint</text>
+<text x="2303" y="1766" font-size="12" class="">PK NN</text>
+<text x="1664" y="1792" font-size="13" class="field">incident_id</text>
+<text x="2004" y="1792" font-size="12" class="type">bigint</text>
+<text x="2303" y="1792" font-size="12" class="">FK NN</text>
+<rect x="1653" y="1800" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1818" font-size="13" class="field">responder_id</text>
+<text x="2004" y="1818" font-size="12" class="type">bigint</text>
+<text x="2303" y="1818" font-size="12" class="">FK NN</text>
+<text x="1664" y="1844" font-size="13" class="field">support_type</text>
+<text x="2004" y="1844" font-size="12" class="type">support_type_enum</text>
+<text x="2303" y="1844" font-size="12" class="">NN</text>
+<rect x="1653" y="1852" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1870" font-size="13" class="field">request_content</text>
+<text x="2004" y="1870" font-size="12" class="type">text</text>
+<text x="2303" y="1870" font-size="12" class="">NN</text>
+<text x="1664" y="1896" font-size="13" class="field">created_at</text>
+<text x="2004" y="1896" font-size="12" class="type">timestamp (without time zone)</text>
+<text x="2303" y="1896" font-size="12" class="">NN</text>
+<rect x="1653" y="1904" width="738" height="26" fill="#f4f7fa"/>
+<text x="1664" y="1922" font-size="13" class="field">agency_id</text>
+<text x="2004" y="1922" font-size="12" class="type">bigint</text>
+<text x="2303" y="1922" font-size="12" class="">FK NN</text>
+<text x="42" y="1775" font-size="23" class="">수정 기준과 저장 규칙</text>
+<text x="42" y="1810" font-size="17" class="">새 첨부 반영: FALSE_POSITIVE · COMPLETED · captured_at NOT NULL</text>
+<text x="42" y="1839" font-size="17" class="">U1: 이메일의 앞뒤 공백과 대소문자를 무시합니다.</text>
+<text x="42" y="1868" font-size="17" class="">U4: RESOLVED / FALSE_POSITIVE 이후 같은 키로 재발 사건 저장 가능</text>
+<text x="42" y="1897" font-size="17" class="">U6: 사건·기관별 현재 추천 1행. 재평가는 기존 행 갱신</text>
+<text x="42" y="1926" font-size="17" class="">U7: 같은 기관추천의 사용자별 알림 중복 생성 방지</text>
+<text x="42" y="1955" font-size="17" class="">상황 스냅샷·평가·경로·지원요청은 여러 행 저장 가능</text>
+<text x="42" y="1984" font-size="17" class="">모든 FK의 실제 참조 컬럼과 NULL 조건: 기능별 sql/*.sql</text>
+<text x="42" y="2013" font-size="17" class="">자세한 UNIQUE 기준: docs/ERD_UNIQUES.md</text>
+<text x="42" y="2042" font-size="17" class="">원본 첨부: database/reference/ERD_2026-10-02.png</text>
+<text x="2457" y="1720" font-size="23" class="">FK 참조 목록</text>
+<text x="2457" y="1754" font-size="10" class="">agencies.region_code → region.region_code</text>
+<text x="2457" y="1771" font-size="10" class="">incident_agency_recommendations.incident_id → incidents.id</text>
+<text x="2457" y="1788" font-size="10" class="">incident_agency_recommendations.agency_id → agencies.id</text>
+<text x="2457" y="1805" font-size="10" class="">users.agency_id → agencies.id</text>
+<text x="2457" y="1822" font-size="10" class="">cctvs.region_code → region.region_code</text>
+<text x="2457" y="1839" font-size="10" class="">weather_alerts.region_code → region.region_code</text>
+<text x="2457" y="1856" font-size="10" class="">incident_assessments.incident_id → incidents.id</text>
+<text x="2457" y="1873" font-size="10" class="">incident_contexts.incident_id → incidents.id</text>
+<text x="2457" y="1890" font-size="10" class="">incident_contexts.weather_alert_id → weather_alerts.id</text>
+<text x="2457" y="1907" font-size="10" class="">incidents.cctv_id → cctvs.id</text>
+<text x="2457" y="1924" font-size="10" class="">notifications.incidents_id → incidents.id</text>
+<text x="2457" y="1941" font-size="10" class="">notifications.agency_id → agencies.id</text>
+<text x="2457" y="1958" font-size="10" class="">notifications.user_id → users.id</text>
+<text x="2457" y="1975" font-size="10" class="">notifications.agency_recommendation_id → incident_agency_recommendations.id</text>
+<text x="2457" y="1992" font-size="10" class="">route_candidates.agency_recommendation_id → incident_agency_recommendations.id</text>
+<text x="2457" y="2009" font-size="10" class="">monitoring_settings.updated_by → users.id</text>
+<text x="2457" y="2026" font-size="10" class="">incident_support_requests.incident_id → incidents.id</text>
+<text x="2457" y="2043" font-size="10" class="">incident_support_requests.responder_id → users.id</text>
+<text x="2457" y="2060" font-size="10" class="">incident_support_requests.agency_id → agencies.id</text>
+<text x="42" y="2130" font-size="23" class="">ENUM 허용값</text>
+<text x="42" y="2170" font-size="16" class="" style="fill:#244563">agency_type_enum</text>
+<text x="392" y="2170" font-size="14" class="">FIRE | POLICE | ROAD_MANAGEMENT | LOCAL_GOVERNMENT</text>
+<text x="42" y="2218" font-size="16" class="" style="fill:#244563">recommendation_status_enum</text>
+<text x="392" y="2218" font-size="14" class="">RECOMMENDED | DELIVERED | COMPLETED</text>
+<text x="42" y="2266" font-size="16" class="" style="fill:#244563">user_role_enum</text>
+<text x="392" y="2266" font-size="14" class="">CONTROL_ADMIN | AGENCY_STAFF | RESPONDER</text>
+<text x="42" y="2314" font-size="16" class="" style="fill:#244563">connection_status_enum</text>
+<text x="392" y="2314" font-size="14" class="">CONNECTED | DISCONNECTED | RECONNECTING</text>
+<text x="42" y="2362" font-size="16" class="" style="fill:#244563">video_quality_enum</text>
+<text x="392" y="2362" font-size="14" class="">GOOD | LOW | UNAVAILABLE</text>
+<text x="1652" y="2170" font-size="16" class="" style="fill:#244563">analysis_status_enum</text>
+<text x="2002" y="2170" font-size="14" class="">RUNNING | STOPPED | ERROR</text>
+<text x="1652" y="2218" font-size="16" class="" style="fill:#244563">monitored_mode_enum</text>
+<text x="2002" y="2218" font-size="14" class="">BASE | ALERT | VERIFY | POST_ALERT | OFF</text>
+<text x="1652" y="2266" font-size="16" class="" style="fill:#244563">weather_status_enum</text>
+<text x="2002" y="2266" font-size="14" class="">ACTIVE | ENDED</text>
+<text x="1652" y="2314" font-size="16" class="" style="fill:#244563">incident_status_enum</text>
+<text x="2002" y="2314" font-size="14" class="">DETECTED | CONFIRMED | SENT | RESOLVED | FALSE_POSITIVE</text>
+<text x="1652" y="2362" font-size="16" class="" style="fill:#244563">support_type_enum</text>
+<text x="2002" y="2362" font-size="14" class="">PERSONNEL | EQUIPMENT | TRAFFIC_CONTROL | OTHER</text>
+</svg>

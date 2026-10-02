@@ -11,7 +11,7 @@ class IncidentResponse(BaseModel):
     incident_no: str
     cctv_id: int
     hazard_type: str
-    status: Literal["DETECTED", "FALSE_POSITIVE", "CONFIRMED", "SENT"]
+    status: Literal["DETECTED", "CONFIRMED", "SENT", "RESOLVED", "FALSE_POSITIVE"]
     confidence: Decimal
     detected_at: datetime
     # TODO: 상세에서 상황 스냅샷·평가·최근 지원요청을 조합하세요.

@@ -10,7 +10,6 @@ CREATE TABLE incident_contexts (
     nearby_facility_type VARCHAR(100),
     nearby_facility_distance_m INT,
     past_disaster_count INT,
-    raw_context_json JSON NOT NULL,
     captured_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 COMMENT ON TABLE incident_contexts IS '외부 상황 스냅샷';
@@ -25,5 +24,4 @@ COMMENT ON COLUMN incident_contexts.road_type IS '도로 유형';
 COMMENT ON COLUMN incident_contexts.nearby_facility_type IS '인근 시설 유형';
 COMMENT ON COLUMN incident_contexts.nearby_facility_distance_m IS '인근 시설 거리(m)';
 COMMENT ON COLUMN incident_contexts.past_disaster_count IS '주변 지역 과거 재난 횟수';
-COMMENT ON COLUMN incident_contexts.raw_context_json IS '외부 상황 원본 JSON';
 COMMENT ON COLUMN incident_contexts.captured_at IS '수집 일시';

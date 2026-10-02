@@ -5,9 +5,9 @@ CREATE TABLE incident_agency_recommendations (
     score_breakdown_json JSON NOT NULL,
     rule_version VARCHAR(50) NOT NULL,
     recommendation_status recommendation_status_enum NOT NULL DEFAULT 'RECOMMENDED',
-    recommended_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     incident_id BIGINT NOT NULL REFERENCES incidents(id),
-    agency_id BIGINT NOT NULL REFERENCES agencies(id)
+    agency_id BIGINT NOT NULL REFERENCES agencies(id),
+    CONSTRAINT uq_recommendations_incident_agency UNIQUE (incident_id, agency_id)
 );
 COMMENT ON TABLE incident_agency_recommendations IS '사건별 추천 기관';
 COMMENT ON COLUMN incident_agency_recommendations.id IS '기관 추천 ID';
@@ -16,6 +16,5 @@ COMMENT ON COLUMN incident_agency_recommendations.recommendation_score IS '기�
 COMMENT ON COLUMN incident_agency_recommendations.score_breakdown_json IS '기관 추천 세부 점수';
 COMMENT ON COLUMN incident_agency_recommendations.rule_version IS '기관 추천 규칙 버전';
 COMMENT ON COLUMN incident_agency_recommendations.recommendation_status IS '기관 추천 처리 상태';
-COMMENT ON COLUMN incident_agency_recommendations.recommended_at IS '기관 추천 시각';
 COMMENT ON COLUMN incident_agency_recommendations.incident_id IS '확정 사건 ID';
-COMMENT ON COLUMN incident_agency_recommendations.agency_id IS '기관 ID · 원본 BIGBT 오기를 BIGINT로 수정';
+COMMENT ON COLUMN incident_agency_recommendations.agency_id IS '기관 ID';

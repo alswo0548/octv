@@ -9,8 +9,8 @@ class CctvResponse(BaseModel):
     name: str
     connection_status: Literal["CONNECTED", "DISCONNECTED", "RECONNECTING"]
     is_monitored: bool
-    monitored_mode: Literal["BASE", "ALERT", "POST_ALERT", "VERIFY"] | None
-    # OFF는 is_monitored=False. UI 표시 문구와 DB 값을 구분합니다.
+    monitored_mode: Literal["BASE", "ALERT", "VERIFY", "POST_ALERT", "OFF"] | None
+    # ERD: is_monitored는 기본 감시 대상 여부, monitored_mode는 현재 감시 상태입니다.
 
 
 class MonitoringRequest(BaseModel):

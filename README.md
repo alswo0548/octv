@@ -3,12 +3,12 @@
 CCTV 기반 재난 대응 의사결정 지원 프로젝트. WEB은 통합관제, MOBILE은 현장 담당자 화면입니다.
 
 **현재:** 프론트엔드는 목업 UI입니다. 백엔드는 서버·API 골격만, AI는 작업 함수만 준비되어 있습니다.
-실제 인증·DB 연결·추천·기관 전달은 앞으로 구현합니다. 업무 API의 `501`은 **아직 미구현**이라는 응답입니다.
+DB 공통 연결·설정·검사 수단은 준비했습니다. 실제 인증·업무 DB 쿼리·추천·기관 전달은 앞으로 구현합니다. 업무 API의 `501`은 **아직 미구현**이라는 응답입니다.
 
 ## 읽는 순서
 
 1. 이 README: 설치·실행·협업
-2. [개발 기준](docs/DEVELOPMENT.md): 확정 정책과 다음 구현 순서
+2. [이번 변경과 확인 사항](docs/CHANGES.md): 최신 ERD 반영·기존 파일 보존
 3. [폴더·파일 설명](docs/STRUCTURE.md): 어느 파일에서 작업하는지
 4. [DB 안내](docs/DATABASE.md): Docker·SQL 적용
 
@@ -68,7 +68,7 @@ CPU 설치로 시작하며 모델 가중치는 포함하지 않습니다. GPU �
 패키지 설치만으로 DB 접속·로그인·AI 판단 기능이 구현되지는 않습니다.
 
 DB는 [DB 안내](docs/DATABASE.md)의 `.env` 준비 → Compose 실행 순서로 진행합니다.
-루트 `.env`는 Docker용입니다. `backend/.env.example`은 향후 연동용이며 현재 서버는 읽지 않습니다.
+루트 `.env`는 Docker와 Python DB 연결이 함께 사용합니다. `backend/.env`의 `DATABASE_URL`이 있으면 우선 적용됩니다. 자세한 설정과 기존 DB 변경은 DB 안내를 따릅니다.
 
 ## 작업 전후
 
@@ -93,3 +93,14 @@ npm run build:mobile:web
 
 종료는 각 서버 창에서 Ctrl+C, DB는 `docker compose stop db`.
 개인 `.env`, `.venv`, `node_modules`, 모델·데이터·빌드 결과는 Git에 올리지 않습니다.
+
+## 이번 결과물 확인
+
+[폴더 안내서](docs/OCTV_폴더구조_핵심안내.docx) · [Docker DB 안내서](docs/OCTV_Docker_DB_세팅가이드.docx) · [검증 결과](docs/VALIDATION.md)
+
+기존 프로젝트에는 개인 작업을 보존한 뒤 반영하고, 옛 `database/schema/`는 새 기능별 `sql/`과 대조 후 정리합니다. 다음 작업은 이 최신 구조를 기준으로 이어갑니다.
+
+## 최종 ERD 수정본 적용
+
+[UNIQUE 7개와 저장 계약](docs/ERD_UNIQUES.md), [GitHub 병합 후 CMD 순서](docs/GITHUB_DB_APPLY.md)를 확인하세요.
+확대용 [ERD.svg](database/ERD.svg)와 [ERD.png](database/ERD.png)는 최종 ENUM·NULL·UNIQUE 기준을 반영합니다.

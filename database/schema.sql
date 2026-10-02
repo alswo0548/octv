@@ -1,21 +1,23 @@
--- 빈 DB 최초 생성용. psql -f database/schema.sql로 실행합니다.
--- 실제 테이블 정의는 schema/ 안에서 수정하세요. 기존 DB에는 재실행하지 않습니다.
+-- 빈 DB 전용 초기화 진입점. 기존 DB에는 재실행하지 않습니다.
 \set ON_ERROR_STOP on
 BEGIN;
 SET LOCAL search_path TO public;
-\ir schema/00_enums.sql
-\ir schema/10_regions.sql
-\ir schema/20_agencies.sql
-\ir schema/30_users.sql
-\ir schema/40_cctvs.sql
-\ir schema/50_monitoring_settings.sql
-\ir schema/60_incidents.sql
-\ir schema/70_weather_alerts.sql
-\ir schema/80_incident_contexts.sql
-\ir schema/90_incident_assessments.sql
-\ir schema/100_agency_recommendations.sql
-\ir schema/110_route_evaluations.sql
-\ir schema/120_route_candidates.sql
-\ir schema/130_notifications.sql
-\ir schema/140_support_requests.sql
+\ir ../backend/app/agencies/sql/enums.sql
+\ir ../backend/app/auth/sql/enums.sql
+\ir ../backend/app/cctvs/sql/enums.sql
+\ir ../backend/app/incidents/sql/enums.sql
+\ir ../backend/app/support_requests/sql/enums.sql
+\ir ../backend/app/db/sql/region.sql
+\ir ../backend/app/agencies/sql/agencies.sql
+\ir ../backend/app/auth/sql/users.sql
+\ir ../backend/app/cctvs/sql/cctvs.sql
+\ir ../backend/app/settings/sql/monitoring_settings.sql
+\ir ../backend/app/incidents/sql/incidents.sql
+\ir ../backend/app/cctvs/sql/weather_alerts.sql
+\ir ../backend/app/incidents/sql/incident_contexts.sql
+\ir ../backend/app/incidents/sql/incident_assessments.sql
+\ir ../backend/app/agencies/sql/incident_agency_recommendations.sql
+\ir ../backend/app/routes/sql/route_candidates.sql
+\ir ../backend/app/notifications/sql/notifications.sql
+\ir ../backend/app/support_requests/sql/incident_support_requests.sql
 COMMIT;
