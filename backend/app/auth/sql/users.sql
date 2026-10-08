@@ -8,7 +8,8 @@ CREATE TABLE users (
     agency_id BIGINT REFERENCES agencies(id),
     notification_enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
-COMMENT ON TABLE users IS '관리자·출동요원';
+
+COMMENT ON TABLE users IS '관제 관리자·기관 담당자·현장 담당자';
 COMMENT ON COLUMN users.id IS '사용자 ID';
 COMMENT ON COLUMN users.email IS '이메일';
 COMMENT ON COLUMN users.password_hash IS '비밀번호 해시';
