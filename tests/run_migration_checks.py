@@ -51,8 +51,15 @@ def main():
                         else:
                             psql(name, 'database/migrations/002_contract.sql')
                     else:
+                        psql(
+                            name,
+                            'database/atlas_migrations/20261008054627_add_agency_service_region_codes.sql'
+                        )
                         psql(name, 'tests/database_contract.sql')
-                        assert check.execute("SELECT rule_version, distance_m, agency_recommendation_id, created_at::text FROM route_candidates").fetchone() == ('r2',123,1,'2026-09-28 00:00:00')
+
+                        assert check.execute(
+                            "SELECT rule_version, distance_m, agency_recommendation_id, created_at::text FROM route_candidates"
+                        ).fetchone() == ('r2', 123, 1, '2026-09-28 00:00:00')
                         assert check.execute('SELECT agency_recommendation_id FROM notifications').fetchone()[0] == 1
                         if shape == 'legacy14':
                             assert check.execute('SELECT status::text FROM incidents').fetchone()[0] == 'FALSE_POSITIVE'

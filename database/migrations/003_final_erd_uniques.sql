@@ -110,5 +110,5 @@ ALTER TABLE incident_agency_recommendations ADD CONSTRAINT uq_recommendations_in
 ALTER TABLE notifications ADD CONSTRAINT uq_notifications_recommendation_user UNIQUE (agency_recommendation_id, user_id);
 CREATE UNIQUE INDEX uq_users_email_normalized ON users (lower(btrim(email)));
 CREATE UNIQUE INDEX uq_incidents_active_dedup ON incidents (cctv_id, hazard_type, dedup_key) WHERE status IN ('DETECTED','CONFIRMED','SENT');
-\ir ../../tests/database_contract.sql
+\ir ../../tests/database_contract_003.sql
 COMMIT;
