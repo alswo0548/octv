@@ -58,3 +58,6 @@ database/backups/
 *.dump
 *.backup
 settings.json
+
+# Generated SQL expanded from database/schema.sql for Atlas (not tracked)
+database/.atlas_generated/

@@ -1,2 +1,5 @@
-\set ON_ERROR_STOP on
-\ir /opt/octv/database/schema.sql
+-- OCTV Atlas migration adoption:
+-- On FIRST Docker DB creation, keep the database empty.
+-- After Docker is healthy, run: .venv\Scripts\python scripts\atlas_db.py apply
+-- Existing PostgreSQL volumes are NOT reinitialized by this change.
+-- Never manually run database/schema.sql against an existing DB.
