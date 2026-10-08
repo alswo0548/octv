@@ -6,7 +6,8 @@ CREATE TABLE agencies (
     latitude DECIMAL(10,7) NOT NULL,
     longitude DECIMAL(10,7) NOT NULL,
     phone VARCHAR(30),
-    region_code VARCHAR(100) NOT NULL REFERENCES region(region_code)
+    region_code VARCHAR(100) NOT NULL REFERENCES region(region_code),
+    service_region_codes TEXT[]
 );
 COMMENT ON TABLE agencies IS '대응 후보 기관';
 COMMENT ON COLUMN agencies.id IS '기관 ID';
@@ -17,3 +18,4 @@ COMMENT ON COLUMN agencies.latitude IS '기관 위치 위도';
 COMMENT ON COLUMN agencies.longitude IS '기관 위치 경도';
 COMMENT ON COLUMN agencies.phone IS '대표 연락처';
 COMMENT ON COLUMN agencies.region_code IS '지역코드 ID';
+COMMENT ON COLUMN agencies.service_region_codes IS 'ROAD_MANAGEMENT 기관의 담당 지역코드 목록';

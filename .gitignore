@@ -59,3 +59,4 @@ database/backups/
 *.backup
 *.bat
 settings.json
+common_poi_cache.json
