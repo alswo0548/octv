@@ -76,15 +76,21 @@ class BackendScaffoldTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["database"], "not_checked")
 
-    def test_login_and_email_check_do_not_fake_success(self):
-        for path, body in [
-            ("/api/auth/login", {"email": "test@example.com", "password": "test-only"}),
-            ("/api/auth/email-check", {"email": "test@example.com"}),
-        ]:
-            with self.subTest(path=path):
-                status, result = self.request(path, "POST", body)
-                self.assertEqual(status, 501)
-                self.assertNotIn("test-only", json.dumps(result))
+    def test_login_and_email_check_are_implemented(self):
+        status, result = self.request(
+            "/api/auth/login",
+            "POST",
+            {"email": "test@example.com", "password": "test-only"},
+        )
+        self.assertEqual(status, 401)
+        self.assertNotIn("test-only", json.dumps(result))
+
+        status, result = self.request(
+            "/api/auth/email-check",
+            "POST",
+            {"email": "test@example.com"},
+        )
+        self.assertEqual(status, 200)
 
     def test_monitoring_and_delivery_do_not_claim_state_change(self):
         cases = [
