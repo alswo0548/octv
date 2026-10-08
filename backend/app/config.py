@@ -34,3 +34,23 @@ def database_connect_kwargs() -> dict:
         'user': value('POSTGRES_USER', 'octv_dev'),
         'password': password, 'connect_timeout': 5,
     }
+
+
+# jwt_secret값 가져오기
+def jwt_secret() -> str:
+    backend_values = dotenv_values(
+        ROOT / "backend" / ".env",
+        interpolate=False,
+    )
+
+    secret = os.environ.get(
+        "JWT_SECRET",
+        backend_values.get("JWT_SECRET"),
+    )
+
+    if not secret or not secret.strip():
+        raise ValueError(
+            "backend/.env에 JWT_SECRET을 설정해야 합니다."
+        )
+
+    return secret.strip()
