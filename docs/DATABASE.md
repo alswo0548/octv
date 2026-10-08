@@ -1,3 +1,5 @@
+> **Atlas 전환 안내**: `docs/ATLAS_SQL_AUTOMATION.md`를 먼저 확인하세요. 기존 `scripts/db.py migrate`는 과거 003 구조까지만 처리합니다. Atlas 기준 Migration 파일은 `database/atlas_migrations/`에 있으며, 최초 기준 버전 준비 후에는 `scripts/atlas_db.py` 명령을 사용해야 합니다. 아래 문서는 과거 SQL 초기화/검증 절차의 기록입니다.
+
 # Docker와 DB 세팅 안내
 
 Windows + VSCode + CMD 기준입니다. 모든 명령은 compose.yaml이 있는 프로젝트 루트에서 실행합니다.
