@@ -1,17 +1,32 @@
-"""사건 조회·상세 입출력 초안. SQL 구조와 UI 단위를 확인하며 완성하세요."""
+"""사건 목록·상세 API 응답 형식."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal
 from datetime import datetime
-from decimal import Decimal
-
 
 class IncidentResponse(BaseModel):
     id: int
     incident_no: str
     cctv_id: int
+    cctv_name: str
     hazard_type: str
     status: Literal["DETECTED", "CONFIRMED", "SENT", "RESOLVED", "FALSE_POSITIVE"]
-    confidence: Decimal
+    confidence: float = Field(ge=0, le=1)
     detected_at: datetime
-    # TODO: 상세에서 상황 스냅샷·평가·최근 지원요청을 조합하세요.
+    last_detected_at: datetime
+    latitude: float
+    longitude: float
+    region_code: str | None
+    risk_score: float | None = None
+    risk_level: str | None = None
+    priority_score: float | None = None
+    priority: str | None = None
+    analysis_status: Literal["PENDING", "READY"]
+    detection_image_path: str
+    detection_bbox_json: dict | list
+
+class IncidentPage(BaseModel):
+    items: list[IncidentResponse]
+    total: int
+    page: int
+    page_size: int
