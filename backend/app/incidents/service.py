@@ -1,16 +1,45 @@
-"""사건 조회·상세: 상태·유형·우선순위·기간·검색과 서버 페이지네이션을 구현하세요. AI 사건 등록은 내부 호출로 분리하고 중복 판별 기준을 합의하세요."""
+"""사건 후보 검증·저장과 목록·상세 응답 변환."""
 
-from ..errors import FeatureNotImplemented
-from . import schemas
+from datetime import datetime, timezone
+from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
+from ..db.session import get_connection
+from . import repository
 
+def utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise ValueError("탐지 시각에는 시간대가 필요합니다.")
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
-def list_incidents(page: int = 1, page_size: int = 5):
-    # TODO: 상태·유형·우선순위·기간·검색과 서버 페이지네이션을 구현하세요. AI 사건 등록은 내부 호출로 분리하고 중복 판별 기준을 합의하세요.
-    # repository에서 조회/저장한 결과를 schemas 형식으로 변환하세요.
-    raise FeatureNotImplemented("사건 조회·상세 / list_incidents 구현 예정")
+def register_detection(candidate: dict):
+    confidence = float(candidate["confidence"])
+    if not 0 <= confidence <= 1:
+        raise ValueError("confidence는 0~1입니다.")
+    data = {**candidate, "confidence": confidence,
+            "detected_at": utc_naive(candidate["detected_at"])}
+    with get_connection() as connection:
+        incident = repository.save_detection(connection, data)
+    return incident  # with 종료 후이므로 이미 commit됨
 
+def serialize_incident(row):
+    item = dict(row)
+    for key in ("detected_at", "last_detected_at"):
+        item[key] = row[key].replace(tzinfo=timezone.utc).isoformat()
+    for key in ("confidence", "latitude", "longitude", "risk_score", "priority_score"):
+        if item.get(key) is not None:
+            item[key] = float(item[key])
+    item["analysis_status"] = "READY" if item.get("risk_level") else "PENDING"
+    return jsonable_encoder(item)
+
+def list_incidents(page=1, page_size=5, filters=None):
+    with get_connection() as connection:
+        result = repository.list_incidents(connection, filters or {}, page, page_size)
+    result["items"] = [serialize_incident(row) for row in result["items"]]
+    return result
 
 def get_incident(incident_id: int):
-    # TODO: 상태·유형·우선순위·기간·검색과 서버 페이지네이션을 구현하세요. AI 사건 등록은 내부 호출로 분리하고 중복 판별 기준을 합의하세요.
-    # repository에서 조회/저장한 결과를 schemas 형식으로 변환하세요.
-    raise FeatureNotImplemented("사건 조회·상세 / get_incident 구현 예정")
+    with get_connection() as connection:
+        row = repository.find_detail(connection, incident_id)
+    if row is None:
+        raise HTTPException(404, "사건이 없습니다.")
+    return serialize_incident(row)
