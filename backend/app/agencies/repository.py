@@ -1,20 +1,21 @@
-"""DB 조회/저장 작업 위치. SQL은 파라미터 바인딩으로 작성하세요."""
+"""기관 관련 SQL의 실행 위치입니다. 미구현 함수의 예외는 그대로 유지합니다."""
 
 from ..errors import FeatureNotImplemented
 
-# db/session.py의 연결을 전달받습니다. commit/rollback 범위는 서비스에서 관리합니다.
 
-
+# 선택한 지역 조건을 적용하고 기관명·ID 순서로 조회합니다.
 def list_agencies(connection, region_code: str | None = None):
-    # TODO: 기관명·유형·지역·좌표 조회.
-    raise FeatureNotImplemented("agencies.list_agencies DB 쿼리 구현 예정")
+    sql = "SELECT id, name, agency_type FROM agencies"
+    params = []
+    if region_code is not None:
+        sql += " WHERE region_code = %s"
+        params.append(region_code)
+    return connection.execute(sql + " ORDER BY name, id", params).fetchall()
 
 
 def list_recommendations(connection, incident_id: int):
-    # TODO: incident_agency_recommendations와 agencies JOIN. 추천 순위 정렬.
     raise FeatureNotImplemented("agencies.list_recommendations DB 쿼리 구현 예정")
 
 
 def save_delivery(connection, incident_id: int, selections: list[dict]):
-    # TODO: 선택 기관별 전달 상태, 사용자별 notifications, 사건 SENT 상태를 한 트랜잭션으로 기록. 중복 전송 방지.
     raise FeatureNotImplemented("agencies.save_delivery DB 쿼리 구현 예정")
