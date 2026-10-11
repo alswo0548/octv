@@ -55,3 +55,60 @@ export type SupportRequest =
 // Fixtures are supplied newest first, independently for each incident.
 export const supportRequestsFor = (incidentId: string): SupportRequest[] =>
   (mock.supportRequests as Record<string, SupportRequest[]>)[incidentId] ?? [];
+
+// 실제 API 응답 타입입니다. 위의 mock 화면 타입은 그대로 유지합니다.
+export type UserDto = {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  agency_id: number | null;
+  is_active: boolean;
+  notification_enabled: boolean;
+};
+
+export type LoginDto = {
+  access_token: string;
+  token_type: string;
+  user: UserDto;
+};
+
+export type AgencyDto = {
+  id: number;
+  name: string;
+  agency_type: string;
+};
+
+// agency_name은 기존 본인 정보와 기관 목록을 조합한 화면용 값입니다.
+export type CurrentUserDto = UserDto & {
+  agency_name: string | null;
+};
+
+export type IncidentDto = {
+  id: number;
+  incident_no: string;
+  cctv_id: number;
+  cctv_name: string;
+  hazard_type: string;
+  status: "DETECTED" | "CONFIRMED" | "SENT" | "RESOLVED" | "FALSE_POSITIVE";
+  confidence: number;
+  detected_at: string;
+  last_detected_at: string;
+  latitude: number;
+  longitude: number;
+  region_code: string | null;
+  risk_score: number | null;
+  risk_level: string | null;
+  priority_score: number | null;
+  priority: string | null;
+  analysis_status: "PENDING" | "READY";
+  detection_image_path: string;
+  detection_bbox_json: Record<string, unknown> | unknown[];
+};
+
+export type PageDto<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+};
