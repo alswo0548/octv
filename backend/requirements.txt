@@ -27,3 +27,4 @@ shapely==2.2.0
 python-multipart==0.0.32
 requests==2.34.2
 bcrypt==5.0.0
+celery[redis]

@@ -38,6 +38,8 @@ def save_detection(connection, candidate: dict):
 
 
 # 각 사건에 최신 평가 1건을 붙이며, 평가가 없어도 사건은 조회합니다.
+# LEFT JOIN 을 활용하여 사건 하나에 분석 기록이 여러 개 있더라도, 
+# 가장 최근에 등록된 분석 결과 하나만 가져온다.
 READ_SQL = """
 SELECT
     i.*, c.name AS cctv_name, c.latitude, c.longitude,
@@ -57,7 +59,9 @@ LEFT JOIN LATERAL (
 """
 
 
-# 검색 조건과 바인딩할 값을 같은 순서로 구성합니다.
+# 사용자가 사건 목록에서 검색하거나 필터를 선택했을 때 사용.
+# READ_SQL은 어떤 데이터를 가져올지 결정.
+# incident_where()는 어떤 사건만 가져올지 결정
 def incident_where(filters: dict):
     clauses, params = ["TRUE"], []
     for key, column in (
@@ -110,7 +114,7 @@ def agency_filter(filters: dict):
     return clause, [filters["agency_id"]]
 
 
-# 전체 건수와 현재 페이지에 같은 조회 조건을 적용합니다.
+# OCTV 상황실 웹에서 사건 목록을 검색하고 페이지를 넘길 때 사용되는 핵심 조회 기능
 def list_incidents(connection, filters: dict, page: int, page_size: int):
     where, params = incident_where(filters)
     scoped_where, scoped_params = agency_filter(filters)

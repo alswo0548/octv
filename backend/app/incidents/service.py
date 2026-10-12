@@ -35,7 +35,7 @@ def register_detection(candidate: dict):
 # DB 행을 복사해 시각·숫자·분석 상태를 API 응답용으로 변환합니다.
 def serialize_incident(row):
     item = dict(row)
-    # 저장된 시각이 UTC라는 전제에서 시간대 표시를 붙입니다.
+    # DB에 저장된 UTC 시각을 API 응답 형식으로 변환합니다. 한국 시간 표시는 프론트엔드에서 처리합니다. 
     for key in ("detected_at", "last_detected_at"):
         item[key] = row[key].replace(tzinfo=timezone.utc).isoformat()
     for key in ("confidence", "latitude", "longitude", "risk_score", "priority_score"):
