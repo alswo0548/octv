@@ -1,17 +1,38 @@
-"""사건 조회·상세 입출력 초안. SQL 구조와 UI 단위를 확인하며 완성하세요."""
+"""사건 목록·상세 응답의 필드와 검증 조건을 정의합니다."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal
 from datetime import datetime
-from decimal import Decimal
 
 
 class IncidentResponse(BaseModel):
     id: int
     incident_no: str
     cctv_id: int
+    cctv_name: str
     hazard_type: str
     status: Literal["DETECTED", "CONFIRMED", "SENT", "RESOLVED", "FALSE_POSITIVE"]
-    confidence: Decimal
+    confidence: float = Field(ge=0, le=1)
     detected_at: datetime
-    # TODO: 상세에서 상황 스냅샷·평가·최근 지원요청을 조합하세요.
+    last_detected_at: datetime
+    latitude: float
+    longitude: float
+    # 필수 필드이지만 값 자체는 null일 수 있습니다.
+    region_code: str | None
+    # 평가 전에는 점수·등급이 없을 수 있습니다.
+    risk_score: float | None = None
+    risk_level: str | None = None
+    priority_score: float | None = None
+    priority: str | None = None
+    # Service가 risk_level의 존재 여부로 계산하는 화면용 상태입니다.
+    analysis_status: Literal["PENDING", "READY"]
+    detection_image_path: str
+    detection_bbox_json: dict | list
+
+
+# 현재 페이지 목록과 검색 조건에 맞는 전체 건수를 묶습니다.
+class IncidentPage(BaseModel):
+    items: list[IncidentResponse]
+    total: int
+    page: int
+    page_size: int

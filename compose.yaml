@@ -1,3 +1,4 @@
+
 name: octv
 
 services:
@@ -42,5 +43,15 @@ services:
       retries: 12
       start_period: 20s
 
+  # AI 판단 작업을 Redis 대기열에 보관하고 Celery Worker에 전달
+  redis:                                              # Redis 서버를 Docker 컨테이너로 실행
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:
