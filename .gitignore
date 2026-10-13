@@ -64,3 +64,9 @@ common_poi_cache.json
 
 # Generated SQL expanded from database/schema.sql for Atlas (not tracked)
 database/.atlas_generated/
+
+# Local test data
+local_data/
+
+# AI model weights
+*.pt
