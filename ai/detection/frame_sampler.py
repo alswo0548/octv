@@ -212,3 +212,17 @@ class FrameSampler:
                 cctv_id,
                 self._default_interval_sec,
             )
+
+    def is_enabled(
+        self,
+        cctv_id: int,
+    ) -> bool:
+        """
+        해당 CCTV의 Frame sampling 활성화 여부를 반환한다.
+        """
+
+        with self._lock:
+            return (
+                cctv_id
+                not in self._disabled_cctv_ids
+            )

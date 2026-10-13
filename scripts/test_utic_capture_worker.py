@@ -2,31 +2,21 @@ from pathlib import Path
 
 import os
 import time
-
 from threading import Event, Lock, Thread
 
-
 import requests
-
 from dotenv import load_dotenv
 
-
 from ai.contracts import Frame
-
 from ai.detection.capture_worker import CaptureWorker
-
 from ai.detection.frame_sampler import FrameSampler
-
 from ai.detection.health_monitor import CctvHealthMonitor
-
 from ai.detection.quality import check_quality
-
-from ai.detection.sampling_policy import (
-    apply_sampling_mode,
-)
-
+from ai.detection.sampling_monitor import SamplingPolicyMonitor
+from ai.detection.sampling_policy import apply_sampling_mode
 
 from backend.app.cctvs.repository import (
+    get_cctv_runtime_state,
     list_monitored_utic_cctvs,
     update_connection_status,
     update_last_frame_at,
@@ -46,7 +36,6 @@ from backend.app.settings.repository import (
 
 ROOT = Path(__file__).resolve().parents[1]
 
-
 ENV_PATH = (
     ROOT
     / "backend"
@@ -62,12 +51,10 @@ UTIC_BASE_URL = (
     "https://www.utic.go.kr"
 )
 
-
 UTIC_OPEN_DATA_URL = (
     f"{UTIC_BASE_URL}"
     "/guide/cctvOpenData.do"
 )
-
 
 UTIC_CCTV_INFO_URL = (
     f"{UTIC_BASE_URL}"
@@ -82,32 +69,36 @@ UTIC_CCTV_INFO_URL = (
 # last_frame_at DB 갱신 주기
 LAST_FRAME_DB_INTERVAL_SEC = 5.0
 
-
 # Health Monitor가 CCTV 상태를 확인하는 주기
 HEALTH_CHECK_INTERVAL_SEC = 2.0
-
 
 # 이 시간 동안 last_frame_at 변화가 없으면 stale
 STALE_AFTER_SEC = 20.0
 
-
-# Health Monitor 시작 후
-# 정상 상태를 몇 초 확인할지
+# Health Monitor 시작 후 정상 상태 확인 시간
 NORMAL_RUN_SEC = 8.0
 
-
-# 재연결 후 정상 heartbeat를
-# 몇 초 더 확인할지
+# 재연결 후 정상 heartbeat 확인 시간
 RECOVERY_RUN_SEC = 8.0
-
 
 # Resolver를 포함한 최초 연결 대기 시간
 INITIAL_CONNECT_TIMEOUT_SEC = 45.0
+
+# SamplingPolicyMonitor DB polling 주기
+SAMPLING_MONITOR_CHECK_INTERVAL_SEC = 0.5
+
+# OFF 상태에서 실제 sampled frame이 생기지 않는지 확인할 시간
+OFF_HOLD_SEC = 4.0
+
+# 실제 샘플 간격 검증 허용 오차
+SAMPLE_INTERVAL_EARLY_TOLERANCE_SEC = 0.75
+SAMPLE_INTERVAL_LATE_TOLERANCE_SEC = 4.0
 
 
 # =========================================================
 # UTIC 인증키
 # =========================================================
+
 
 def load_utic_key() -> str:
     """
@@ -135,6 +126,7 @@ def load_utic_key() -> str:
 # DB에서 현재 감시 대상 CCTV 조회
 # =========================================================
 
+
 def get_monitored_utic_cctv() -> dict:
     """
     DB에서 현재 감시 대상인
@@ -161,6 +153,7 @@ def get_monitored_utic_cctv() -> dict:
 # =========================================================
 # UTIC Stream Resolver
 # =========================================================
+
 
 def get_utic_stream_url(
     external_cctv_id: str,
@@ -248,6 +241,7 @@ def get_utic_stream_url(
 # 상태 전이 검증
 # =========================================================
 
+
 def contains_subsequence(
     values: list[str],
     expected: list[str],
@@ -279,13 +273,15 @@ def contains_subsequence(
 # Main
 # =========================================================
 
+
 def main() -> None:
 
     print("=" * 70)
 
     print(
         "OCTV UTIC + DB + DYNAMIC STREAM "
-        "RESOLVER INTEGRATION TEST"
+        "RESOLVER + RUNTIME SAMPLING MODE "
+        "INTEGRATION TEST"
     )
 
     print("=" * 70)
@@ -304,9 +300,17 @@ def main() -> None:
         get_monitored_utic_cctv()
     )
 
+    cctv_id = int(
+        cctv["id"]
+    )
+
+    original_mode = str(
+        cctv["monitored_mode"]
+    ).upper()
+
     print(
         f"OCTV CCTV ID      : "
-        f"{cctv['id']}"
+        f"{cctv_id}"
     )
 
     print(
@@ -326,7 +330,7 @@ def main() -> None:
 
     print(
         f"Monitoring Mode   : "
-        f"{cctv['monitored_mode']}"
+        f"{original_mode}"
     )
 
     # =====================================================
@@ -414,6 +418,11 @@ def main() -> None:
     )
 
     print(
+        f"POST_ALERT interval    : "
+        f"{base_interval_sec:.1f}초"
+    )
+
+    print(
         f"Quality threshold      : "
         f"{quality_threshold:.2f}"
     )
@@ -427,6 +436,30 @@ def main() -> None:
         f"Max reconnect attempts : "
         f"{max_reconnect_attempts}회"
     )
+
+    interval_by_mode = {
+        "BASE":
+            base_interval_sec,
+
+        "ALERT":
+            alert_interval_sec,
+
+        "VERIFY":
+            verify_interval_sec,
+
+        "POST_ALERT":
+            base_interval_sec,
+
+        "OFF":
+            None,
+    }
+
+    if original_mode not in interval_by_mode:
+
+        raise RuntimeError(
+            f"지원하지 않는 monitored_mode입니다: "
+            f"{original_mode}"
+        )
 
     # =====================================================
     # 3. Dynamic UTIC Stream Resolver 준비
@@ -516,7 +549,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 4. Sampling Policy 적용
+    # 4. Sampling Policy 최초 적용
     # =====================================================
 
     sampler = FrameSampler(
@@ -527,9 +560,9 @@ def main() -> None:
     applied_interval_sec = (
         apply_sampling_mode(
             sampler=sampler,
-            cctv_id=cctv["id"],
+            cctv_id=cctv_id,
             monitored_mode=(
-                cctv["monitored_mode"]
+                original_mode
             ),
             settings=(
                 monitoring_settings
@@ -540,24 +573,24 @@ def main() -> None:
     print()
 
     print(
-        "[SAMPLING POLICY]"
+        "[SAMPLING POLICY - INITIAL]"
     )
 
     if applied_interval_sec is None:
 
         print(
-            f"CCTV {cctv['id']} "
+            f"CCTV {cctv_id} "
             f"/ mode="
-            f"{cctv['monitored_mode']} "
+            f"{original_mode} "
             f"→ 분석 비활성화"
         )
 
     else:
 
         print(
-            f"CCTV {cctv['id']} "
+            f"CCTV {cctv_id} "
             f"/ mode="
-            f"{cctv['monitored_mode']} "
+            f"{original_mode} "
             f"→ 분석 주기 "
             f"{applied_interval_sec:.1f}초"
         )
@@ -569,6 +602,11 @@ def main() -> None:
     received_count = 0
 
     sampled_count = 0
+
+    # 실제 Sampling이 발생한 monotonic 시각
+    sampled_at_monotonic: list[
+        float
+    ] = []
 
     counter_lock = Lock()
 
@@ -602,6 +640,12 @@ def main() -> None:
 
     health_reconnect_lock = Lock()
 
+    # mode별 실제 Sampling 간격 기록
+    measured_intervals: dict[
+        str,
+        float,
+    ] = {}
+
     # =====================================================
     # 6. 영상 품질 상태 DB UPDATE
     # =====================================================
@@ -622,7 +666,7 @@ def main() -> None:
                 result = (
                     update_video_quality_status(
                         connection,
-                        cctv["id"],
+                        cctv_id,
                         status,
                     )
                 )
@@ -631,7 +675,7 @@ def main() -> None:
 
             print(
                 f"[DB QUALITY] "
-                f"CCTV {cctv['id']} "
+                f"CCTV {cctv_id} "
                 f"→ "
                 f"{result['video_quality_status']}"
             )
@@ -640,7 +684,7 @@ def main() -> None:
 
             print(
                 f"[DB QUALITY ERROR] "
-                f"CCTV {cctv['id']} "
+                f"CCTV {cctv_id} "
                 f"/ status={status} "
                 f"/ error={exc}"
             )
@@ -657,7 +701,7 @@ def main() -> None:
 
         print(
             f"[DB STATUS] "
-            f"CCTV {cctv['id']} "
+            f"CCTV {cctv_id} "
             f"→ {status}"
         )
 
@@ -689,7 +733,7 @@ def main() -> None:
 
                 update_connection_status(
                     connection,
-                    cctv["id"],
+                    cctv_id,
                     status,
                 )
 
@@ -697,7 +741,7 @@ def main() -> None:
 
             print(
                 f"[DB STATUS ERROR] "
-                f"CCTV {cctv['id']} "
+                f"CCTV {cctv_id} "
                 f"/ status={status} "
                 f"/ error={exc}"
             )
@@ -763,7 +807,7 @@ def main() -> None:
                         result = (
                             update_last_frame_at(
                                 connection,
-                                cctv["id"],
+                                cctv_id,
                                 frame.captured_at,
                             )
                         )
@@ -774,7 +818,7 @@ def main() -> None:
 
                     print(
                         f"[DB HEARTBEAT] "
-                        f"CCTV {cctv['id']} "
+                        f"CCTV {cctv_id} "
                         f"last_frame_at="
                         f"{result['last_frame_at']}"
                     )
@@ -783,7 +827,7 @@ def main() -> None:
 
                     print(
                         f"[DB HEARTBEAT ERROR] "
-                        f"CCTV {cctv['id']} "
+                        f"CCTV {cctv_id} "
                         f"/ error={exc}"
                     )
 
@@ -818,12 +862,20 @@ def main() -> None:
         ):
             return
 
+        sampled_at = (
+            time.monotonic()
+        )
+
         with counter_lock:
 
             sampled_count += 1
 
             current_sampled = (
                 sampled_count
+            )
+
+            sampled_at_monotonic.append(
+                sampled_at
             )
 
         # -------------------------------------------------
@@ -865,7 +917,7 @@ def main() -> None:
         )
 
         elapsed = (
-            time.monotonic()
+            sampled_at
             - started_at
         )
 
@@ -880,13 +932,10 @@ def main() -> None:
 
     # =====================================================
     # 9. CaptureWorker 생성
-    #
-    # ★ 고정 stream_url을 전달하지 않는다.
-    # ★ stream_url_resolver를 전달한다.
     # =====================================================
 
     worker = CaptureWorker(
-        cctv_id=cctv["id"],
+        cctv_id=cctv_id,
 
         stream_url_resolver=(
             resolve_utic_stream_url
@@ -914,12 +963,354 @@ def main() -> None:
         },
         name=(
             f"utic-capture-"
-            f"{cctv['id']}"
+            f"{cctv_id}"
         ),
     )
 
     # =====================================================
-    # 10. Health Monitor용 DB 상태 조회
+    # 10. SamplingPolicyMonitor용 DB Provider
+    # =====================================================
+
+    def sampling_state_provider() -> list[dict]:
+        """
+        실행 중인 CCTV 하나의 현재 runtime 상태를 가져온다.
+
+        중요:
+        list_monitored_utic_cctvs()는 OFF를 제외하므로
+        OFF 전환을 감지할 수 없다.
+
+        따라서 이미 실행 중인 CCTV는
+        get_cctv_runtime_state()로 직접 조회한다.
+        """
+
+        with get_connection() as connection:
+
+            state = (
+                get_cctv_runtime_state(
+                    connection=connection,
+                    cctv_id=cctv_id,
+                )
+            )
+
+        if state is None:
+
+            raise RuntimeError(
+                f"CCTV {cctv_id}를 "
+                "찾을 수 없습니다."
+            )
+
+        return [
+            state
+        ]
+
+    def sampling_settings_provider() -> dict:
+        """
+        현재 monitoring_settings 최신값을 가져온다.
+        """
+
+        with get_connection() as connection:
+
+            settings = (
+                get_monitoring_settings(
+                    connection
+                )
+            )
+
+        if settings is None:
+
+            raise RuntimeError(
+                "monitoring_settings가 "
+                "비어 있습니다."
+            )
+
+        return settings
+
+    # =====================================================
+    # 11. 테스트용 monitored_mode DB 변경
+    # =====================================================
+
+    def set_db_monitored_mode(
+        mode: str,
+    ) -> None:
+
+        query = """
+        UPDATE cctvs
+        SET monitored_mode =
+            CAST(%s AS monitored_mode_enum)
+        WHERE id = %s;
+        """
+
+        with get_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    query,
+                    (
+                        mode,
+                        cctv_id,
+                    ),
+                )
+
+        print()
+
+        print(
+            f"[DB MODE CHANGE] "
+            f"CCTV {cctv_id} "
+            f"→ {mode}"
+        )
+
+    # =====================================================
+    # 12. Sampling Policy 적용 대기
+    # =====================================================
+
+    def wait_for_sampling_state(
+        expected_mode: str,
+        expected_interval: float | None,
+        timeout_sec: float = 6.0,
+    ) -> None:
+
+        deadline = (
+            time.monotonic()
+            + timeout_sec
+        )
+
+        while (
+            time.monotonic()
+            < deadline
+        ):
+
+            state = (
+                sampling_state_provider()[0]
+            )
+
+            actual_mode = str(
+                state[
+                    "monitored_mode"
+                ]
+            ).upper()
+
+            actual_interval = (
+                sampler.get_interval(
+                    cctv_id
+                )
+            )
+
+            sampling_enabled = (
+                sampler.is_enabled(
+                    cctv_id
+                )
+            )
+
+            if actual_mode == expected_mode:
+
+                # OFF
+                if expected_interval is None:
+
+                    if not sampling_enabled:
+
+                        print(
+                            f"[PASS] "
+                            f"{expected_mode} "
+                            f"→ 분석 비활성화"
+                        )
+
+                        return
+
+                # BASE / ALERT / VERIFY / POST_ALERT
+                else:
+
+                    if (
+                        sampling_enabled
+                        and actual_interval
+                        == expected_interval
+                    ):
+
+                        print(
+                            f"[PASS] "
+                            f"{expected_mode} "
+                            f"→ "
+                            f"{actual_interval:.1f}초 "
+                            f"적용"
+                        )
+
+                        return
+
+            time.sleep(
+                0.1
+            )
+
+        raise AssertionError(
+            f"{expected_mode} "
+            f"Sampling Policy 적용을 "
+            f"{timeout_sec:.1f}초 안에 "
+            "확인하지 못했습니다."
+        )
+
+    # =====================================================
+    # 13. 실제 새 Sampling Frame 기다리기
+    # =====================================================
+
+    def wait_for_new_samples(
+        start_index: int,
+        required_count: int,
+        timeout_sec: float,
+    ) -> list[float]:
+
+        deadline = (
+            time.monotonic()
+            + timeout_sec
+        )
+
+        target_length = (
+            start_index
+            + required_count
+        )
+
+        while (
+            time.monotonic()
+            < deadline
+        ):
+
+            with counter_lock:
+
+                if (
+                    len(sampled_at_monotonic)
+                    >= target_length
+                ):
+
+                    return (
+                        sampled_at_monotonic[
+                            start_index:
+                            target_length
+                        ]
+                    )
+
+            time.sleep(
+                0.1
+            )
+
+        with counter_lock:
+
+            current_length = (
+                len(sampled_at_monotonic)
+            )
+
+        raise AssertionError(
+            "새 Sampling Frame을 기다리는 중 "
+            "timeout이 발생했습니다. "
+            f"start_index={start_index}, "
+            f"required={required_count}, "
+            f"current_length={current_length}"
+        )
+
+    # =====================================================
+    # 14. 실제 Sampling 간격 검증
+    # =====================================================
+
+    def verify_actual_sampling_interval(
+        mode: str,
+        expected_interval: float,
+    ) -> None:
+        """
+        DB mode를 실제로 변경한 뒤
+        SamplingPolicyMonitor가 반영할 때까지 기다린다.
+
+        그 이후 새 Sample 2개를 기다려
+        실제 Frame Sampling 간격을 측정한다.
+        """
+
+        set_db_monitored_mode(
+            mode
+        )
+
+        wait_for_sampling_state(
+            expected_mode=mode,
+            expected_interval=(
+                expected_interval
+            ),
+        )
+
+        with counter_lock:
+
+            start_index = (
+                len(
+                    sampled_at_monotonic
+                )
+            )
+
+        timeout_sec = (
+            expected_interval
+            * 3.0
+            + 10.0
+        )
+
+        sample_times = (
+            wait_for_new_samples(
+                start_index=start_index,
+                required_count=2,
+                timeout_sec=timeout_sec,
+            )
+        )
+
+        actual_interval = (
+            sample_times[1]
+            - sample_times[0]
+        )
+
+        measured_intervals[
+            mode
+        ] = actual_interval
+
+        min_allowed = max(
+            0.0,
+            (
+                expected_interval
+                - SAMPLE_INTERVAL_EARLY_TOLERANCE_SEC
+            ),
+        )
+
+        max_allowed = (
+            expected_interval
+            + SAMPLE_INTERVAL_LATE_TOLERANCE_SEC
+        )
+
+        print(
+            f"[ACTUAL SAMPLE INTERVAL] "
+            f"{mode} "
+            f"expected="
+            f"{expected_interval:.1f}s "
+            f"/ actual="
+            f"{actual_interval:.2f}s "
+            f"/ allowed="
+            f"{min_allowed:.2f}"
+            f"~"
+            f"{max_allowed:.2f}s"
+        )
+
+        if not (
+            min_allowed
+            <= actual_interval
+            <= max_allowed
+        ):
+
+            raise AssertionError(
+                f"{mode} 실제 Sampling 간격이 "
+                "허용 범위를 벗어났습니다. "
+                f"expected="
+                f"{expected_interval:.1f}, "
+                f"actual="
+                f"{actual_interval:.2f}"
+            )
+
+        print(
+            f"[PASS] "
+            f"{mode} "
+            f"실제 Frame Sampling 주기 확인"
+        )
+
+    # =====================================================
+    # 15. Health Monitor용 DB 상태 조회
     # =====================================================
 
     def health_state_provider() -> list[dict]:
@@ -935,20 +1326,21 @@ def main() -> None:
         return rows
 
     # =====================================================
-    # 11. Health Monitor → 재연결 요청
+    # 16. Health Monitor → 재연결 요청
     # =====================================================
 
     def health_reconnect_requester(
-        cctv_id: int,
+        requested_cctv_id: int,
     ) -> None:
 
         nonlocal health_reconnect_count
 
-        if cctv_id != cctv["id"]:
+        if requested_cctv_id != cctv_id:
 
             raise LookupError(
                 f"테스트 Worker가 없는 "
-                f"CCTV입니다: {cctv_id}"
+                f"CCTV입니다: "
+                f"{requested_cctv_id}"
             )
 
         with health_reconnect_lock:
@@ -963,7 +1355,7 @@ def main() -> None:
 
         print(
             f"[HEALTH ACTION] "
-            f"CCTV {cctv_id} "
+            f"CCTV {requested_cctv_id} "
             f"CaptureWorker 재연결 요청 "
             f"#{count}"
         )
@@ -973,10 +1365,10 @@ def main() -> None:
         health_reconnect_requested_event.set()
 
     # =====================================================
-    # 12. Health Monitor 생성
+    # 17. Monitor 생성
     # =====================================================
 
-    monitor = CctvHealthMonitor(
+    health_monitor = CctvHealthMonitor(
         check_interval_sec=(
             HEALTH_CHECK_INTERVAL_SEC
         ),
@@ -985,8 +1377,8 @@ def main() -> None:
         ),
     )
 
-    monitor_thread = Thread(
-        target=monitor.run,
+    health_monitor_thread = Thread(
+        target=health_monitor.run,
         kwargs={
             "state_provider":
                 health_state_provider,
@@ -997,8 +1389,32 @@ def main() -> None:
         name="cctv-health-monitor",
     )
 
+    sampling_monitor = (
+        SamplingPolicyMonitor(
+            sampler=sampler,
+            check_interval_sec=(
+                SAMPLING_MONITOR_CHECK_INTERVAL_SEC
+            ),
+        )
+    )
+
+    sampling_monitor_thread = Thread(
+        target=sampling_monitor.run,
+        kwargs={
+            "state_provider":
+                sampling_state_provider,
+
+            "settings_provider":
+                sampling_settings_provider,
+        },
+        name=(
+            "sampling-policy-monitor-"
+            "utic-test"
+        ),
+    )
+
     # =====================================================
-    # 13. CaptureWorker 시작
+    # 18. CaptureWorker 시작
     # =====================================================
 
     print()
@@ -1071,22 +1487,317 @@ def main() -> None:
 
     if initial_resolver_call_count < 1:
 
+        worker.stop()
+
+        worker_thread.join(
+            timeout=5
+        )
+
         raise AssertionError(
             "최초 연결 전에 Stream Resolver가 "
             "호출되지 않았습니다."
         )
 
     # =====================================================
-    # 14. Health Monitor 시작
+    # 19. SamplingPolicyMonitor 시작
+    #     + 실제 DB mode Runtime 전환
+    # =====================================================
+
+    print()
+
+    print("=" * 70)
+
+    print(
+        "[5] 실제 UTIC Frame "
+        "+ Runtime Sampling Mode 테스트"
+    )
+
+    print("=" * 70)
+
+    sampling_monitor_thread.start()
+
+    try:
+
+        # 최초 DB 상태를 읽을 시간
+        time.sleep(
+            1.0
+        )
+
+        # -------------------------------------------------
+        # BASE
+        # -------------------------------------------------
+
+        verify_actual_sampling_interval(
+            mode="BASE",
+            expected_interval=(
+                base_interval_sec
+            ),
+        )
+
+        # -------------------------------------------------
+        # ALERT
+        # -------------------------------------------------
+
+        verify_actual_sampling_interval(
+            mode="ALERT",
+            expected_interval=(
+                alert_interval_sec
+            ),
+        )
+
+        # -------------------------------------------------
+        # VERIFY
+        # -------------------------------------------------
+
+        verify_actual_sampling_interval(
+            mode="VERIFY",
+            expected_interval=(
+                verify_interval_sec
+            ),
+        )
+
+        # -------------------------------------------------
+        # POST_ALERT
+        # -------------------------------------------------
+
+        verify_actual_sampling_interval(
+            mode="POST_ALERT",
+            expected_interval=(
+                base_interval_sec
+            ),
+        )
+
+        # -------------------------------------------------
+        # OFF
+        #
+        # 실제 Capture는 계속되지만
+        # sampled frame은 0개여야 함
+        # -------------------------------------------------
+
+        set_db_monitored_mode(
+            "OFF"
+        )
+
+        wait_for_sampling_state(
+            expected_mode="OFF",
+            expected_interval=None,
+        )
+
+        # OFF 적용 직전 이미
+        # should_sample()을 통과한 Frame이
+        # 있을 수 있으므로 짧게 안정화
+        time.sleep(
+            0.5
+        )
+
+        with counter_lock:
+
+            off_start_sampled_count = (
+                sampled_count
+            )
+
+            off_start_received_count = (
+                received_count
+            )
+
+        print(
+            f"[OFF TEST] "
+            f"{OFF_HOLD_SEC:.1f}초 동안 "
+            "영상 수신은 유지하고 "
+            "Sampling만 중단되는지 확인합니다."
+        )
+
+        time.sleep(
+            OFF_HOLD_SEC
+        )
+
+        with counter_lock:
+
+            off_end_sampled_count = (
+                sampled_count
+            )
+
+            off_end_received_count = (
+                received_count
+            )
+
+        received_during_off = (
+            off_end_received_count
+            - off_start_received_count
+        )
+
+        sampled_during_off = (
+            off_end_sampled_count
+            - off_start_sampled_count
+        )
+
+        print(
+            f"[OFF TEST] "
+            f"received 증가="
+            f"{received_during_off} "
+            f"/ sampled 증가="
+            f"{sampled_during_off}"
+        )
+
+        if received_during_off <= 0:
+
+            raise AssertionError(
+                "OFF 상태에서 실제 CCTV Frame "
+                "수신까지 멈췄습니다. "
+                "현재 구조에서는 Capture는 유지되고 "
+                "Sampling만 중단되어야 합니다."
+            )
+
+        if sampled_during_off != 0:
+
+            raise AssertionError(
+                "OFF 상태인데 "
+                "Sampling Frame이 생성되었습니다. "
+                f"count="
+                f"{sampled_during_off}"
+            )
+
+        print(
+            "[PASS] OFF "
+            "→ Capture 유지 / Sampling 0개"
+        )
+
+        # -------------------------------------------------
+        # OFF → BASE
+        #
+        # set_enabled(False → True) 전환 후
+        # 첫 Frame이 다시 Sampling 되어야 함
+        # -------------------------------------------------
+
+        with counter_lock:
+
+            before_recovery_sample_count = (
+                sampled_count
+            )
+
+        set_db_monitored_mode(
+            "BASE"
+        )
+
+        wait_for_sampling_state(
+            expected_mode="BASE",
+            expected_interval=(
+                base_interval_sec
+            ),
+        )
+
+        recovery_deadline = (
+            time.monotonic()
+            + 5.0
+        )
+
+        while (
+            time.monotonic()
+            < recovery_deadline
+        ):
+
+            with counter_lock:
+
+                current_sample_count = (
+                    sampled_count
+                )
+
+            if (
+                current_sample_count
+                > before_recovery_sample_count
+            ):
+                break
+
+            time.sleep(
+                0.1
+            )
+
+        else:
+
+            raise AssertionError(
+                "OFF → BASE 이후 "
+                "5초 안에 Sampling이 "
+                "재개되지 않았습니다."
+            )
+
+        print(
+            "[PASS] OFF → BASE "
+            "실제 Frame Sampling 재개"
+        )
+
+    finally:
+
+        # -------------------------------------------------
+        # 테스트 실패 여부와 관계없이
+        # DB monitored_mode 원상복구
+        # -------------------------------------------------
+
+        print()
+
+        print(
+            f"[SAMPLING TEST RESTORE] "
+            f"원래 mode "
+            f"{original_mode}로 복구"
+        )
+
+        try:
+
+            set_db_monitored_mode(
+                original_mode
+            )
+
+            wait_for_sampling_state(
+                expected_mode=(
+                    original_mode
+                ),
+                expected_interval=(
+                    interval_by_mode[
+                        original_mode
+                    ]
+                ),
+            )
+
+        finally:
+
+            sampling_monitor.stop()
+
+            sampling_monitor_thread.join(
+                timeout=5
+            )
+
+            if (
+                sampling_monitor_thread.is_alive()
+            ):
+
+                worker.stop()
+
+                worker_thread.join(
+                    timeout=5
+                )
+
+                raise AssertionError(
+                    "SamplingPolicyMonitor Thread가 "
+                    "종료되지 않았습니다."
+                )
+
+    print(
+        "[PASS] Runtime Sampling Mode "
+        "테스트 완료 "
+        f"/ DB mode 복구="
+        f"{original_mode}"
+    )
+
+    # =====================================================
+    # 20. Health Monitor 시작
     # =====================================================
 
     print()
 
     print(
-        "[5] Health Monitor 시작"
+        "[6] Health Monitor 시작"
     )
 
-    monitor_thread.start()
+    health_monitor_thread.start()
 
     print(
         f"{NORMAL_RUN_SEC:.0f}초 동안 "
@@ -1098,7 +1809,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 15. Heartbeat 강제 중단
+    # 21. Heartbeat 강제 중단
     # =====================================================
 
     print()
@@ -1126,7 +1837,7 @@ def main() -> None:
     heartbeat_paused.set()
 
     # =====================================================
-    # 16. Health Monitor 재연결 요청 대기
+    # 22. Health Monitor 재연결 요청 대기
     # =====================================================
 
     watchdog_timeout = (
@@ -1137,7 +1848,7 @@ def main() -> None:
     print()
 
     print(
-        "[6] Health Monitor STALE 감지 대기"
+        "[7] Health Monitor STALE 감지 대기"
     )
 
     detected = (
@@ -1150,11 +1861,11 @@ def main() -> None:
 
         heartbeat_paused.clear()
 
-        monitor.stop()
+        health_monitor.stop()
 
         worker.stop()
 
-        monitor_thread.join(
+        health_monitor_thread.join(
             timeout=5
         )
 
@@ -1174,7 +1885,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 17. RECONNECTING 확인
+    # 23. RECONNECTING 확인
     # =====================================================
 
     if not reconnecting_event.wait(
@@ -1192,7 +1903,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 18. 재연결 후 CONNECTED 확인
+    # 24. 재연결 후 CONNECTED 확인
     # =====================================================
 
     reconnect_wait_timeout = (
@@ -1220,7 +1931,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 19. Resolver 재호출 확인
+    # 25. Resolver 재호출 확인
     # =====================================================
 
     with resolver_lock:
@@ -1240,7 +1951,10 @@ def main() -> None:
         f"{after_reconnect_resolver_count}"
     )
 
-    if after_reconnect_resolver_count < 2:
+    if (
+        after_reconnect_resolver_count
+        < 2
+    ):
 
         raise AssertionError(
             "재연결 시 UTIC Stream Resolver가 "
@@ -1253,13 +1967,13 @@ def main() -> None:
     )
 
     # =====================================================
-    # 20. Heartbeat 다시 활성화
+    # 26. Heartbeat 다시 활성화
     # =====================================================
 
     print()
 
     print(
-        "[7] DB heartbeat 복구"
+        "[8] DB heartbeat 복구"
     )
 
     heartbeat_paused.clear()
@@ -1274,22 +1988,24 @@ def main() -> None:
     )
 
     # =====================================================
-    # 21. Health Monitor 먼저 종료
+    # 27. Health Monitor 먼저 종료
     # =====================================================
 
     print()
 
     print(
-        "[8] Health Monitor 종료"
+        "[9] Health Monitor 종료"
     )
 
-    monitor.stop()
+    health_monitor.stop()
 
-    monitor_thread.join(
+    health_monitor_thread.join(
         timeout=5
     )
 
-    if monitor_thread.is_alive():
+    if (
+        health_monitor_thread.is_alive()
+    ):
 
         raise AssertionError(
             "Health Monitor Thread가 "
@@ -1297,13 +2013,13 @@ def main() -> None:
         )
 
     # =====================================================
-    # 22. CaptureWorker 종료
+    # 28. CaptureWorker 종료
     # =====================================================
 
     print()
 
     print(
-        "[9] CaptureWorker 종료"
+        "[10] CaptureWorker 종료"
     )
 
     worker.stop()
@@ -1320,7 +2036,7 @@ def main() -> None:
         )
 
     # =====================================================
-    # 23. 최종 DB 상태 확인
+    # 29. 최종 DB 상태 확인
     # =====================================================
 
     with get_connection() as connection:
@@ -1335,13 +2051,13 @@ def main() -> None:
         (
             row
             for row in final_cctvs
-            if row["id"] == cctv["id"]
+            if row["id"] == cctv_id
         ),
         None,
     )
 
     # =====================================================
-    # 24. 최종 결과 정리
+    # 30. 최종 결과 정리
     # =====================================================
 
     with status_lock:
@@ -1360,6 +2076,16 @@ def main() -> None:
 
         final_resolver_call_count = (
             resolver_call_count
+        )
+
+    with counter_lock:
+
+        final_received_count = (
+            received_count
+        )
+
+        final_sampled_count = (
+            sampled_count
         )
 
     expected_transition = [
@@ -1383,26 +2109,28 @@ def main() -> None:
 
     print("=" * 70)
 
-    print("RESULT")
+    print(
+        "RESULT"
+    )
 
     print("=" * 70)
 
     print(
-        f"Monitoring Mode        : "
-        f"{cctv['monitored_mode']}"
+        f"원래 Monitoring Mode    : "
+        f"{original_mode}"
     )
 
     if applied_interval_sec is None:
 
         print(
-            "적용 분석 주기          : "
+            "최초 적용 분석 주기      : "
             "OFF"
         )
 
     else:
 
         print(
-            f"적용 분석 주기          : "
+            f"최초 적용 분석 주기      : "
             f"{applied_interval_sec:.1f}초"
         )
 
@@ -1428,12 +2156,12 @@ def main() -> None:
 
     print(
         f"전체 수신 Frame         : "
-        f"{received_count}"
+        f"{final_received_count}"
     )
 
     print(
-        f"Sampling Frame          : "
-        f"{sampled_count}"
+        f"Sampling Frame         : "
+        f"{final_sampled_count}"
     )
 
     print(
@@ -1442,7 +2170,7 @@ def main() -> None:
     )
 
     print(
-        "상태 History            : "
+        "상태 History           : "
         + " → ".join(
             final_status_history
         )
@@ -1451,6 +2179,58 @@ def main() -> None:
     print(
         f"상태 전이 검증          : "
         f"{transition_ok}"
+    )
+
+    print()
+
+    print(
+        "실제 Runtime Sampling 간격"
+    )
+
+    for mode in [
+        "BASE",
+        "ALERT",
+        "VERIFY",
+        "POST_ALERT",
+    ]:
+
+        actual = (
+            measured_intervals.get(
+                mode
+            )
+        )
+
+        expected = (
+            interval_by_mode[
+                mode
+            ]
+        )
+
+        if actual is None:
+
+            print(
+                f"{mode:<10} : "
+                "측정 없음"
+            )
+
+        else:
+
+            print(
+                f"{mode:<10} : "
+                f"expected="
+                f"{expected:.1f}s "
+                f"/ actual="
+                f"{actual:.2f}s"
+            )
+
+    print(
+        "OFF        : "
+        "Capture 유지 / Sampling 0개"
+    )
+
+    print(
+        "OFF→BASE   : "
+        "실제 Frame Sampling 재개"
     )
 
     if final_cctv is not None:
@@ -1481,6 +2261,11 @@ def main() -> None:
             f"{final_cctv['last_frame_at']}"
         )
 
+        print(
+            f"monitored_mode       : "
+            f"{final_cctv['monitored_mode']}"
+        )
+
     # =====================================================
     # 최종 Assert
     # =====================================================
@@ -1503,7 +2288,7 @@ def main() -> None:
             "확인되지 않았습니다."
         )
 
-    if received_count <= 0:
+    if final_received_count <= 0:
 
         raise AssertionError(
             "실제 CCTV Frame이 "
@@ -1512,7 +2297,7 @@ def main() -> None:
 
     if (
         applied_interval_sec is not None
-        and sampled_count <= 0
+        and final_sampled_count <= 0
     ):
 
         raise AssertionError(
@@ -1528,13 +2313,37 @@ def main() -> None:
             "호출되지 않았습니다."
         )
 
+    if final_cctv is None:
+
+        raise AssertionError(
+            "최종 DB 상태에서 "
+            "테스트 CCTV를 찾을 수 없습니다."
+        )
+
+    final_mode = str(
+        final_cctv[
+            "monitored_mode"
+        ]
+    ).upper()
+
+    if final_mode != original_mode:
+
+        raise AssertionError(
+            "테스트 종료 후 "
+            "monitored_mode가 "
+            "원래 값으로 복구되지 않았습니다. "
+            f"original={original_mode}, "
+            f"final={final_mode}"
+        )
+
     print()
 
     print(
         "[SUCCESS] "
         "UTIC Dynamic Stream Resolver "
         "+ DB Settings "
-        "+ Sampling "
+        "+ Runtime Sampling Mode "
+        "+ Actual Frame Sampling "
         "+ Quality "
         "+ Health Monitor "
         "+ Auto Reconnect "
