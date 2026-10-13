@@ -7,17 +7,24 @@ from threading import Event, Lock, Thread
 import requests
 from dotenv import load_dotenv
 
-from ai.contracts import Frame
+from ai.contracts import Detection, Frame
 from ai.detection.capture_worker import CaptureWorker
+from ai.detection.detector import YoloDetector
+from ai.detection.frame_queue import AnalysisFrameQueue
 from ai.detection.frame_sampler import FrameSampler
 from ai.detection.health_monitor import CctvHealthMonitor
 from ai.detection.quality import check_quality
 from ai.detection.sampling_monitor import SamplingPolicyMonitor
 from ai.detection.sampling_policy import apply_sampling_mode
+from ai.detection.yolo_worker import (
+    YoloPerformance,
+    YoloWorker,
+)
 
 from backend.app.cctvs.repository import (
     get_cctv_runtime_state,
     list_monitored_utic_cctvs,
+    update_analysis_status,
     update_connection_status,
     update_last_frame_at,
     update_video_quality_status,
@@ -40,6 +47,11 @@ ENV_PATH = (
     ROOT
     / "backend"
     / ".env"
+)
+
+YOLO_MODEL_PATH = (
+    ROOT
+    / "yolo11s.pt"
 )
 
 
@@ -69,28 +81,28 @@ UTIC_CCTV_INFO_URL = (
 # last_frame_at DB 갱신 주기
 LAST_FRAME_DB_INTERVAL_SEC = 5.0
 
-# Health Monitor가 CCTV 상태를 확인하는 주기
+# Health Monitor 상태 확인 주기
 HEALTH_CHECK_INTERVAL_SEC = 2.0
 
-# 이 시간 동안 last_frame_at 변화가 없으면 stale
+# 이 시간 동안 heartbeat가 바뀌지 않으면 stale
 STALE_AFTER_SEC = 20.0
 
 # Health Monitor 시작 후 정상 상태 확인 시간
 NORMAL_RUN_SEC = 8.0
 
-# 재연결 후 정상 heartbeat 확인 시간
+# 재연결 후 정상 상태 확인 시간
 RECOVERY_RUN_SEC = 8.0
 
-# Resolver를 포함한 최초 연결 대기 시간
+# 최초 연결 최대 대기 시간
 INITIAL_CONNECT_TIMEOUT_SEC = 45.0
 
 # SamplingPolicyMonitor DB polling 주기
 SAMPLING_MONITOR_CHECK_INTERVAL_SEC = 0.5
 
-# OFF 상태에서 실제 sampled frame이 생기지 않는지 확인할 시간
+# OFF 상태 유지 테스트 시간
 OFF_HOLD_SEC = 4.0
 
-# 실제 샘플 간격 검증 허용 오차
+# 실제 Sampling 간격 허용 오차
 SAMPLE_INTERVAL_EARLY_TOLERANCE_SEC = 0.75
 SAMPLE_INTERVAL_LATE_TOLERANCE_SEC = 4.0
 
@@ -123,7 +135,7 @@ def load_utic_key() -> str:
 
 
 # =========================================================
-# DB에서 현재 감시 대상 CCTV 조회
+# DB에서 감시 대상 UTIC CCTV 조회
 # =========================================================
 
 
@@ -142,6 +154,7 @@ def get_monitored_utic_cctv() -> dict:
         )
 
     if not cctvs:
+
         raise RuntimeError(
             "현재 감시 대상인 "
             "UTIC CCTV가 없습니다."
@@ -161,19 +174,15 @@ def get_utic_stream_url(
     """
     UTIC external_cctv_id를 이용해
     현재 CCTV 상세정보를 조회하고
-    실제 HLS Stream URL을 생성한다.
+    실제 Stream URL을 만든다.
 
-    이 함수는 최초 연결뿐 아니라
-    재연결할 때도 다시 호출할 수 있다.
+    최초 연결과 재연결 시
+    매번 새로 조회할 수 있다.
     """
 
     key = load_utic_key()
 
     with requests.Session() as session:
-
-        # -------------------------------------------------
-        # 1. UTIC 개방데이터 페이지 접근
-        # -------------------------------------------------
 
         page_response = session.get(
             UTIC_OPEN_DATA_URL,
@@ -184,10 +193,6 @@ def get_utic_stream_url(
         )
 
         page_response.raise_for_status()
-
-        # -------------------------------------------------
-        # 2. CCTV 상세정보 조회
-        # -------------------------------------------------
 
         info_response = session.get(
             UTIC_CCTV_INFO_URL,
@@ -207,24 +212,21 @@ def get_utic_stream_url(
 
         info_response.raise_for_status()
 
-        data = info_response.json()
+        data = (
+            info_response.json()
+        )
 
-    # -----------------------------------------------------
-    # 3. 현재 Stream ID 확인
-    # -----------------------------------------------------
-
-    stream_id = data.get(
-        "ID"
+    stream_id = (
+        data.get(
+            "ID"
+        )
     )
 
     if not stream_id:
+
         raise RuntimeError(
             "UTIC CCTV Stream ID가 없습니다."
         )
-
-    # -----------------------------------------------------
-    # 4. 실제 HLS URL 생성
-    # -----------------------------------------------------
 
     stream_url = (
         "https://cctvsec.ktict.co.kr/"
@@ -238,7 +240,7 @@ def get_utic_stream_url(
 
 
 # =========================================================
-# 상태 전이 검증
+# 상태 전이 검증 Helper
 # =========================================================
 
 
@@ -247,8 +249,8 @@ def contains_subsequence(
     expected: list[str],
 ) -> bool:
     """
-    values 안에 expected 순서가
-    중간 값이 있더라도 순서대로 존재하는지 확인한다.
+    values 안에 expected가
+    순서대로 존재하는지 확인한다.
     """
 
     expected_index = 0
@@ -259,8 +261,11 @@ def contains_subsequence(
             expected_index
             < len(expected)
             and value
-            == expected[expected_index]
+            == expected[
+                expected_index
+            ]
         ):
+
             expected_index += 1
 
     return (
@@ -279,15 +284,14 @@ def main() -> None:
     print("=" * 70)
 
     print(
-        "OCTV UTIC + DB + DYNAMIC STREAM "
-        "RESOLVER + RUNTIME SAMPLING MODE "
-        "INTEGRATION TEST"
+        "OCTV UTIC + DB + RUNTIME SAMPLING "
+        "+ YOLO PIPELINE INTEGRATION TEST"
     )
 
     print("=" * 70)
 
     # =====================================================
-    # 1. DB에서 감시 대상 CCTV 조회
+    # 1. DB 감시 대상 CCTV 조회
     # =====================================================
 
     print()
@@ -305,7 +309,9 @@ def main() -> None:
     )
 
     original_mode = str(
-        cctv["monitored_mode"]
+        cctv[
+            "monitored_mode"
+        ]
     ).upper()
 
     print(
@@ -352,13 +358,11 @@ def main() -> None:
         )
 
     if monitoring_settings is None:
-        raise RuntimeError(
-            "monitoring_settings가 비어 있습니다."
-        )
 
-    # -----------------------------------------------------
-    # DB 설정값 변환
-    # -----------------------------------------------------
+        raise RuntimeError(
+            "monitoring_settings가 "
+            "비어 있습니다."
+        )
 
     base_interval_sec = float(
         monitoring_settings[
@@ -395,6 +399,23 @@ def main() -> None:
             "max_reconnect_attempts"
         ]
     )
+
+    interval_by_mode = {
+        "BASE":
+            base_interval_sec,
+
+        "ALERT":
+            alert_interval_sec,
+
+        "VERIFY":
+            verify_interval_sec,
+
+        "POST_ALERT":
+            base_interval_sec,
+
+        "OFF":
+            None,
+    }
 
     print()
 
@@ -437,30 +458,6 @@ def main() -> None:
         f"{max_reconnect_attempts}회"
     )
 
-    interval_by_mode = {
-        "BASE":
-            base_interval_sec,
-
-        "ALERT":
-            alert_interval_sec,
-
-        "VERIFY":
-            verify_interval_sec,
-
-        "POST_ALERT":
-            base_interval_sec,
-
-        "OFF":
-            None,
-    }
-
-    if original_mode not in interval_by_mode:
-
-        raise RuntimeError(
-            f"지원하지 않는 monitored_mode입니다: "
-            f"{original_mode}"
-        )
-
     # =====================================================
     # 3. Dynamic UTIC Stream Resolver 준비
     # =====================================================
@@ -475,19 +472,15 @@ def main() -> None:
 
     resolver_call_count = 0
 
-    latest_utic_info: dict | None = None
+    latest_utic_info: (
+        dict
+        | None
+    ) = None
 
     def resolve_utic_stream_url() -> str:
         """
-        CaptureWorker가 연결을 시도할 때마다 호출된다.
-
-        최초 연결:
-        → UTIC API 조회
-
-        재연결:
-        → UTIC API 다시 조회
-
-        따라서 오래된 Stream URL을 재사용하지 않는다.
+        CaptureWorker가 연결할 때마다
+        최신 UTIC Stream URL을 다시 가져온다.
         """
 
         nonlocal resolver_call_count
@@ -526,7 +519,8 @@ def main() -> None:
 
         print(
             f"[UTIC RESOLVER] "
-            f"CCTV={utic_info.get('CCTVID')} "
+            f"CCTV="
+            f"{utic_info.get('CCTVID')} "
             f"/ NAME="
             f"{utic_info.get('CCTVNAME')} "
             f"/ KIND="
@@ -535,7 +529,6 @@ def main() -> None:
             f"{utic_info.get('MOVIE')}"
         )
 
-        # 실제 URL 전체는 출력하지 않음
         print(
             "[UTIC RESOLVER] "
             "Stream URL 획득 완료"
@@ -553,8 +546,9 @@ def main() -> None:
     # =====================================================
 
     sampler = FrameSampler(
-        default_interval_sec=
-            base_interval_sec,
+        default_interval_sec=(
+            base_interval_sec
+        ),
     )
 
     applied_interval_sec = (
@@ -596,14 +590,61 @@ def main() -> None:
         )
 
     # =====================================================
-    # 5. 테스트 상태 준비
+    # 5. YOLO Detector / Queue / Worker 준비
+    # =====================================================
+
+    print()
+
+    print(
+        "[YOLO PIPELINE PREPARE]"
+    )
+
+    if not YOLO_MODEL_PATH.exists():
+
+        raise FileNotFoundError(
+            f"YOLO 모델을 찾을 수 없습니다: "
+            f"{YOLO_MODEL_PATH}"
+        )
+
+    detector = YoloDetector(
+        model_path=YOLO_MODEL_PATH,
+        imgsz=640,
+        device="cpu",
+        confidence=0.25,
+    )
+
+    detector.warmup()
+
+    analysis_frame_queue = (
+        AnalysisFrameQueue(
+            maxsize=4,
+        )
+    )
+
+    yolo_worker = YoloWorker(
+        frame_queue=(
+            analysis_frame_queue
+        ),
+        detect_fn=(
+            detector.detect
+        ),
+        poll_interval_sec=0.1,
+    )
+
+    print(
+        "[PASS] YOLO Detector "
+        "+ AnalysisFrameQueue "
+        "+ YoloWorker 준비 완료"
+    )
+
+    # =====================================================
+    # 6. 테스트 상태 준비
     # =====================================================
 
     received_count = 0
 
     sampled_count = 0
 
-    # 실제 Sampling이 발생한 monotonic 시각
     sampled_at_monotonic: list[
         float
     ] = []
@@ -617,6 +658,34 @@ def main() -> None:
     last_frame_db_update_at = 0.0
 
     last_quality_status = None
+
+    # -----------------------------------------------------
+    # YOLO 통계
+    # -----------------------------------------------------
+
+    yolo_result_count = 0
+
+    yolo_detection_count = 0
+
+    yolo_enqueued_count = 0
+
+    yolo_dropped_count = 0
+
+    yolo_counter_lock = Lock()
+
+    # -----------------------------------------------------
+    # YOLO 상태
+    # -----------------------------------------------------
+
+    yolo_status_lock = Lock()
+
+    yolo_status_history: list[
+        str
+    ] = []
+
+    # -----------------------------------------------------
+    # Capture / Health 상태
+    # -----------------------------------------------------
 
     heartbeat_paused = Event()
 
@@ -632,7 +701,9 @@ def main() -> None:
 
     status_lock = Lock()
 
-    status_history: list[str] = []
+    status_history: list[
+        str
+    ] = []
 
     seen_reconnecting = False
 
@@ -640,14 +711,13 @@ def main() -> None:
 
     health_reconnect_lock = Lock()
 
-    # mode별 실제 Sampling 간격 기록
     measured_intervals: dict[
         str,
         float,
     ] = {}
 
     # =====================================================
-    # 6. 영상 품질 상태 DB UPDATE
+    # 7. 영상 품질 상태 DB UPDATE
     # =====================================================
 
     def update_quality_status_if_changed(
@@ -656,7 +726,11 @@ def main() -> None:
 
         nonlocal last_quality_status
 
-        if last_quality_status == status:
+        if (
+            last_quality_status
+            == status
+        ):
+
             return
 
         try:
@@ -671,7 +745,9 @@ def main() -> None:
                     )
                 )
 
-            last_quality_status = status
+            last_quality_status = (
+                status
+            )
 
             print(
                 f"[DB QUALITY] "
@@ -690,7 +766,152 @@ def main() -> None:
             )
 
     # =====================================================
-    # 7. Capture 상태 Callback
+    # 8. YOLO 분석 상태 Callback
+    # =====================================================
+
+    def handle_yolo_status(
+        status_cctv_id: int,
+        status: str,
+    ) -> None:
+
+        if (
+            status_cctv_id
+            != cctv_id
+        ):
+
+            raise LookupError(
+                "예상하지 않은 CCTV ID입니다: "
+                f"{status_cctv_id}"
+            )
+
+        print(
+            f"[YOLO STATUS] "
+            f"CCTV {status_cctv_id} "
+            f"→ {status}"
+        )
+
+        with yolo_status_lock:
+
+            yolo_status_history.append(
+                status
+            )
+
+        try:
+
+            with get_connection() as connection:
+
+                result = (
+                    update_analysis_status(
+                        connection,
+                        status_cctv_id,
+                        status,
+                    )
+                )
+
+            print(
+                f"[DB ANALYSIS] "
+                f"CCTV {status_cctv_id} "
+                f"→ "
+                f"{result['analysis_status']}"
+            )
+
+        except Exception as exc:
+
+            print(
+                f"[DB ANALYSIS ERROR] "
+                f"CCTV {status_cctv_id} "
+                f"/ status={status} "
+                f"/ error={exc}"
+            )
+
+    # =====================================================
+    # 9. YOLO 결과 Callback
+    # =====================================================
+
+    def handle_yolo_result(
+        frame: Frame,
+        detections: list[
+            Detection
+        ],
+        performance: YoloPerformance,
+    ) -> None:
+
+        nonlocal yolo_result_count
+        nonlocal yolo_detection_count
+
+        with yolo_counter_lock:
+
+            yolo_result_count += 1
+
+            yolo_detection_count += (
+                len(
+                    detections
+                )
+            )
+
+            current_result_count = (
+                yolo_result_count
+            )
+
+        print()
+
+        print(
+            f"[YOLO RESULT "
+            f"#{current_result_count}] "
+            f"CCTV {frame.cctv_id} "
+            f"/ detections="
+            f"{len(detections)} "
+            f"/ queue_wait="
+            f"{performance.queue_wait_sec:.4f}s "
+            f"/ inference="
+            f"{performance.inference_sec:.4f}s "
+            f"/ total="
+            f"{performance.total_latency_sec:.4f}s"
+        )
+
+        if detections:
+
+            for (
+                index,
+                detection,
+            ) in enumerate(
+                detections,
+                start=1,
+            ):
+
+                print(
+                    f"  [DETECTION "
+                    f"#{index}] "
+                    f"type="
+                    f"{detection.hazard_type} "
+                    f"/ conf="
+                    f"{detection.confidence:.3f} "
+                    f"/ bbox="
+                    f"{detection.bbox} "
+                    f"/ model="
+                    f"{detection.model_version}"
+                )
+
+    # =====================================================
+    # 10. YoloWorker Thread 준비
+    # =====================================================
+
+    yolo_worker_thread = Thread(
+        target=yolo_worker.run,
+        kwargs={
+            "on_result":
+                handle_yolo_result,
+
+            "on_status":
+                handle_yolo_status,
+        },
+        name=(
+            "yolo-analysis-worker"
+        ),
+    )
+
+    # =====================================================
+    # 11. Capture 상태 Callback
     # =====================================================
 
     def handle_status(
@@ -711,13 +932,21 @@ def main() -> None:
                 status
             )
 
-            if status == "RECONNECTING":
+            if (
+                status
+                == "RECONNECTING"
+            ):
 
-                seen_reconnecting = True
+                seen_reconnecting = (
+                    True
+                )
 
                 reconnecting_event.set()
 
-            elif status == "CONNECTED":
+            elif (
+                status
+                == "CONNECTED"
+            ):
 
                 if seen_reconnecting:
 
@@ -756,7 +985,7 @@ def main() -> None:
             )
 
     # =====================================================
-    # 8. Frame Callback
+    # 12. Frame Callback
     # =====================================================
 
     def handle_frame(
@@ -766,6 +995,8 @@ def main() -> None:
         nonlocal received_count
         nonlocal sampled_count
         nonlocal last_frame_db_update_at
+        nonlocal yolo_enqueued_count
+        nonlocal yolo_dropped_count
 
         # -------------------------------------------------
         # 전체 수신 Frame
@@ -787,10 +1018,13 @@ def main() -> None:
             time.monotonic()
         )
 
-        if not heartbeat_paused.is_set():
+        if (
+            not heartbeat_paused.is_set()
+        ):
 
-            should_update_last_frame = (
-                last_frame_db_update_at == 0.0
+            should_update = (
+                last_frame_db_update_at
+                == 0.0
                 or (
                     now_monotonic
                     - last_frame_db_update_at
@@ -798,7 +1032,7 @@ def main() -> None:
                 >= LAST_FRAME_DB_INTERVAL_SEC
             )
 
-            if should_update_last_frame:
+            if should_update:
 
                 try:
 
@@ -857,9 +1091,12 @@ def main() -> None:
         # Sampling
         # -------------------------------------------------
 
-        if not sampler.should_sample(
-            frame
+        if (
+            not sampler.should_sample(
+                frame
+            )
         ):
+
             return
 
         sampled_at = (
@@ -885,7 +1122,9 @@ def main() -> None:
         quality_result = (
             check_quality(
                 frame,
-                threshold=quality_threshold,
+                threshold=(
+                    quality_threshold
+                ),
             )
         )
 
@@ -904,8 +1143,10 @@ def main() -> None:
         print(
             f"[QUALITY] "
             f"CCTV {frame.cctv_id} "
-            f"/ status={quality_status} "
-            f"/ threshold={quality_threshold:.2f} "
+            f"/ status="
+            f"{quality_status} "
+            f"/ threshold="
+            f"{quality_threshold:.2f} "
             f"/ score="
             f"{quality_result['quality_score']:.3f} "
             f"/ brightness="
@@ -916,14 +1157,71 @@ def main() -> None:
             f"{quality_result['reason']}"
         )
 
+        # -------------------------------------------------
+        # Quality GOOD → YOLO Queue
+        # -------------------------------------------------
+
+        if (
+            quality_status
+            == "GOOD"
+        ):
+
+            dropped_frame = (
+                analysis_frame_queue.put_latest(
+                    frame
+                )
+            )
+
+            with yolo_counter_lock:
+
+                yolo_enqueued_count += 1
+
+                if (
+                    dropped_frame
+                    is not None
+                ):
+
+                    yolo_dropped_count += 1
+
+                current_enqueued = (
+                    yolo_enqueued_count
+                )
+
+                current_dropped = (
+                    yolo_dropped_count
+                )
+
+            print(
+                f"[YOLO QUEUE] "
+                f"CCTV {frame.cctv_id} "
+                f"/ enqueued="
+                f"{current_enqueued} "
+                f"/ queue_size="
+                f"{analysis_frame_queue.size()} "
+                f"/ dropped="
+                f"{current_dropped}"
+            )
+
+        else:
+
+            print(
+                f"[YOLO SKIP] "
+                f"CCTV {frame.cctv_id} "
+                f"/ quality="
+                f"{quality_status} "
+                f"→ YOLO Queue 미전달"
+            )
+
         elapsed = (
             sampled_at
             - started_at
         )
 
         print(
-            f"[SAMPLE #{current_sampled}] "
-            f"elapsed={elapsed:.2f}s "
+            f"[SAMPLE "
+            f"#{current_sampled}] "
+            f"elapsed="
+            f"{elapsed:.2f}s "
             f"/ received="
             f"{current_received} "
             f"/ shape="
@@ -931,7 +1229,7 @@ def main() -> None:
         )
 
     # =====================================================
-    # 9. CaptureWorker 생성
+    # 13. CaptureWorker 생성
     # =====================================================
 
     worker = CaptureWorker(
@@ -968,20 +1266,12 @@ def main() -> None:
     )
 
     # =====================================================
-    # 10. SamplingPolicyMonitor용 DB Provider
+    # 14. Sampling Monitor DB Provider
     # =====================================================
 
-    def sampling_state_provider() -> list[dict]:
-        """
-        실행 중인 CCTV 하나의 현재 runtime 상태를 가져온다.
-
-        중요:
-        list_monitored_utic_cctvs()는 OFF를 제외하므로
-        OFF 전환을 감지할 수 없다.
-
-        따라서 이미 실행 중인 CCTV는
-        get_cctv_runtime_state()로 직접 조회한다.
-        """
+    def sampling_state_provider() -> list[
+        dict
+    ]:
 
         with get_connection() as connection:
 
@@ -1004,9 +1294,6 @@ def main() -> None:
         ]
 
     def sampling_settings_provider() -> dict:
-        """
-        현재 monitoring_settings 최신값을 가져온다.
-        """
 
         with get_connection() as connection:
 
@@ -1026,7 +1313,7 @@ def main() -> None:
         return settings
 
     # =====================================================
-    # 11. 테스트용 monitored_mode DB 변경
+    # 15. monitored_mode DB 변경 Helper
     # =====================================================
 
     def set_db_monitored_mode(
@@ -1061,12 +1348,15 @@ def main() -> None:
         )
 
     # =====================================================
-    # 12. Sampling Policy 적용 대기
+    # 16. Sampling 상태 적용 대기
     # =====================================================
 
     def wait_for_sampling_state(
         expected_mode: str,
-        expected_interval: float | None,
+        expected_interval: (
+            float
+            | None
+        ),
         timeout_sec: float = 6.0,
     ) -> None:
 
@@ -1102,12 +1392,19 @@ def main() -> None:
                 )
             )
 
-            if actual_mode == expected_mode:
+            if (
+                actual_mode
+                == expected_mode
+            ):
 
-                # OFF
-                if expected_interval is None:
+                if (
+                    expected_interval
+                    is None
+                ):
 
-                    if not sampling_enabled:
+                    if (
+                        not sampling_enabled
+                    ):
 
                         print(
                             f"[PASS] "
@@ -1117,7 +1414,6 @@ def main() -> None:
 
                         return
 
-                # BASE / ALERT / VERIFY / POST_ALERT
                 else:
 
                     if (
@@ -1142,13 +1438,13 @@ def main() -> None:
 
         raise AssertionError(
             f"{expected_mode} "
-            f"Sampling Policy 적용을 "
+            "Sampling Policy 적용을 "
             f"{timeout_sec:.1f}초 안에 "
             "확인하지 못했습니다."
         )
 
     # =====================================================
-    # 13. 실제 새 Sampling Frame 기다리기
+    # 17. 새 Sampling Frame 대기
     # =====================================================
 
     def wait_for_new_samples(
@@ -1175,7 +1471,9 @@ def main() -> None:
             with counter_lock:
 
                 if (
-                    len(sampled_at_monotonic)
+                    len(
+                        sampled_at_monotonic
+                    )
                     >= target_length
                 ):
 
@@ -1193,32 +1491,28 @@ def main() -> None:
         with counter_lock:
 
             current_length = (
-                len(sampled_at_monotonic)
+                len(
+                    sampled_at_monotonic
+                )
             )
 
         raise AssertionError(
-            "새 Sampling Frame을 기다리는 중 "
+            "새 Sampling Frame 대기 중 "
             "timeout이 발생했습니다. "
             f"start_index={start_index}, "
             f"required={required_count}, "
-            f"current_length={current_length}"
+            f"current_length="
+            f"{current_length}"
         )
 
     # =====================================================
-    # 14. 실제 Sampling 간격 검증
+    # 18. 실제 Sampling Interval 검증
     # =====================================================
 
     def verify_actual_sampling_interval(
         mode: str,
         expected_interval: float,
     ) -> None:
-        """
-        DB mode를 실제로 변경한 뒤
-        SamplingPolicyMonitor가 반영할 때까지 기다린다.
-
-        그 이후 새 Sample 2개를 기다려
-        실제 Frame Sampling 간격을 측정한다.
-        """
 
         set_db_monitored_mode(
             mode
@@ -1247,9 +1541,13 @@ def main() -> None:
 
         sample_times = (
             wait_for_new_samples(
-                start_index=start_index,
+                start_index=(
+                    start_index
+                ),
                 required_count=2,
-                timeout_sec=timeout_sec,
+                timeout_sec=(
+                    timeout_sec
+                ),
             )
         )
 
@@ -1306,14 +1604,16 @@ def main() -> None:
         print(
             f"[PASS] "
             f"{mode} "
-            f"실제 Frame Sampling 주기 확인"
+            "실제 Frame Sampling 주기 확인"
         )
 
     # =====================================================
-    # 15. Health Monitor용 DB 상태 조회
+    # 19. Health Monitor용 DB 상태 조회
     # =====================================================
 
-    def health_state_provider() -> list[dict]:
+    def health_state_provider() -> list[
+        dict
+    ]:
 
         with get_connection() as connection:
 
@@ -1326,7 +1626,7 @@ def main() -> None:
         return rows
 
     # =====================================================
-    # 16. Health Monitor → 재연결 요청
+    # 20. Health Monitor 재연결 요청
     # =====================================================
 
     def health_reconnect_requester(
@@ -1335,10 +1635,13 @@ def main() -> None:
 
         nonlocal health_reconnect_count
 
-        if requested_cctv_id != cctv_id:
+        if (
+            requested_cctv_id
+            != cctv_id
+        ):
 
             raise LookupError(
-                f"테스트 Worker가 없는 "
+                "테스트 Worker가 없는 "
                 f"CCTV입니다: "
                 f"{requested_cctv_id}"
             )
@@ -1356,7 +1659,7 @@ def main() -> None:
         print(
             f"[HEALTH ACTION] "
             f"CCTV {requested_cctv_id} "
-            f"CaptureWorker 재연결 요청 "
+            "CaptureWorker 재연결 요청 "
             f"#{count}"
         )
 
@@ -1365,16 +1668,18 @@ def main() -> None:
         health_reconnect_requested_event.set()
 
     # =====================================================
-    # 17. Monitor 생성
+    # 21. Monitor 생성
     # =====================================================
 
-    health_monitor = CctvHealthMonitor(
-        check_interval_sec=(
-            HEALTH_CHECK_INTERVAL_SEC
-        ),
-        stale_after_sec=(
-            STALE_AFTER_SEC
-        ),
+    health_monitor = (
+        CctvHealthMonitor(
+            check_interval_sec=(
+                HEALTH_CHECK_INTERVAL_SEC
+            ),
+            stale_after_sec=(
+                STALE_AFTER_SEC
+            ),
+        )
     )
 
     health_monitor_thread = Thread(
@@ -1414,7 +1719,23 @@ def main() -> None:
     )
 
     # =====================================================
-    # 18. CaptureWorker 시작
+    # 22. YoloWorker 시작
+    # =====================================================
+
+    print()
+
+    print(
+        "[YOLO WORKER START]"
+    )
+
+    yolo_worker_thread.start()
+
+    print(
+        "[PASS] YoloWorker Thread 시작"
+    )
+
+    # =====================================================
+    # 23. CaptureWorker 시작
     # =====================================================
 
     print()
@@ -1429,13 +1750,23 @@ def main() -> None:
         "첫 CONNECTED 상태를 기다립니다."
     )
 
-    if not initial_connected_event.wait(
-        timeout=INITIAL_CONNECT_TIMEOUT_SEC
+    if (
+        not initial_connected_event.wait(
+            timeout=(
+                INITIAL_CONNECT_TIMEOUT_SEC
+            )
+        )
     ):
 
         worker.stop()
 
         worker_thread.join(
+            timeout=5
+        )
+
+        yolo_worker.stop()
+
+        yolo_worker_thread.join(
             timeout=5
         )
 
@@ -1448,9 +1779,9 @@ def main() -> None:
         "[PASS] 최초 CONNECTED 확인"
     )
 
-    # -----------------------------------------------------
-    # 최초 Resolver 호출 확인
-    # -----------------------------------------------------
+    # =====================================================
+    # 최초 Resolver 확인
+    # =====================================================
 
     with resolver_lock:
 
@@ -1469,11 +1800,14 @@ def main() -> None:
     )
 
     print(
-        f"최초 연결까지 Resolver 호출 수 : "
+        "최초 연결까지 Resolver 호출 수 : "
         f"{initial_resolver_call_count}"
     )
 
-    if first_utic_info is not None:
+    if (
+        first_utic_info
+        is not None
+    ):
 
         print(
             f"UTIC CCTV ID : "
@@ -1485,22 +1819,19 @@ def main() -> None:
             f"{first_utic_info.get('CCTVNAME')}"
         )
 
-    if initial_resolver_call_count < 1:
-
-        worker.stop()
-
-        worker_thread.join(
-            timeout=5
-        )
+    if (
+        initial_resolver_call_count
+        < 1
+    ):
 
         raise AssertionError(
-            "최초 연결 전에 Stream Resolver가 "
+            "최초 연결 전에 "
+            "Stream Resolver가 "
             "호출되지 않았습니다."
         )
 
     # =====================================================
-    # 19. SamplingPolicyMonitor 시작
-    #     + 실제 DB mode Runtime 전환
+    # 24. Runtime Sampling 테스트
     # =====================================================
 
     print()
@@ -1509,7 +1840,8 @@ def main() -> None:
 
     print(
         "[5] 실제 UTIC Frame "
-        "+ Runtime Sampling Mode 테스트"
+        "+ Runtime Sampling Mode "
+        "+ YOLO 테스트"
     )
 
     print("=" * 70)
@@ -1518,7 +1850,6 @@ def main() -> None:
 
     try:
 
-        # 최초 DB 상태를 읽을 시간
         time.sleep(
             1.0
         )
@@ -1569,9 +1900,6 @@ def main() -> None:
 
         # -------------------------------------------------
         # OFF
-        #
-        # 실제 Capture는 계속되지만
-        # sampled frame은 0개여야 함
         # -------------------------------------------------
 
         set_db_monitored_mode(
@@ -1583,9 +1911,6 @@ def main() -> None:
             expected_interval=None,
         )
 
-        # OFF 적용 직전 이미
-        # should_sample()을 통과한 Frame이
-        # 있을 수 있으므로 짧게 안정화
         time.sleep(
             0.5
         )
@@ -1603,7 +1928,7 @@ def main() -> None:
         print(
             f"[OFF TEST] "
             f"{OFF_HOLD_SEC:.1f}초 동안 "
-            "영상 수신은 유지하고 "
+            "Capture는 유지하고 "
             "Sampling만 중단되는지 확인합니다."
         )
 
@@ -1639,20 +1964,26 @@ def main() -> None:
             f"{sampled_during_off}"
         )
 
-        if received_during_off <= 0:
+        if (
+            received_during_off
+            <= 0
+        ):
 
             raise AssertionError(
-                "OFF 상태에서 실제 CCTV Frame "
-                "수신까지 멈췄습니다. "
-                "현재 구조에서는 Capture는 유지되고 "
-                "Sampling만 중단되어야 합니다."
+                "OFF 상태에서 "
+                "CCTV Frame 수신까지 "
+                "멈췄습니다."
             )
 
-        if sampled_during_off != 0:
+        if (
+            sampled_during_off
+            != 0
+        ):
 
             raise AssertionError(
                 "OFF 상태인데 "
-                "Sampling Frame이 생성되었습니다. "
+                "Sampling Frame이 "
+                "생성되었습니다. "
                 f"count="
                 f"{sampled_during_off}"
             )
@@ -1664,9 +1995,6 @@ def main() -> None:
 
         # -------------------------------------------------
         # OFF → BASE
-        #
-        # set_enabled(False → True) 전환 후
-        # 첫 Frame이 다시 Sampling 되어야 함
         # -------------------------------------------------
 
         with counter_lock:
@@ -1706,6 +2034,7 @@ def main() -> None:
                 current_sample_count
                 > before_recovery_sample_count
             ):
+
                 break
 
             time.sleep(
@@ -1727,58 +2056,43 @@ def main() -> None:
 
     finally:
 
-        # -------------------------------------------------
-        # 테스트 실패 여부와 관계없이
-        # DB monitored_mode 원상복구
-        # -------------------------------------------------
-
         print()
 
         print(
-            f"[SAMPLING TEST RESTORE] "
+            "[SAMPLING TEST RESTORE] "
             f"원래 mode "
             f"{original_mode}로 복구"
         )
 
-        try:
+        set_db_monitored_mode(
+            original_mode
+        )
 
-            set_db_monitored_mode(
+        wait_for_sampling_state(
+            expected_mode=(
                 original_mode
-            )
-
-            wait_for_sampling_state(
-                expected_mode=(
+            ),
+            expected_interval=(
+                interval_by_mode[
                     original_mode
-                ),
-                expected_interval=(
-                    interval_by_mode[
-                        original_mode
-                    ]
-                ),
+                ]
+            ),
+        )
+
+        sampling_monitor.stop()
+
+        sampling_monitor_thread.join(
+            timeout=5
+        )
+
+        if (
+            sampling_monitor_thread.is_alive()
+        ):
+
+            raise AssertionError(
+                "SamplingPolicyMonitor "
+                "Thread가 종료되지 않았습니다."
             )
-
-        finally:
-
-            sampling_monitor.stop()
-
-            sampling_monitor_thread.join(
-                timeout=5
-            )
-
-            if (
-                sampling_monitor_thread.is_alive()
-            ):
-
-                worker.stop()
-
-                worker_thread.join(
-                    timeout=5
-                )
-
-                raise AssertionError(
-                    "SamplingPolicyMonitor Thread가 "
-                    "종료되지 않았습니다."
-                )
 
     print(
         "[PASS] Runtime Sampling Mode "
@@ -1788,7 +2102,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 20. Health Monitor 시작
+    # 25. Health Monitor 시작
     # =====================================================
 
     print()
@@ -1801,7 +2115,8 @@ def main() -> None:
 
     print(
         f"{NORMAL_RUN_SEC:.0f}초 동안 "
-        "정상 heartbeat 상태를 확인합니다."
+        "정상 heartbeat 상태를 "
+        "확인합니다."
     )
 
     time.sleep(
@@ -1809,7 +2124,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 21. Heartbeat 강제 중단
+    # 26. Heartbeat 강제 중단
     # =====================================================
 
     print()
@@ -1817,8 +2132,8 @@ def main() -> None:
     print("=" * 70)
 
     print(
-        "[TEST] DB last_frame_at heartbeat "
-        "강제 중단"
+        "[TEST] DB last_frame_at "
+        "heartbeat 강제 중단"
     )
 
     print("=" * 70)
@@ -1831,13 +2146,14 @@ def main() -> None:
     print(
         f"※ {STALE_AFTER_SEC:.0f}초 이상 "
         "last_frame_at이 변하지 않으면 "
-        "Health Monitor가 재연결해야 합니다."
+        "Health Monitor가 "
+        "재연결해야 합니다."
     )
 
     heartbeat_paused.set()
 
     # =====================================================
-    # 22. Health Monitor 재연결 요청 대기
+    # 27. STALE 감지 대기
     # =====================================================
 
     watchdog_timeout = (
@@ -1848,12 +2164,15 @@ def main() -> None:
     print()
 
     print(
-        "[7] Health Monitor STALE 감지 대기"
+        "[7] Health Monitor "
+        "STALE 감지 대기"
     )
 
     detected = (
         health_reconnect_requested_event.wait(
-            timeout=watchdog_timeout
+            timeout=(
+                watchdog_timeout
+            )
         )
     )
 
@@ -1873,9 +2192,15 @@ def main() -> None:
             timeout=5
         )
 
+        yolo_worker.stop()
+
+        yolo_worker_thread.join(
+            timeout=5
+        )
+
         raise AssertionError(
-            "last_frame_at이 STALE 상태가 "
-            "되었는데 Health Monitor가 "
+            "last_frame_at이 STALE인데 "
+            "Health Monitor가 "
             "재연결을 요청하지 않았습니다."
         )
 
@@ -1885,17 +2210,20 @@ def main() -> None:
     )
 
     # =====================================================
-    # 23. RECONNECTING 확인
+    # 28. RECONNECTING 확인
     # =====================================================
 
-    if not reconnecting_event.wait(
-        timeout=5
+    if (
+        not reconnecting_event.wait(
+            timeout=5
+        )
     ):
 
         raise AssertionError(
-            "Health Monitor의 요청 이후 "
-            "CaptureWorker가 RECONNECTING "
-            "상태가 되지 않았습니다."
+            "Health Monitor 요청 이후 "
+            "CaptureWorker가 "
+            "RECONNECTING 상태가 "
+            "되지 않았습니다."
         )
 
     print(
@@ -1903,7 +2231,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 24. 재연결 후 CONNECTED 확인
+    # 29. 재연결 후 CONNECTED 확인
     # =====================================================
 
     reconnect_wait_timeout = (
@@ -1916,8 +2244,12 @@ def main() -> None:
         f"{reconnect_wait_timeout:.1f}초"
     )
 
-    if not reconnected_event.wait(
-        timeout=reconnect_wait_timeout
+    if (
+        not reconnected_event.wait(
+            timeout=(
+                reconnect_wait_timeout
+            )
+        )
     ):
 
         raise AssertionError(
@@ -1927,11 +2259,12 @@ def main() -> None:
         )
 
     print(
-        "[PASS] 재연결 후 CONNECTED 복구"
+        "[PASS] 재연결 후 "
+        "CONNECTED 복구"
     )
 
     # =====================================================
-    # 25. Resolver 재호출 확인
+    # 30. Resolver 재호출 확인
     # =====================================================
 
     with resolver_lock:
@@ -1957,7 +2290,8 @@ def main() -> None:
     ):
 
         raise AssertionError(
-            "재연결 시 UTIC Stream Resolver가 "
+            "재연결 시 "
+            "UTIC Stream Resolver가 "
             "다시 호출되지 않았습니다."
         )
 
@@ -1967,7 +2301,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 26. Heartbeat 다시 활성화
+    # 31. Heartbeat 복구
     # =====================================================
 
     print()
@@ -1988,7 +2322,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # 27. Health Monitor 먼저 종료
+    # 32. Health Monitor 종료
     # =====================================================
 
     print()
@@ -2013,7 +2347,7 @@ def main() -> None:
         )
 
     # =====================================================
-    # 28. CaptureWorker 종료
+    # 33. CaptureWorker 종료
     # =====================================================
 
     print()
@@ -2028,7 +2362,9 @@ def main() -> None:
         timeout=10
     )
 
-    if worker_thread.is_alive():
+    if (
+        worker_thread.is_alive()
+    ):
 
         raise AssertionError(
             "CaptureWorker Thread가 "
@@ -2036,7 +2372,138 @@ def main() -> None:
         )
 
     # =====================================================
-    # 29. 최종 DB 상태 확인
+    # 34. YOLO Queue Drain
+    # =====================================================
+
+    print()
+
+    print(
+        "[11] YOLO Queue 처리 완료 대기"
+    )
+
+    yolo_drain_deadline = (
+        time.monotonic()
+        + 10.0
+    )
+
+    while (
+        time.monotonic()
+        < yolo_drain_deadline
+    ):
+
+        with yolo_counter_lock:
+
+            current_enqueued = (
+                yolo_enqueued_count
+            )
+
+            current_dropped = (
+                yolo_dropped_count
+            )
+
+            current_results = (
+                yolo_result_count
+            )
+
+        expected_results = (
+            current_enqueued
+            - current_dropped
+        )
+
+        if (
+            analysis_frame_queue.empty()
+            and current_results
+            >= expected_results
+        ):
+
+            break
+
+        time.sleep(
+            0.1
+        )
+
+    else:
+
+        raise AssertionError(
+            "CaptureWorker 종료 후 "
+            "YOLO Queue가 10초 안에 "
+            "처리 완료되지 않았습니다. "
+            f"enqueued="
+            f"{current_enqueued}, "
+            f"dropped="
+            f"{current_dropped}, "
+            f"results="
+            f"{current_results}, "
+            f"queue_size="
+            f"{analysis_frame_queue.size()}"
+        )
+
+    print(
+        f"[PASS] YOLO Queue 처리 완료 "
+        f"/ enqueued="
+        f"{current_enqueued} "
+        f"/ dropped="
+        f"{current_dropped} "
+        f"/ results="
+        f"{current_results}"
+    )
+
+    # =====================================================
+    # 35. YoloWorker 종료
+    # =====================================================
+
+    print()
+
+    print(
+        "[12] YoloWorker 종료"
+    )
+
+    yolo_worker.stop()
+
+    yolo_worker_thread.join(
+        timeout=5
+    )
+
+    if (
+        yolo_worker_thread.is_alive()
+    ):
+
+        raise AssertionError(
+            "YoloWorker Thread가 "
+            "종료되지 않았습니다."
+        )
+
+    with yolo_status_lock:
+
+        final_yolo_status_history = (
+            yolo_status_history.copy()
+        )
+
+    if (
+        not final_yolo_status_history
+        or (
+            final_yolo_status_history[
+                -1
+            ]
+            != "STOPPED"
+        )
+    ):
+
+        raise AssertionError(
+            "YoloWorker 종료 후 "
+            "STOPPED 상태가 "
+            "확인되지 않았습니다. "
+            f"history="
+            f"{final_yolo_status_history}"
+        )
+
+    print(
+        "[PASS] YoloWorker "
+        "STOPPED 확인"
+    )
+
+    # =====================================================
+    # 36. 최종 DB 상태 확인
     # =====================================================
 
     with get_connection() as connection:
@@ -2051,13 +2518,21 @@ def main() -> None:
         (
             row
             for row in final_cctvs
-            if row["id"] == cctv_id
+            if row["id"]
+            == cctv_id
         ),
         None,
     )
 
+    if final_cctv is None:
+
+        raise AssertionError(
+            "최종 DB 상태에서 "
+            "테스트 CCTV를 찾을 수 없습니다."
+        )
+
     # =====================================================
-    # 30. 최종 결과 정리
+    # 37. 최종 통계
     # =====================================================
 
     with status_lock:
@@ -2088,6 +2563,24 @@ def main() -> None:
             sampled_count
         )
 
+    with yolo_counter_lock:
+
+        final_yolo_enqueued_count = (
+            yolo_enqueued_count
+        )
+
+        final_yolo_dropped_count = (
+            yolo_dropped_count
+        )
+
+        final_yolo_result_count = (
+            yolo_result_count
+        )
+
+        final_yolo_detection_count = (
+            yolo_detection_count
+        )
+
     expected_transition = [
         "CONNECTED",
         "RECONNECTING",
@@ -2096,13 +2589,33 @@ def main() -> None:
 
     transition_ok = (
         contains_subsequence(
-            values=final_status_history,
-            expected=expected_transition,
+            values=(
+                final_status_history
+            ),
+            expected=(
+                expected_transition
+            ),
+        )
+    )
+
+    expected_yolo_transition = [
+        "RUNNING",
+        "STOPPED",
+    ]
+
+    yolo_transition_ok = (
+        contains_subsequence(
+            values=(
+                final_yolo_status_history
+            ),
+            expected=(
+                expected_yolo_transition
+            ),
         )
     )
 
     # =====================================================
-    # 결과 출력
+    # 38. 결과 출력
     # =====================================================
 
     print()
@@ -2120,7 +2633,10 @@ def main() -> None:
         f"{original_mode}"
     )
 
-    if applied_interval_sec is None:
+    if (
+        applied_interval_sec
+        is None
+    ):
 
         print(
             "최초 적용 분석 주기      : "
@@ -2165,20 +2681,52 @@ def main() -> None:
     )
 
     print(
+        f"YOLO Queue 입력 Frame  : "
+        f"{final_yolo_enqueued_count}"
+    )
+
+    print(
+        f"YOLO Queue Drop Frame  : "
+        f"{final_yolo_dropped_count}"
+    )
+
+    print(
+        f"YOLO 처리 결과 Frame   : "
+        f"{final_yolo_result_count}"
+    )
+
+    print(
+        f"YOLO Detection 총합    : "
+        f"{final_yolo_detection_count}"
+    )
+
+    print(
         f"Health 재연결 요청 수   : "
         f"{final_health_reconnect_count}"
     )
 
     print(
-        "상태 History           : "
+        "Capture 상태 History   : "
         + " → ".join(
             final_status_history
         )
     )
 
     print(
-        f"상태 전이 검증          : "
+        f"Capture 상태 전이 검증  : "
         f"{transition_ok}"
+    )
+
+    print(
+        "YOLO 상태 History      : "
+        + " → ".join(
+            final_yolo_status_history
+        )
+    )
+
+    print(
+        f"YOLO 상태 전이 검증     : "
+        f"{yolo_transition_ok}"
     )
 
     print()
@@ -2233,41 +2781,39 @@ def main() -> None:
         "실제 Frame Sampling 재개"
     )
 
-    if final_cctv is not None:
+    print()
 
-        print()
+    print(
+        "최종 DB 상태"
+    )
 
-        print(
-            "최종 DB 상태"
-        )
+    print(
+        f"connection_status    : "
+        f"{final_cctv['connection_status']}"
+    )
 
-        print(
-            f"connection_status    : "
-            f"{final_cctv['connection_status']}"
-        )
+    print(
+        f"video_quality_status : "
+        f"{final_cctv['video_quality_status']}"
+    )
 
-        print(
-            f"video_quality_status : "
-            f"{final_cctv['video_quality_status']}"
-        )
+    print(
+        f"analysis_status      : "
+        f"{final_cctv['analysis_status']}"
+    )
 
-        print(
-            f"analysis_status      : "
-            f"{final_cctv['analysis_status']}"
-        )
+    print(
+        f"last_frame_at        : "
+        f"{final_cctv['last_frame_at']}"
+    )
 
-        print(
-            f"last_frame_at        : "
-            f"{final_cctv['last_frame_at']}"
-        )
-
-        print(
-            f"monitored_mode       : "
-            f"{final_cctv['monitored_mode']}"
-        )
+    print(
+        f"monitored_mode       : "
+        f"{final_cctv['monitored_mode']}"
+    )
 
     # =====================================================
-    # 최종 Assert
+    # 39. 최종 Assert - 기존 Capture / Health
     # =====================================================
 
     if (
@@ -2276,7 +2822,8 @@ def main() -> None:
     ):
 
         raise AssertionError(
-            "Health Monitor의 재연결 요청은 "
+            "Health Monitor의 "
+            "재연결 요청은 "
             "정확히 1번이어야 합니다."
         )
 
@@ -2288,7 +2835,10 @@ def main() -> None:
             "확인되지 않았습니다."
         )
 
-    if final_received_count <= 0:
+    if (
+        final_received_count
+        <= 0
+    ):
 
         raise AssertionError(
             "실제 CCTV Frame이 "
@@ -2296,8 +2846,10 @@ def main() -> None:
         )
 
     if (
-        applied_interval_sec is not None
-        and final_sampled_count <= 0
+        applied_interval_sec
+        is not None
+        and final_sampled_count
+        <= 0
     ):
 
         raise AssertionError(
@@ -2305,19 +2857,15 @@ def main() -> None:
             "Sampling Frame이 없습니다."
         )
 
-    if final_resolver_call_count < 2:
+    if (
+        final_resolver_call_count
+        < 2
+    ):
 
         raise AssertionError(
             "최초 연결과 재연결에서 "
             "Stream Resolver가 각각 "
             "호출되지 않았습니다."
-        )
-
-    if final_cctv is None:
-
-        raise AssertionError(
-            "최종 DB 상태에서 "
-            "테스트 CCTV를 찾을 수 없습니다."
         )
 
     final_mode = str(
@@ -2326,28 +2874,112 @@ def main() -> None:
         ]
     ).upper()
 
-    if final_mode != original_mode:
+    if (
+        final_mode
+        != original_mode
+    ):
 
         raise AssertionError(
             "테스트 종료 후 "
             "monitored_mode가 "
             "원래 값으로 복구되지 않았습니다. "
-            f"original={original_mode}, "
-            f"final={final_mode}"
+            f"original="
+            f"{original_mode}, "
+            f"final="
+            f"{final_mode}"
         )
+
+    # =====================================================
+    # 40. 최종 Assert - YOLO
+    # =====================================================
+
+    if (
+        final_yolo_enqueued_count
+        <= 0
+    ):
+
+        raise AssertionError(
+            "Quality GOOD Frame이 "
+            "YOLO Queue에 한 장도 "
+            "전달되지 않았습니다."
+        )
+
+    if (
+        final_yolo_result_count
+        <= 0
+    ):
+
+        raise AssertionError(
+            "YoloWorker가 실제 CCTV Frame을 "
+            "한 장도 처리하지 못했습니다."
+        )
+
+    expected_yolo_results = (
+        final_yolo_enqueued_count
+        - final_yolo_dropped_count
+    )
+
+    if (
+        final_yolo_result_count
+        != expected_yolo_results
+    ):
+
+        raise AssertionError(
+            "YOLO Queue 처리 수가 "
+            "일치하지 않습니다. "
+            f"enqueued="
+            f"{final_yolo_enqueued_count}, "
+            f"dropped="
+            f"{final_yolo_dropped_count}, "
+            f"expected_results="
+            f"{expected_yolo_results}, "
+            f"actual_results="
+            f"{final_yolo_result_count}"
+        )
+
+    if not yolo_transition_ok:
+
+        raise AssertionError(
+            "YOLO 분석 상태가 "
+            "RUNNING → STOPPED 순서로 "
+            "확인되지 않았습니다. "
+            f"history="
+            f"{final_yolo_status_history}"
+        )
+
+    if (
+        final_cctv[
+            "analysis_status"
+        ]
+        != "STOPPED"
+    ):
+
+        raise AssertionError(
+            "YoloWorker 종료 후 "
+            "DB analysis_status가 "
+            "STOPPED가 아닙니다. "
+            f"actual="
+            f"{final_cctv['analysis_status']}"
+        )
+
+    # =====================================================
+    # SUCCESS
+    # =====================================================
 
     print()
 
     print(
         "[SUCCESS] "
-        "UTIC Dynamic Stream Resolver "
+        "UTIC Capture "
         "+ DB Settings "
         "+ Runtime Sampling Mode "
-        "+ Actual Frame Sampling "
         "+ Quality "
+        "+ AnalysisFrameQueue "
+        "+ YoloWorker "
+        "+ Actual YOLO Inference "
         "+ Health Monitor "
         "+ Auto Reconnect "
-        "통합 테스트 정상"
+        "전체 통합 테스트 정상"
     )
 
     print("=" * 70)
