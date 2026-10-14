@@ -5,11 +5,51 @@ from ..errors import FeatureNotImplemented
 # db/session.py의 연결을 전달받습니다. commit/rollback 범위는 서비스에서 관리합니다.
 
 
+# 04번 07 코드 · 기존 경로 테이블 저장과 조회
+from psycopg.types.json import Jsonb
+
+
 def list_candidates(connection, incident_id: int, agency_id: int):
-    # TODO: 기관 추천 → route_candidates JOIN. 사건과 기관이 일치하는 후보 3개/제외 사유 반환.
-    raise FeatureNotImplemented("routes.list_candidates DB 쿼리 구현 예정")
+    return connection.execute(
+        """
+        SELECT r.* FROM route_candidates r
+        JOIN incident_agency_recommendations ar
+            ON ar.id = r.agency_recommendation_id
+        WHERE ar.incident_id = %s AND ar.agency_id = %s
+        ORDER BY
+            (r.disqualify_reason IS NOT NULL),
+            CASE r.score_breakdown_json ->> 'verification_status'
+                WHEN 'VERIFIED' THEN 0
+                WHEN 'NEEDS_REVIEW' THEN 1
+                ELSE 2
+            END,
+            r.total_score DESC NULLS LAST,
+            r.id
+        """,
+        (incident_id, agency_id),
+    ).fetchall()
 
 
 def save_evaluation(connection, recommendation_id: int, evaluation: dict):
-    # TODO: route_candidates에 후보별 점수·좌표·규칙 버전·생성시각·기관추천 ID를 저장.
-    raise FeatureNotImplemented("routes.save_evaluation DB 쿼리 구현 예정")
+    p = {
+        **evaluation,
+        'recommendation_id': recommendation_id,
+        'path': Jsonb(evaluation['route_path_json']),
+        'breakdown': Jsonb(evaluation['score_breakdown_json']),
+    }
+    return connection.execute(
+        """
+        INSERT INTO route_candidates (
+            route_name, distance_m, duration_sec, total_score,
+            score_breakdown_json, disqualify_reason, route_path_json,
+            rule_version, agency_recommendation_id
+        )
+        VALUES (
+            %(route_name)s, %(distance_m)s, %(duration_sec)s, %(total_score)s,
+            %(breakdown)s, %(disqualify_reason)s, %(path)s,
+            %(rule_version)s, %(recommendation_id)s
+        )
+        RETURNING *
+        """,
+        p,
+    ).fetchone()
