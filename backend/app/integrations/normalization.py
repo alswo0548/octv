@@ -5,6 +5,7 @@
 주요 기능
 1. 외부 API 데이터의 출처와 단위 보관
 2. 결측·오류·오래된 데이터(NO_DATA / INVALID / STALE) 구분 후 정상 데이터(OK)만 다음 판단 단계에서 사용
+3. 여러 공공 API에서 서로 다른 형식으로 제공하는 데이터를 사용할 수 있도록 추출
 
 추후 확인
 현재 모든 음수를 INVALID 로 처리하는 조건이 있다. 
@@ -237,3 +238,80 @@ def parse_mapped(payload, spec):
     )
 
     return value, at
+
+"""
+여러 공공 API에서 서로 다른 형식으로 제공하는 데이터를 사용할 수 있도록 추출하고 정리하는 공통 파서(Parser)
+Parser란? 데이터의 구조를 해석하고 필요한 값을 추출하는 기능
+
+각 API마다 데이터를 읽는 코드를 처음부터 만들면 중복코드가 많아지기 때문에 
+아래 함수를 만들어놓고, 어떤 위치에서 어떤 데이터를 읽을지 설정값(spec)만 바꿔서 재사용
+spec이란? Specification(명세,규격)의 줄임말으로, API에서 받은 데이터 중 어떤 값을, 어디서, 어떻게 ㄱ져올지 알려주는 설정표
+이 프로젝트에서는 딕셔너리 형태로 사용
+
+흐름
+1. 외부 API 응답(JSON): 제공처마다 서로 다른 데이터 구조
+2. 아래 함수 (def parse_configured_metric(payload, spec)): 지역·도로 선택 → 최신 자료 선택 → 값 추출 → 단위 변환
+3. 반환 결과: 관측값 + 관측시각
+4. context.py -> rules.py: 외부 정보 통합 후 위험도 계산
+"""
+def parse_configured_metric(payload, spec):
+    rows = payload
+
+    for key in spec.get('rows_path', []):
+        rows = rows[key]
+
+    if isinstance(rows, dict):
+        rows = [rows]
+
+    if not isinstance(rows, list):
+        raise ValueError('관측 목록의 자료형이 올바르지 않습니다.')
+
+    if 'match_key' in spec and 'match_value' in spec:
+        rows = [
+            row for row in rows
+            if str(row.get(spec['match_key'])) == str(spec['match_value'])
+        ]
+    elif not spec.get('single_scope'):
+        raise ValueError('관측 대상 지역·도로의 일치 조건이 필요합니다.')
+
+    if not rows:
+        return None, None
+
+    def observed_at(row):
+        if 'time_key' in spec:
+            return datetime.strptime(
+                str(row[spec['time_key']]),
+                spec['time_format']
+            ).replace(
+                tzinfo=spec['timezone']
+            )
+        # 연간 통계처럼 관측 시각 필드가 없을 때에는 검증된 자료 기준일을 주입합니다.
+        at = spec['observed_at']
+        return (
+            datetime.fromisoformat(at)
+            if isinstance(at, str)
+            else at
+        )
+
+    row = max(
+        rows,
+        key=observed_at
+    )
+    raw = row
+    keys = spec['value_key']
+
+    for key in (keys if isinstance(keys, (list, tuple)) else (keys,)):
+        raw = raw[key]
+
+    if (
+        raw is None
+        or (isinstance(raw, str) and raw.strip().lower() in ('', '-', 'null'))
+    ):
+        return None, None
+
+    value = (
+        raw
+        if spec.get('numeric') is False
+        else float(raw) * float(spec.get('scale', 1))
+    )
+    return value, observed_at(row)
