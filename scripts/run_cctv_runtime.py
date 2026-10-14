@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import signal
 
-from ai.detection.cctv_runtime import (
-    CctvDetectionRuntime,
+from ai.detection.incident_runtime import (
+    IncidentAwareCctvDetectionRuntime,
 )
 
 
 def main() -> None:
 
     runtime = (
-        CctvDetectionRuntime()
+        IncidentAwareCctvDetectionRuntime()
     )
 
     # =====================================================
