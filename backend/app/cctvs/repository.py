@@ -1,29 +1,69 @@
 """DB 조회/저장 작업 위치. SQL은 파라미터 바인딩으로 작성하세요."""
 
-from ..errors import FeatureNotImplemented
 from datetime import datetime
 
-# db/session.py의 연결을 전달받습니다. commit/rollback 범위는 서비스에서 관리합니다.
+from ..errors import FeatureNotImplemented
 
 
-def list_cctvs(connection, region_code: str | None = None):
-    # TODO: cctvs와 region 조회. 감시 상태와 연결 상태를 각각 반환.
-    raise FeatureNotImplemented("cctvs.list_cctvs DB 쿼리 구현 예정")
+# db/session.py의 연결을 전달받습니다.
+# commit/rollback 범위는 서비스에서 관리합니다.
 
 
-def update_monitoring(connection, cctv_id: int, enabled: bool, mode: str | None):
-    # TODO: 특보/권한을 서비스에서 확인한 후 기본 감시 대상 여부와 현재 모드의 의미를 구분해 저장. 동시 변경 충돌 고려.
-    raise FeatureNotImplemented("cctvs.update_monitoring DB 쿼리 구현 예정")
+def list_cctvs(
+    connection,
+    region_code: str | None = None,
+):
+    # TODO:
+    # cctvs와 region 조회.
+    # 감시 상태와 연결 상태를 각각 반환.
+    raise FeatureNotImplemented(
+        "cctvs.list_cctvs DB 쿼리 구현 예정"
+    )
 
 
-def list_monitored_utic_cctvs(connection):
+def update_monitoring(
+    connection,
+    cctv_id: int,
+    enabled: bool,
+    mode: str | None,
+):
+    # TODO:
+    # 특보/권한을 서비스에서 확인한 후
+    # 기본 감시 대상 여부와 현재 모드의 의미를
+    # 구분해 저장.
+    # 동시 변경 충돌 고려.
+    raise FeatureNotImplemented(
+        "cctvs.update_monitoring DB 쿼리 구현 예정"
+    )
+
+
+def list_monitored_utic_cctvs(
+    connection,
+):
     """
-    현재 감시 대상인 UTIC CCTV를 조회한다.
+    현재 Capture 대상인 UTIC CCTV를 조회한다.
 
     조건:
     - provider = UTIC
     - is_monitored = TRUE
-    - monitored_mode != OFF
+
+    중요:
+    monitored_mode = OFF인 CCTV도 포함한다.
+
+    OCTV에서 OFF는 Capture 중지를 의미하지 않는다.
+
+    OFF 상태에서도:
+    - CCTV Stream 연결 유지
+    - Frame 수신 유지
+    - last_frame_at 갱신 유지
+    - Health Monitor 유지
+
+    대신:
+    - Sampling 중지
+    - YOLO 분석 중지
+
+    CaptureWorker 자체를 종료할지는
+    is_monitored 값으로 판단한다.
     """
 
     query = """
@@ -46,12 +86,15 @@ def list_monitored_utic_cctvs(connection):
         FROM cctvs
         WHERE provider = 'UTIC'
           AND is_monitored = TRUE
-          AND monitored_mode <> 'OFF'
         ORDER BY id;
     """
 
     with connection.cursor() as cursor:
-        cursor.execute(query)
+
+        cursor.execute(
+            query
+        )
+
         return cursor.fetchall()
 
 
@@ -77,13 +120,16 @@ def update_connection_status(
     """
 
     if status not in CONNECTION_STATUSES:
+
         raise ValueError(
-            f"지원하지 않는 CCTV 연결 상태입니다: {status}"
+            "지원하지 않는 CCTV 연결 상태입니다: "
+            f"{status}"
         )
 
     query = """
         UPDATE cctvs
-        SET connection_status = %s::connection_status_enum
+        SET connection_status =
+            %s::connection_status_enum
         WHERE id = %s
         RETURNING
             id,
@@ -92,6 +138,7 @@ def update_connection_status(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
@@ -100,11 +147,15 @@ def update_connection_status(
             ),
         )
 
-        row = cursor.fetchone()
+        row = (
+            cursor.fetchone()
+        )
 
     if row is None:
+
         raise LookupError(
-            f"CCTV를 찾을 수 없습니다. cctv_id={cctv_id}"
+            "CCTV를 찾을 수 없습니다. "
+            f"cctv_id={cctv_id}"
         )
 
     return row
@@ -132,13 +183,16 @@ def update_analysis_status(
     """
 
     if status not in ANALYSIS_STATUSES:
+
         raise ValueError(
-            f"지원하지 않는 CCTV 분석 상태입니다: {status}"
+            "지원하지 않는 CCTV 분석 상태입니다: "
+            f"{status}"
         )
 
     query = """
         UPDATE cctvs
-        SET analysis_status = %s::analysis_status_enum
+        SET analysis_status =
+            %s::analysis_status_enum
         WHERE id = %s
         RETURNING
             id,
@@ -147,6 +201,7 @@ def update_analysis_status(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
@@ -155,11 +210,15 @@ def update_analysis_status(
             ),
         )
 
-        row = cursor.fetchone()
+        row = (
+            cursor.fetchone()
+        )
 
     if row is None:
+
         raise LookupError(
-            f"CCTV를 찾을 수 없습니다. cctv_id={cctv_id}"
+            "CCTV를 찾을 수 없습니다. "
+            f"cctv_id={cctv_id}"
         )
 
     return row
@@ -173,14 +232,19 @@ def update_last_frame_at(
     """
     CCTV의 마지막 프레임 수신 시각을 갱신한다.
 
-    DB 컬럼이 TIMESTAMP WITHOUT TIME ZONE이므로
-    timezone-aware datetime은 현재 지역 시각을 유지한 채
+    DB 컬럼이
+    TIMESTAMP WITHOUT TIME ZONE이므로
+    timezone-aware datetime은
+    현재 지역 시각을 유지한 채
     tzinfo를 제거하여 저장한다.
     """
 
     db_timestamp = (
-        captured_at.replace(tzinfo=None)
-        if captured_at.tzinfo is not None
+        captured_at.replace(
+            tzinfo=None
+        )
+        if captured_at.tzinfo
+        is not None
         else captured_at
     )
 
@@ -195,6 +259,7 @@ def update_last_frame_at(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
@@ -203,11 +268,15 @@ def update_last_frame_at(
             ),
         )
 
-        row = cursor.fetchone()
+        row = (
+            cursor.fetchone()
+        )
 
     if row is None:
+
         raise LookupError(
-            f"CCTV를 찾을 수 없습니다. cctv_id={cctv_id}"
+            "CCTV를 찾을 수 없습니다. "
+            f"cctv_id={cctv_id}"
         )
 
     return row
@@ -234,14 +303,20 @@ def update_video_quality_status(
     - UNAVAILABLE
     """
 
-    if status not in VIDEO_QUALITY_STATUSES:
+    if (
+        status
+        not in VIDEO_QUALITY_STATUSES
+    ):
+
         raise ValueError(
-            f"지원하지 않는 영상 품질 상태입니다: {status}"
+            "지원하지 않는 영상 품질 상태입니다: "
+            f"{status}"
         )
 
     query = """
         UPDATE cctvs
-        SET video_quality_status = %s::video_quality_enum
+        SET video_quality_status =
+            %s::video_quality_enum
         WHERE id = %s
         RETURNING
             id,
@@ -250,6 +325,7 @@ def update_video_quality_status(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
@@ -258,21 +334,26 @@ def update_video_quality_status(
             ),
         )
 
-        row = cursor.fetchone()
+        row = (
+            cursor.fetchone()
+        )
 
     if row is None:
+
         raise LookupError(
-            f"CCTV를 찾을 수 없습니다. cctv_id={cctv_id}"
+            "CCTV를 찾을 수 없습니다. "
+            f"cctv_id={cctv_id}"
         )
 
     return row
+
 
 def get_cctv_runtime_state(
     connection,
     cctv_id: int,
 ):
     """
-    CCTV Health Check에 필요한
+    CCTV Runtime/Health Check에 필요한
     현재 실행 상태를 조회한다.
     """
 
@@ -290,16 +371,23 @@ def get_cctv_runtime_state(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
-            (cctv_id,),
+            (
+                cctv_id,
+            ),
         )
 
-        row = cursor.fetchone()
+        row = (
+            cursor.fetchone()
+        )
 
     if row is None:
+
         raise LookupError(
-            f"CCTV를 찾을 수 없습니다. cctv_id={cctv_id}"
+            "CCTV를 찾을 수 없습니다. "
+            f"cctv_id={cctv_id}"
         )
 
     return row
