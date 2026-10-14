@@ -7,30 +7,75 @@ from psycopg.types.json import Jsonb
 
 # 새 사건을 저장하거나, 같은 진행 사건의 최근 탐지 시각만 갱신합니다.
 def save_detection(connection, candidate: dict):
+    representative_image = candidate.get("representative_image")
+
     params = {
         **candidate,
         "incident_no": "OCTV-" + uuid4().hex,
         "bbox": Jsonb(candidate["detection_bbox_json"]),
+        "representative_image": representative_image,
+        "representative_image_updated_at": (
+            candidate["detected_at"]
+            if representative_image is not None
+            else None
+        ),
     }
-    # 중복 시 최초 정보는 유지하고, 과거 탐지로 최근 시각이 되돌아가지 않게 합니다.
+
     return connection.execute(
         """
         INSERT INTO incidents (
-            incident_no, cctv_id, hazard_type, confidence, model_version,
-            detection_image_path, detection_bbox_json, dedup_key,
-            detected_at, last_detected_at
+            incident_no,
+            cctv_id,
+            hazard_type,
+            confidence,
+            model_version,
+            representative_image,
+            representative_image_updated_at,
+            detection_bbox_json,
+            dedup_key,
+            detected_at,
+            last_detected_at
         )
         VALUES (
-            %(incident_no)s, %(cctv_id)s, %(hazard_type)s,
-            %(confidence)s, %(model_version)s, %(detection_image_path)s,
-            %(bbox)s, %(dedup_key)s, %(detected_at)s, %(detected_at)s
+            %(incident_no)s,
+            %(cctv_id)s,
+            %(hazard_type)s,
+            %(confidence)s,
+            %(model_version)s,
+            %(representative_image)s,
+            %(representative_image_updated_at)s,
+            %(bbox)s,
+            %(dedup_key)s,
+            %(detected_at)s,
+            %(detected_at)s
         )
         ON CONFLICT (cctv_id, hazard_type, dedup_key)
             WHERE status IN ('DETECTED', 'CONFIRMED', 'SENT')
         DO UPDATE SET
             last_detected_at = GREATEST(
-                incidents.last_detected_at, EXCLUDED.last_detected_at
-            )
+                incidents.last_detected_at,
+                EXCLUDED.last_detected_at
+            ),
+            representative_image = CASE
+                WHEN EXCLUDED.representative_image IS NOT NULL
+                 AND (
+                    incidents.representative_image_updated_at IS NULL
+                    OR EXCLUDED.representative_image_updated_at
+                       >= incidents.representative_image_updated_at
+                 )
+                THEN EXCLUDED.representative_image
+                ELSE incidents.representative_image
+            END,
+            representative_image_updated_at = CASE
+                WHEN EXCLUDED.representative_image IS NOT NULL
+                 AND (
+                    incidents.representative_image_updated_at IS NULL
+                    OR EXCLUDED.representative_image_updated_at
+                       >= incidents.representative_image_updated_at
+                 )
+                THEN EXCLUDED.representative_image_updated_at
+                ELSE incidents.representative_image_updated_at
+            END
         RETURNING *
         """,
         params,
@@ -42,10 +87,31 @@ def save_detection(connection, candidate: dict):
 # 가장 최근에 등록된 분석 결과 하나만 가져온다.
 READ_SQL = """
 SELECT
-    i.*, c.name AS cctv_name, c.latitude, c.longitude,
-    c.region_code, c.provider, c.address,
-    a.risk_score, a.risk_level, a.priority_score, a.priority,
-    a.risk_breakdown_json, a.priority_breakdown_json, a.rule_version
+    i.id,
+    i.incident_no,
+    i.cctv_id,
+    i.hazard_type,
+    i.confidence,
+    i.model_version,
+    i.detection_bbox_json,
+    i.dedup_key,
+    i.status,
+    i.detected_at,
+    i.last_detected_at,
+    i.representative_image_updated_at,
+    c.name AS cctv_name,
+    c.latitude,
+    c.longitude,
+    c.region_code,
+    c.provider,
+    c.address,
+    a.risk_score,
+    a.risk_level,
+    a.priority_score,
+    a.priority,
+    a.risk_breakdown_json,
+    a.priority_breakdown_json,
+    a.rule_version
 FROM incidents i
 JOIN cctvs c
     ON c.id = i.cctv_id
@@ -152,3 +218,16 @@ def find_agency_access(connection, incident_id: int, agency_id: int):
 
 def find_detail(connection, incident_id: int):
     return connection.execute(READ_SQL + " WHERE i.id = %s", (incident_id,)).fetchone()
+
+
+def find_representative_image(connection, incident_id: int):
+    return connection.execute(
+        """
+        SELECT
+            representative_image,
+            representative_image_updated_at
+        FROM incidents
+        WHERE id = %s
+        """,
+        (incident_id,),
+    ).fetchone()

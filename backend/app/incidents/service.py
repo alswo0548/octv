@@ -36,8 +36,13 @@ def register_detection(candidate: dict):
 def serialize_incident(row):
     item = dict(row)
     # DB에 저장된 UTC 시각을 API 응답 형식으로 변환합니다. 한국 시간 표시는 프론트엔드에서 처리합니다. 
-    for key in ("detected_at", "last_detected_at"):
-        item[key] = row[key].replace(tzinfo=timezone.utc).isoformat()
+    for key in (
+        "detected_at",
+        "last_detected_at",
+        "representative_image_updated_at",
+    ):
+        if item.get(key) is not None:
+            item[key] = item[key].replace(tzinfo=timezone.utc).isoformat()
     for key in ("confidence", "latitude", "longitude", "risk_score", "priority_score"):
         if item.get(key) is not None:
             item[key] = float(item[key])
@@ -78,3 +83,36 @@ def get_incident(incident_id: int, user: dict):
     if row is None:
         raise HTTPException(404, "사건이 없습니다.")
     return serialize_incident(row)
+
+def get_incident_image(incident_id: int, user: dict):
+    if user is None:
+        raise HTTPException(401, "로그인이 필요합니다.")
+
+    with get_connection() as connection:
+        if user["role"] != "CONTROL_ADMIN":
+            agency_id = user.get("agency_id")
+
+            if agency_id is None:
+                raise HTTPException(404, "조회할 수 없는 사건입니다.")
+
+            access = repository.find_agency_access(
+                connection,
+                incident_id,
+                agency_id,
+            )
+
+            if access is None:
+                raise HTTPException(404, "조회할 수 없는 사건입니다.")
+
+        row = repository.find_representative_image(
+            connection,
+            incident_id,
+        )
+
+    if row is None:
+        raise HTTPException(404, "사건이 없습니다.")
+
+    if row["representative_image"] is None:
+        raise HTTPException(404, "저장된 대표 이미지가 없습니다.")
+
+    return bytes(row["representative_image"])

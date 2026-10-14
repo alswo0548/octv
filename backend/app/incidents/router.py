@@ -2,7 +2,7 @@
 """사건 목록·상세 요청을 검증하고 Service 결과를 응답 모델로 반환합니다."""
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from typing import Literal
 
 from . import schemas, service
@@ -76,3 +76,25 @@ def request_incident_analysis(
     user=Depends(require_control_admin)
 ):
     return request_analysis(incident_id)
+
+@router.get(
+    "/{incident_id}/image",
+    summary="사건 대표 이미지 조회",
+    response_class=Response,
+)
+def get_incident_image(
+    incident_id: int,
+    user=Depends(get_current_user),
+):
+    image_bytes = service.get_incident_image(
+        incident_id,
+        user,
+    )
+
+    return Response(
+        content=image_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store",
+        },
+    )
