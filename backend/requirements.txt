@@ -28,3 +28,4 @@ python-multipart==0.0.32
 requests==2.34.2
 bcrypt==5.0.0
 celery[redis]
+pandas==3.0.6
