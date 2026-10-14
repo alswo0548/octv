@@ -26,6 +26,9 @@ class CaptureWorkerProtocol(Protocol):
     def stop(self) -> None:
         ...
 
+    def request_reconnect(self) -> None:
+        ...
+
 
 WorkerFactory = Callable[
     [Mapping[str, object]],
@@ -67,17 +70,23 @@ class CaptureWorkerManager:
     2. CCTV별 Thread 시작
     3. 새 CCTV가 생기면 Worker 시작
     4. 감시 대상에서 빠지면 Worker 종료
-    5. 전체 Worker 일괄 종료
+    5. 특정 CCTV Worker에 재연결 요청 전달
+    6. 전체 Worker 일괄 종료
 
     이 Manager는
-    CCTV Stream 자체의 reconnect는 담당하지 않는다.
+    CCTV Stream 자체의 reconnect 로직을
+    직접 수행하지 않는다.
 
     각 CCTV 내부 reconnect는
     기존 CaptureWorker가 담당한다.
 
-    Manager는 오직
+    Manager는
     '어떤 CCTV Worker가 살아 있어야 하는가'
-    를 관리한다.
+    를 관리하고,
+
+    외부 Health Monitor 등의
+    재연결 요청을 해당 CCTV Worker에
+    전달하는 역할만 담당한다.
     """
 
     def __init__(
@@ -339,6 +348,61 @@ class CaptureWorkerManager:
             f"[CAPTURE MANAGER] "
             f"CCTV {cctv_id} "
             "Worker 종료 완료"
+        )
+
+        return True
+
+    # =====================================================
+    # 단일 CCTV 재연결 요청
+    # =====================================================
+
+    def request_reconnect(
+        self,
+        cctv_id: int,
+    ) -> bool:
+        """
+        현재 실행 중인 특정 CCTV Worker에
+        재연결을 요청한다.
+
+        실제 Stream close/open 및
+        URL 재조회는 CaptureWorker 자신의
+        Thread 내부에서 수행한다.
+
+        Worker가 없거나
+        Thread가 이미 종료된 경우 False.
+
+        재연결 요청을 정상 전달한 경우 True.
+        """
+
+        with self._lock:
+
+            managed = (
+                self._workers.get(
+                    cctv_id
+                )
+            )
+
+            if (
+                managed is None
+                or not managed.thread.is_alive()
+            ):
+
+                return False
+
+            worker = (
+                managed.worker
+            )
+
+        # Lock 밖에서 호출한다.
+        #
+        # Worker 내부 동작 때문에
+        # Manager Lock을 오래 잡지 않도록 한다.
+        worker.request_reconnect()
+
+        print(
+            f"[CAPTURE MANAGER] "
+            f"CCTV {cctv_id} "
+            "재연결 요청 전달"
         )
 
         return True
