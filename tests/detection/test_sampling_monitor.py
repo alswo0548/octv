@@ -1,4 +1,4 @@
-"""SamplingPolicyMonitor 실시간 monitored_mode 변경 테스트."""
+"""SamplingPolicyMonitor 실시간 mode·sampling 설정 변경 테스트."""
 
 import time
 
@@ -27,6 +27,8 @@ def main() -> None:
     # =====================================================
     # 가짜 monitoring_settings
     # =====================================================
+
+    settings_lock = Lock()
 
     settings = {
         "base_analysis_interval_sec": 5,
@@ -66,7 +68,9 @@ def main() -> None:
         실제 서비스에서는 monitoring_settings를 조회한다.
         """
 
-        return settings.copy()
+        with settings_lock:
+
+            return settings.copy()
 
     # =====================================================
     # FrameSampler
@@ -100,7 +104,7 @@ def main() -> None:
     )
 
     # =====================================================
-    # Mode 변경 Helper
+    # 변경 Helper
     # =====================================================
 
     def change_mode(
@@ -121,6 +125,27 @@ def main() -> None:
         )
 
         # Monitor가 상태를 읽을 시간
+        time.sleep(0.3)
+
+    def change_setting(
+        key: str,
+        value: float,
+    ) -> None:
+
+        with settings_lock:
+
+            settings[
+                key
+            ] = value
+
+        print()
+
+        print(
+            f"[TEST SETTING CHANGE] "
+            f"{key} → {value}"
+        )
+
+        # Monitor가 설정을 읽을 시간
         time.sleep(0.3)
 
     # =====================================================
@@ -184,6 +209,60 @@ def main() -> None:
 
     print(
         "[PASS] BASE → 5초"
+    )
+
+    # =====================================================
+    # BASE mode 유지 + settings 변경
+    #
+    # 기존 버그:
+    # monitored_mode가 BASE 그대로이면
+    # base_analysis_interval_sec 변경이 반영되지 않았다.
+    # =====================================================
+
+    change_setting(
+        "base_analysis_interval_sec",
+        4,
+    )
+
+    interval = sampler.get_interval(
+        1
+    )
+
+    if interval != 4.0:
+        raise AssertionError(
+            "BASE mode 유지 상태에서 "
+            "base_analysis_interval_sec 변경이 "
+            "반영되지 않았습니다. "
+            f"actual={interval}"
+        )
+
+    print(
+        "[PASS] BASE 유지 + 설정 변경 "
+        "→ 4초"
+    )
+
+    # 이후 기존 mode 전환 테스트가
+    # 원래 설정값 5초를 계속 사용하도록 복구
+    change_setting(
+        "base_analysis_interval_sec",
+        5,
+    )
+
+    interval = sampler.get_interval(
+        1
+    )
+
+    if interval != 5.0:
+        raise AssertionError(
+            "BASE mode 유지 상태에서 "
+            "base_analysis_interval_sec 복구가 "
+            "반영되지 않았습니다. "
+            f"actual={interval}"
+        )
+
+    print(
+        "[PASS] BASE 유지 + 설정 복구 "
+        "→ 5초"
     )
 
     # =====================================================
@@ -388,6 +467,11 @@ def main() -> None:
     )
 
     print(
+        "BASE 유지 + 설정 변경 "
+        "→ 4초 → 5초"
+    )
+
+    print(
         "ALERT      → 3초"
     )
 
@@ -412,7 +496,7 @@ def main() -> None:
     print(
         "[SUCCESS] "
         "SamplingPolicyMonitor "
-        "실시간 monitored_mode 전환 정상"
+        "실시간 mode·sampling 설정 변경 반영 정상"
     )
 
     print("=" * 70)

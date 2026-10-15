@@ -1,7 +1,7 @@
-"""실행 중 CCTV 감시 모드 변경을 Sampling Policy에 반영한다."""
+"""실행 중 CCTV 감시 모드·분석 주기 변경을 Sampling Policy에 반영한다."""
 
 from threading import Event
-from typing import Callable, Mapping, Any
+from typing import Any, Callable, Mapping
 
 from .frame_sampler import FrameSampler
 from .sampling_policy import apply_sampling_mode
@@ -9,8 +9,8 @@ from .sampling_policy import apply_sampling_mode
 
 class SamplingPolicyMonitor:
     """
-    CCTV의 monitored_mode 변경을 주기적으로 확인하고
-    FrameSampler에 반영한다.
+    CCTV의 monitored_mode와 sampling 관련 monitoring_settings 변경을
+    주기적으로 확인하고 FrameSampler에 반영한다.
 
     DB 자체에는 직접 의존하지 않는다.
 
@@ -46,6 +46,12 @@ class SamplingPolicyMonitor:
             str,
         ] = {}
 
+        # Sampling 주기에 영향을 주는
+        # monitoring_settings의 마지막 적용값
+        self._last_sampling_settings_signature: (
+            tuple[float, float, float] | None
+        ) = None
+
     # =====================================================
     # 외부 제어
     # =====================================================
@@ -73,7 +79,7 @@ class SamplingPolicyMonitor:
         ],
     ) -> None:
         """
-        monitored_mode를 주기적으로 확인한다.
+        monitored_mode와 sampling 설정을 주기적으로 확인한다.
 
         state_provider:
         [
@@ -133,6 +139,39 @@ class SamplingPolicyMonitor:
             )
 
     # =====================================================
+    # Sampling 설정 Signature
+    # =====================================================
+
+    @staticmethod
+    def _sampling_settings_signature(
+        settings: Mapping[str, Any],
+    ) -> tuple[float, float, float]:
+        """
+        FrameSampler 주기에 영향을 주는 설정만 추출한다.
+
+        quality_threshold 등 Sampling 주기와 무관한 설정 변경은
+        불필요한 Policy 재적용을 발생시키지 않는다.
+        """
+
+        return (
+            float(
+                settings[
+                    "base_analysis_interval_sec"
+                ]
+            ),
+            float(
+                settings[
+                    "alert_analysis_interval_sec"
+                ]
+            ),
+            float(
+                settings[
+                    "verify_analysis_interval_sec"
+                ]
+            ),
+        )
+
+    # =====================================================
     # 상태 적용
     # =====================================================
 
@@ -142,9 +181,23 @@ class SamplingPolicyMonitor:
         settings: Mapping[str, Any],
     ) -> None:
         """
-        이전 monitored_mode와 달라진 CCTV만
-        Sampling Policy를 다시 적용한다.
+        아래 조건 중 하나라도 만족하면 Sampling Policy를 적용한다.
+
+        - CCTV의 monitored_mode가 변경됨
+        - Sampling 주기에 영향을 주는 monitoring_settings가 변경됨
+        - 새 CCTV가 조회 대상에 추가됨
         """
+
+        settings_signature = (
+            self._sampling_settings_signature(
+                settings
+            )
+        )
+
+        settings_changed = (
+            self._last_sampling_settings_signature
+            != settings_signature
+        )
 
         active_cctv_ids: set[int] = set()
 
@@ -168,8 +221,17 @@ class SamplingPolicyMonitor:
                 )
             )
 
-            # mode가 그대로면 아무것도 하지 않음
-            if previous_mode == monitored_mode:
+            mode_changed = (
+                previous_mode
+                != monitored_mode
+            )
+
+            # mode와 sampling 설정이 모두 그대로면
+            # 기존 FrameSampler 설정을 유지한다.
+            if (
+                not mode_changed
+                and not settings_changed
+            ):
                 continue
 
             applied_interval = (
@@ -187,13 +249,26 @@ class SamplingPolicyMonitor:
                 cctv_id
             ] = monitored_mode
 
+            if mode_changed:
+
+                change_text = (
+                    f"{previous_mode} "
+                    f"→ {monitored_mode}"
+                )
+
+            else:
+
+                change_text = (
+                    f"{monitored_mode} 유지 "
+                    "/ 설정 변경 반영"
+                )
+
             if applied_interval is None:
 
                 print(
                     f"[SAMPLING MONITOR] "
                     f"CCTV {cctv_id} "
-                    f"{previous_mode} "
-                    f"→ {monitored_mode} "
+                    f"{change_text} "
                     f"/ 분석 비활성화"
                 )
 
@@ -202,8 +277,7 @@ class SamplingPolicyMonitor:
                 print(
                     f"[SAMPLING MONITOR] "
                     f"CCTV {cctv_id} "
-                    f"{previous_mode} "
-                    f"→ {monitored_mode} "
+                    f"{change_text} "
                     f"/ 분석 주기 "
                     f"{applied_interval:.1f}초"
                 )
@@ -226,3 +300,13 @@ class SamplingPolicyMonitor:
                 cctv_id,
                 None,
             )
+
+        # 모든 현재 CCTV에 정상 적용된 뒤에만
+        # settings signature를 갱신한다.
+        #
+        # apply_sampling_mode 중 예외가 발생하면
+        # 이 줄까지 도달하지 않으므로 다음 polling에서
+        # 동일한 settings 변경을 다시 시도한다.
+        self._last_sampling_settings_signature = (
+            settings_signature
+        )
