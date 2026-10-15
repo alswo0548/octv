@@ -2,21 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import (
-    Mapping,
-    Sequence,
-)
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .client import (
-    KmaWarningStatus,
-)
+from .client import KmaWarningStatus
 
 
-KST = ZoneInfo(
-    "Asia/Seoul"
-)
+KST = ZoneInfo("Asia/Seoul")
 
 
 # ============================================================
@@ -29,15 +22,9 @@ KST = ZoneInfo(
 # O = 폭풍해일
 # S = 대설
 #
-# OCTV 현재 탐지 대상:
-#
-# flood
-# fallen_tree
-# severe_road_damage
-# road_obstacle
-#
-# 위 재난의 발생 가능성을 높이는
-# 기상특보만 집중감시 트리거로 사용한다.
+# 1 = 예비특보
+# 2 = 주의보
+# 3 = 경보
 # ============================================================
 
 MONITORING_TRIGGER_WARNING_CODES = {
@@ -48,26 +35,15 @@ MONITORING_TRIGGER_WARNING_CODES = {
     "S",
 }
 
-
-# 1 = 예비특보
-# 2 = 주의보
-# 3 = 경보
-#
-# CCTV ALERT 전환은
-# 주의보 / 경보만 사용한다.
-
 MONITORING_TRIGGER_LEVEL_CODES = {
     "2",
     "3",
 }
 
 
-# 기존 DB ACTIVE 행이
-# 감시 트리거였는지 확인할 때 사용한다.
-#
-# 기상청 공식 표기에서는 O가 "해일"로
-# 나타날 수도 있으므로 둘 다 허용한다.
-
+# 기존 DB ACTIVE 행이 감시 트리거였는지 확인할 때 사용한다.
+# 기상청 공식 표기에서는 O가 "해일"로 나타날 수도 있으므로
+# "해일"과 "폭풍해일"을 모두 허용한다.
 MONITORING_TRIGGER_ALERT_TYPES = {
     "호우",
     "강풍",
@@ -77,7 +53,6 @@ MONITORING_TRIGGER_ALERT_TYPES = {
     "대설",
 }
 
-
 MONITORING_TRIGGER_ALERT_LEVELS = {
     "주의보",
     "경보",
@@ -86,17 +61,10 @@ MONITORING_TRIGGER_ALERT_LEVELS = {
 
 def _now_kst_naive() -> datetime:
     """
-    TIMESTAMP WITHOUT TIME ZONE에
-    저장할 현재 KST 시각.
+    TIMESTAMP WITHOUT TIME ZONE에 저장할 현재 KST 시각.
     """
-
-    return (
-        datetime.now(
-            KST
-        )
-        .replace(
-            tzinfo=None
-        )
+    return datetime.now(KST).replace(
+        tzinfo=None
     )
 
 
@@ -104,24 +72,17 @@ def is_monitoring_trigger(
     warning: KmaWarningStatus,
 ) -> bool:
     """
-    해당 특보가 CCTV 집중감시
-    ALERT 전환 대상인지 판단한다.
+    해당 특보가 CCTV 집중감시 ALERT 전환 대상인지 판단한다.
 
     조건:
-
     ACTIVE
-    +
-    호우 / 강풍 / 태풍 / 폭풍해일 / 대설
-    +
-    주의보 / 경보
+    + 호우 / 강풍 / 태풍 / 폭풍해일 / 대설
+    + 주의보 / 경보
     """
-
     return (
         warning.active
-
         and warning.warning_code
         in MONITORING_TRIGGER_WARNING_CODES
-
         and warning.level_code
         in MONITORING_TRIGGER_LEVEL_CODES
     )
@@ -134,20 +95,10 @@ def _stored_alert_is_monitoring_trigger(
     이미 DB에 저장된 기존 ACTIVE 특보가
     CCTV 감시 트리거였는지 판단한다.
     """
-
     return (
-        str(
-            row[
-                "alert_type"
-            ]
-        )
+        str(row["alert_type"])
         in MONITORING_TRIGGER_ALERT_TYPES
-
-        and str(
-            row[
-                "alert_level"
-            ]
-        )
+        and str(row["alert_level"])
         in MONITORING_TRIGGER_ALERT_LEVELS
     )
 
@@ -159,7 +110,6 @@ def list_region_weather_mappings(
     OCTV 내부 region_code와
     기상청 특보구역 코드 배열을 조회한다.
     """
-
     query = """
         SELECT
             region_code,
@@ -173,27 +123,17 @@ def list_region_weather_mappings(
     """
 
     with connection.cursor() as cursor:
-        cursor.execute(
-            query
-        )
-
+        cursor.execute(query)
         return cursor.fetchall()
 
 
 def _build_weather_to_regions(
-    region_rows: Sequence[
-        Mapping
-    ],
-) -> dict[
-    str,
-    set[str],
-]:
+    region_rows: Sequence[Mapping],
+) -> dict[str, set[str]]:
     """
     기상청 특보구역 코드
-    →
-    OCTV 내부 region_code 역매핑.
+    -> OCTV 내부 region_code 역매핑.
     """
-
     result: dict[
         str,
         set[str],
@@ -201,9 +141,7 @@ def _build_weather_to_regions(
 
     for row in region_rows:
         region_code = str(
-            row[
-                "region_code"
-            ]
+            row["region_code"]
         )
 
         weather_codes = (
@@ -213,13 +151,9 @@ def _build_weather_to_regions(
             or []
         )
 
-        for weather_code in (
-            weather_codes
-        ):
+        for weather_code in weather_codes:
             normalized_code = (
-                str(
-                    weather_code
-                )
+                str(weather_code)
                 .strip()
             )
 
@@ -251,7 +185,6 @@ def _build_records(
     OCTV 내부 region_code 단위
     weather_alert record로 확장한다.
     """
-
     weather_to_regions = (
         _build_weather_to_regions(
             region_rows
@@ -259,17 +192,12 @@ def _build_records(
     )
 
     records_by_key: dict[
-        tuple[
-            str,
-            str,
-        ],
+        tuple[str, str],
         dict,
     ] = {}
 
     for warning in warnings:
-
-        # 해제된 특보는
-        # 현재 ACTIVE Snapshot에 포함하지 않는다.
+        # 해제된 특보는 현재 ACTIVE Snapshot에 포함하지 않는다.
         if not warning.active:
             continue
 
@@ -288,32 +216,23 @@ def _build_records(
             )
         )
 
-        for region_code in (
-            matched_regions
-        ):
+        for region_code in matched_regions:
             key = (
                 warning.external_alert_id,
                 region_code,
             )
 
-            records_by_key[
-                key
-            ] = {
+            records_by_key[key] = {
                 "external_alert_id":
                     warning.external_alert_id,
-
                 "alert_type":
                     warning.warning_name,
-
                 "alert_level":
                     warning.level_name,
-
                 "title":
                     warning.title,
-
                 "issued_at":
                     warning.issued_at,
-
                 "region_code":
                     region_code,
             }
@@ -338,7 +257,6 @@ def build_alert_records(
     CCTV 감시 강화 대상이 아닌
     폭염 등의 특보도 DB 기록 자체는 유지한다.
     """
-
     return _build_records(
         warnings=warnings,
         region_rows=region_rows,
@@ -359,7 +277,6 @@ def build_monitoring_trigger_records(
     현재 ACTIVE 특보만 만든다.
 
     종류:
-
     - 호우
     - 강풍
     - 태풍
@@ -367,11 +284,9 @@ def build_monitoring_trigger_records(
     - 대설
 
     단계:
-
     - 주의보
     - 경보
     """
-
     return _build_records(
         warnings=warnings,
         region_rows=region_rows,
@@ -389,7 +304,6 @@ def _upsert_active_alerts(
     현재 ACTIVE 특보를
     weather_alerts에 저장/갱신한다.
     """
-
     if not records:
         return
 
@@ -421,18 +335,13 @@ def _upsert_active_alerts(
         DO UPDATE SET
             alert_type =
                 EXCLUDED.alert_type,
-
             alert_level =
                 EXCLUDED.alert_level,
-
             title =
                 EXCLUDED.title,
-
             issued_at =
                 EXCLUDED.issued_at,
-
             ended_at = NULL,
-
             status =
                 'ACTIVE'
                 ::weather_status_enum;
@@ -475,7 +384,6 @@ def _list_active_alert_rows(
     DB에서 현재 ACTIVE인
     기상특보를 조회한다.
     """
-
     query = """
         SELECT
             external_alert_id,
@@ -489,20 +397,14 @@ def _list_active_alert_rows(
     """
 
     with connection.cursor() as cursor:
-        cursor.execute(
-            query
-        )
-
+        cursor.execute(query)
         return cursor.fetchall()
 
 
 def _end_stale_alerts(
     connection,
     stale_keys: Sequence[
-        tuple[
-            str,
-            str,
-        ]
+        tuple[str, str]
     ],
     ended_at: datetime,
 ) -> None:
@@ -511,7 +413,6 @@ def _end_stale_alerts(
     현재 Snapshot에서 사라진 특보를
     ENDED로 변경한다.
     """
-
     if not stale_keys:
         return
 
@@ -521,9 +422,7 @@ def _end_stale_alerts(
             status =
                 'ENDED'
                 ::weather_status_enum,
-
             ended_at = %s
-
         WHERE external_alert_id = %s
           AND region_code = %s
           AND status =
@@ -557,41 +456,48 @@ def _set_alert_mode(
     감시 강화 대상 특보가 있는
     지역의 CCTV를 ALERT로 변경한다.
 
-    BASE
-        -> ALERT
+    false + OFF
+        -> true + ALERT
 
-    POST_ALERT
-        -> ALERT
+    true + BASE
+        -> true + ALERT
 
-    OFF
-        변경하지 않음.
+    true + POST_ALERT
+        -> true + ALERT
 
-    VERIFY
-        변경하지 않음.
+    VERIFY는 변경하지 않는다.
     """
-
     if not region_codes:
         return 0
 
     query = """
         UPDATE cctvs
-        SET monitored_mode =
-            'ALERT'
-            ::monitored_mode_enum
-
-        WHERE is_monitored = TRUE
-
-          AND region_code =
+        SET
+            is_monitored = TRUE,
+            monitored_mode =
+                'ALERT'
+                ::monitored_mode_enum
+        WHERE region_code =
               ANY(
                   %s::varchar[]
               )
-
-          AND monitored_mode IN (
-              'BASE'
-              ::monitored_mode_enum,
-
-              'POST_ALERT'
-              ::monitored_mode_enum
+          AND (
+              (
+                  is_monitored = FALSE
+                  AND monitored_mode =
+                      'OFF'
+                      ::monitored_mode_enum
+              )
+              OR
+              (
+                  is_monitored = TRUE
+                  AND monitored_mode IN (
+                      'BASE'
+                      ::monitored_mode_enum,
+                      'POST_ALERT'
+                      ::monitored_mode_enum
+                  )
+              )
           );
     """
 
@@ -616,16 +522,14 @@ def _set_post_alert_mode(
     감시 강화 대상 특보가 모두 끝난
     지역의 CCTV를:
 
-    ALERT
-      ↓
-    POST_ALERT
+    true + ALERT
+        -> true + POST_ALERT
 
     로 변경한다.
 
-    POST_ALERT → BASE 자동복귀는
-    수행하지 않는다.
+    POST_ALERT 이후 감시 종료는
+    관리자가 수동으로 수행한다.
     """
-
     if not region_codes:
         return 0
 
@@ -634,14 +538,11 @@ def _set_post_alert_mode(
         SET monitored_mode =
             'POST_ALERT'
             ::monitored_mode_enum
-
         WHERE is_monitored = TRUE
-
           AND region_code =
               ANY(
                   %s::varchar[]
               )
-
           AND monitored_mode =
               'ALERT'
               ::monitored_mode_enum;
@@ -671,49 +572,40 @@ def synchronize_weather_alerts(
 ]:
     """
     현재 기상특보 Snapshot을
-    DB와 CCTV monitored_mode에 반영한다.
+    DB와 CCTV 감시 상태에 반영한다.
 
     weather_alerts:
-
         모든 현재 ACTIVE 특보 기록.
 
     CCTV 집중감시 대상:
-
-        호우
-        강풍
-        태풍
-        폭풍해일
-        대설
-
+        호우 / 강풍 / 태풍 / 폭풍해일 / 대설
         +
-
-        주의보
-        경보
+        주의보 / 경보
 
     상태 전환:
 
-        BASE
-          ↓ 대상 특보 발생
-        ALERT
+        false + OFF
+            -> 대상 특보 발생
+            -> true + ALERT
 
-        POST_ALERT
-          ↓ 대상 특보 재발생
-        ALERT
+        true + BASE
+            -> 대상 특보 발생
+            -> true + ALERT
 
-        ALERT
-          ↓ 해당 지역 대상 특보 모두 종료
-        POST_ALERT
+        true + POST_ALERT
+            -> 대상 특보 재발생
+            -> true + ALERT
 
-        POST_ALERT
-          ↓
-        BASE
+        true + ALERT
+            -> 해당 지역 대상 특보 모두 종료
+            -> true + POST_ALERT
 
-        자동복귀하지 않음.
+    POST_ALERT 이후 감시 종료:
+        관리자 수동
+        -> false + OFF
 
-    OFF / VERIFY는
-    Scheduler가 변경하지 않는다.
+    VERIFY는 Scheduler가 변경하지 않는다.
     """
-
     region_rows = (
         list_region_weather_mappings(
             connection
@@ -836,7 +728,6 @@ def synchronize_weather_alerts(
                 ),
             )
             in stale_keys
-
             and
             _stored_alert_is_monitoring_trigger(
                 row
@@ -844,13 +735,12 @@ def synchronize_weather_alerts(
         )
     }
 
-    # 같은 지역에서
+    # 같은 지역에서:
     #
     # 호우는 종료
     # 태풍은 아직 ACTIVE
     #
-    # 라면 POST_ALERT로 내려가면 안 된다.
-
+    # 같은 상황이면 POST_ALERT로 내려가면 안 된다.
     post_alert_region_codes = (
         stale_trigger_region_codes
         - active_trigger_region_codes
@@ -880,7 +770,7 @@ def synchronize_weather_alerts(
     )
 
     # ========================================================
-    # 3. CCTV 감시 모드 반영
+    # 3. CCTV 감시 상태 반영
     # ========================================================
 
     alert_mode_updates = (

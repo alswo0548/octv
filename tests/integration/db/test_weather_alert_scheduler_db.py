@@ -3,29 +3,31 @@
 실제 DB transaction 안에서:
 
 1. BASE + 폭염경보
-   -> BASE 유지
+   -> true + BASE 유지
 
 2. BASE + 대설주의보
-   -> ALERT
+   -> true + ALERT
 
 3. 대설 + 강풍 동시 ACTIVE
-   -> ALERT
+   -> true + ALERT 유지
 
 4. 대설만 종료, 강풍 유지
-   -> ALERT 유지
+   -> true + ALERT 유지
 
 5. 모든 감시대상 특보 종료
-   -> POST_ALERT
+   -> true + POST_ALERT
 
 6. POST_ALERT + 폭염만 존재
-   -> POST_ALERT 유지
-   -> BASE 자동복귀 금지 확인
+   -> true + POST_ALERT 유지
 
-7. OFF + 대설주의보
-   -> OFF 유지
+7. false + OFF + 대설주의보
+   -> true + ALERT
 
-8. VERIFY + 대설주의보
-   -> VERIFY 유지
+8. 위 대설 종료
+   -> true + POST_ALERT
+
+9. true + VERIFY + 대설주의보
+   -> true + VERIFY 유지
 
 모든 변경은 마지막에 ROLLBACK한다.
 """
@@ -48,20 +50,25 @@ from backend.app.weather_alerts.repository import (
 )
 
 
-def _get_mode(
+def _get_state(
     connection,
     cctv_id: int,
-) -> str:
-    """CCTV monitored_mode 조회."""
+) -> dict:
+    """CCTV is_monitored / monitored_mode 조회."""
 
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT monitored_mode::text
+            SELECT
+                is_monitored,
+                monitored_mode::text
+                    AS monitored_mode
             FROM cctvs
             WHERE id = %s;
             """,
-            (cctv_id,),
+            (
+                cctv_id,
+            ),
         )
 
         row = cursor.fetchone()
@@ -71,25 +78,30 @@ def _get_mode(
             f"CCTV {cctv_id}가 없습니다."
         )
 
-    return row["monitored_mode"]
+    return row
 
 
-def _set_mode(
+def _set_state(
     connection,
     cctv_id: int,
+    *,
+    is_monitored: bool,
     mode: str,
 ) -> None:
-    """테스트용 monitored_mode 변경."""
+    """테스트용 CCTV 감시 상태 변경."""
 
     with connection.cursor() as cursor:
         cursor.execute(
             """
             UPDATE cctvs
-            SET monitored_mode =
-                %s::monitored_mode_enum
+            SET
+                is_monitored = %s,
+                monitored_mode =
+                    %s::monitored_mode_enum
             WHERE id = %s;
             """,
             (
+                is_monitored,
                 mode,
                 cctv_id,
             ),
@@ -192,40 +204,70 @@ def _warning(
     )
 
 
-def _assert_mode(
+def _assert_state(
     connection,
     cctv_id: int,
-    expected: str,
+    *,
+    expected_is_monitored: bool,
+    expected_mode: str,
     label: str,
 ) -> None:
     """
-    CCTV mode 검사.
+    CCTV is_monitored / monitored_mode 검사.
     """
 
-    actual = _get_mode(
+    state = _get_state(
         connection,
         cctv_id,
     )
 
-    if actual != expected:
+    actual_is_monitored = bool(
+        state[
+            "is_monitored"
+        ]
+    )
+
+    actual_mode = str(
+        state[
+            "monitored_mode"
+        ]
+    )
+
+    if (
+        actual_is_monitored
+        != expected_is_monitored
+    ):
         raise AssertionError(
             f"{label}: "
-            f"expected={expected}, "
-            f"actual={actual}"
+            "is_monitored "
+            f"expected={expected_is_monitored}, "
+            f"actual={actual_is_monitored}"
+        )
+
+    if actual_mode != expected_mode:
+        raise AssertionError(
+            f"{label}: "
+            "monitored_mode "
+            f"expected={expected_mode}, "
+            f"actual={actual_mode}"
         )
 
     print(
         f"[PASS] {label} "
-        f"-> {actual}"
+        f"-> is_monitored="
+        f"{actual_is_monitored} "
+        f"/ mode={actual_mode}"
     )
 
 
 def main() -> None:
     print("=" * 72)
+
     print(
         "WEATHER ALERT SCHEDULER "
         "POSTGRESQL INTEGRATION TEST"
     )
+
     print("=" * 72)
 
     connection = psycopg.connect(
@@ -276,9 +318,6 @@ def main() -> None:
         # 테스트 transaction 안에서는
         # 기존 weather_alerts를 보이지 않게 만든다.
         #
-        # 아직 COMMIT하지 않으므로
-        # 다른 DB connection에서는 영향을 받지 않는다.
-        #
         # 마지막 ROLLBACK 시 전부 복구된다.
         # ====================================================
 
@@ -289,11 +328,12 @@ def main() -> None:
                 """
             )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "BASE",
-            "초기 상태",
+            expected_is_monitored=True,
+            expected_mode="BASE",
+            label="초기 상태",
         )
 
         # ====================================================
@@ -336,9 +376,6 @@ def main() -> None:
         # ====================================================
         # TEST 1
         # 폭염경보만 존재
-        #
-        # 폭염은 weather_alerts 기록 대상이지만
-        # CCTV ALERT 트리거는 아니다.
         # ====================================================
 
         result = synchronize_weather_alerts(
@@ -359,18 +396,17 @@ def main() -> None:
                 "아니어야 합니다."
             )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "BASE",
-            "폭염경보는 BASE 유지",
+            expected_is_monitored=True,
+            expected_mode="BASE",
+            label="폭염경보는 BASE 유지",
         )
 
         # ====================================================
         # TEST 2
-        # 대설주의보 발생
-        #
-        # BASE -> ALERT
+        # true + BASE -> true + ALERT
         # ====================================================
 
         result = synchronize_weather_alerts(
@@ -392,18 +428,20 @@ def main() -> None:
                 "생성되지 않았습니다."
             )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "ALERT",
-            "대설주의보 BASE -> ALERT",
+            expected_is_monitored=True,
+            expected_mode="ALERT",
+            label=(
+                "대설주의보 "
+                "BASE -> ALERT"
+            ),
         )
 
         # ====================================================
         # TEST 3
         # 대설 + 강풍 동시 ACTIVE
-        #
-        # ALERT 유지
         # ====================================================
 
         synchronize_weather_alerts(
@@ -415,20 +453,20 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "ALERT",
-            "대설+강풍 동시 특보 ALERT 유지",
+            expected_is_monitored=True,
+            expected_mode="ALERT",
+            label=(
+                "대설+강풍 동시 특보 "
+                "ALERT 유지"
+            ),
         )
 
         # ====================================================
         # TEST 4
-        # 대설 종료
-        # 강풍은 여전히 ACTIVE
-        #
-        # 같은 지역에 감시대상 특보가 남아 있으므로
-        # ALERT 유지
+        # 대설 종료 + 강풍 유지
         # ====================================================
 
         synchronize_weather_alerts(
@@ -439,20 +477,22 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "ALERT",
-            "대설 종료 + 강풍 유지 -> ALERT 유지",
+            expected_is_monitored=True,
+            expected_mode="ALERT",
+            label=(
+                "대설 종료 + 강풍 유지 "
+                "-> ALERT 유지"
+            ),
         )
 
         # ====================================================
         # TEST 5
-        # 강풍까지 종료
+        # 모든 감시대상 특보 종료
         #
-        # 폭염만 남음.
-        #
-        # ALERT -> POST_ALERT
+        # true + ALERT -> true + POST_ALERT
         # ====================================================
 
         synchronize_weather_alerts(
@@ -462,18 +502,20 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "POST_ALERT",
-            "감시대상 특보 모두 종료 -> POST_ALERT",
+            expected_is_monitored=True,
+            expected_mode="POST_ALERT",
+            label=(
+                "감시대상 특보 모두 종료 "
+                "-> POST_ALERT"
+            ),
         )
 
         # ====================================================
         # TEST 6
-        # 폭염만 계속 존재
-        #
-        # POST_ALERT -> BASE 자동복귀 금지
+        # POST_ALERT 자동복귀 금지
         # ====================================================
 
         synchronize_weather_alerts(
@@ -483,22 +525,39 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "POST_ALERT",
-            "POST_ALERT 수동복귀 정책",
+            expected_is_monitored=True,
+            expected_mode="POST_ALERT",
+            label="POST_ALERT 유지 정책",
         )
 
         # ====================================================
         # TEST 7
-        # OFF 상태에서는 대설이 와도 OFF 유지
+        #
+        # 평소 감시하지 않는 CCTV 상태:
+        #
+        # false + OFF
+        #
+        # 여기에 대설주의보가 발생하면:
+        #
+        # true + ALERT
         # ====================================================
 
-        _set_mode(
+        _set_state(
             connection,
             cctv_id,
-            "OFF",
+            is_monitored=False,
+            mode="OFF",
+        )
+
+        _assert_state(
+            connection,
+            cctv_id,
+            expected_is_monitored=False,
+            expected_mode="OFF",
+            label="기상특보 전 OFF 상태",
         )
 
         synchronize_weather_alerts(
@@ -509,22 +568,55 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "OFF",
-            "OFF 상태 보호",
+            expected_is_monitored=True,
+            expected_mode="ALERT",
+            label=(
+                "OFF + 대설주의보 "
+                "-> ALERT"
+            ),
         )
 
         # ====================================================
         # TEST 8
-        # VERIFY 상태에서는 대설이 와도 VERIFY 유지
+        #
+        # OFF에서 특보로 켜진 CCTV의
+        # 감시대상 특보가 모두 종료되면:
+        #
+        # true + ALERT
+        # -> true + POST_ALERT
         # ====================================================
 
-        _set_mode(
+        synchronize_weather_alerts(
+            connection,
+            [
+                heat,
+            ],
+        )
+
+        _assert_state(
             connection,
             cctv_id,
-            "VERIFY",
+            expected_is_monitored=True,
+            expected_mode="POST_ALERT",
+            label=(
+                "OFF에서 시작한 특보 종료 "
+                "-> POST_ALERT"
+            ),
+        )
+
+        # ====================================================
+        # TEST 9
+        # VERIFY는 Scheduler가 변경하지 않는다.
+        # ====================================================
+
+        _set_state(
+            connection,
+            cctv_id,
+            is_monitored=True,
+            mode="VERIFY",
         )
 
         synchronize_weather_alerts(
@@ -535,15 +627,16 @@ def main() -> None:
             ],
         )
 
-        _assert_mode(
+        _assert_state(
             connection,
             cctv_id,
-            "VERIFY",
-            "VERIFY 상태 보호",
+            expected_is_monitored=True,
+            expected_mode="VERIFY",
+            label="VERIFY 상태 보호",
         )
 
         # ====================================================
-        # weather_alerts 저장 자체도 확인
+        # weather_alerts 저장 확인
         # ====================================================
 
         with connection.cursor() as cursor:
@@ -578,6 +671,7 @@ def main() -> None:
         )
 
         print()
+
         print(
             "[SUCCESS] "
             "Weather Alert Scheduler "
@@ -586,9 +680,7 @@ def main() -> None:
 
     finally:
         # ====================================================
-        # 중요:
-        #
-        # 테스트 중 weather_alerts와 CCTV mode의
+        # 테스트 중 weather_alerts와 CCTV 감시 상태의
         # 모든 변경을 원상복구한다.
         # ====================================================
 
