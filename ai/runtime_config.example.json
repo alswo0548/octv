@@ -1,0 +1,36 @@
+
+{
+  "_설정_안내": {
+    "설정_목적": "OCTV LangGraph 기관 추천 및 경로 평가 실행 설정",
+    "설정_기준": "2026-10-15 개발용 초기값. 실제 API 테스트 결과에 따라 변경 가능",
+    "수정_방법": "필요한 숫자만 변경한 후 관련 실행 프로세스를 재시작",
+    "기관_기본_반경": "max_distance_m: 기관 탐색 기본 반경. 단위 m, 현재 50000 = 50km",
+    "기관_확대_반경": "fallback_max_distance_m: 기본 반경 내 후보가 부족하면 탐색 범위를 확대. 현재 100000 = 100km",
+    "기관_추천_개수": "limit: 최대 4개. 기존 추천 정책이므로 임의 변경 금지",
+    "경로_시간_기준": "duration_scale_sec: 이동시간 점수 계산 기준. 1800초 = 30분. 최대 이동시간 제한이 아님",
+    "경로_거리_기준": "distance_scale_m: 이동거리 점수 계산 기준. 20000m = 20km. 최대 이동거리 제한이 아님",
+    "경로_점수_정책": "이동시간 70점, 이동거리 30점. 기존 확정 정책이므로 변경하지 않음",
+    "CCTV_매핑": "cctvs: CCTV별 기상·수위·교통 API 요청 설정. 실제 연동 전까지 빈 객체 유지",
+    "주의사항": "실제 운영 전 기관 위치 및 경로 API 결과로 초기값 검증 필요. 인증키는 JSON에 직접 저장하지 않음"
+  },
+
+  "context_transport": "mcp",
+
+  "agency_policy": {
+    "version": "OCTV_AGENCY_RULE_20261014",
+    "max_distance_m": 50000,
+    "fallback_max_distance_m": 100000,
+    "limit": 4,
+    "min_score": 0
+  },
+
+  "route_policy": {
+    "version": "OCTV_ROUTE_RULE_20261014",
+    "duration_scale_sec": 1800,
+    "distance_scale_m": 20000,
+    "time_points": 70,
+    "distance_points": 30
+  },
+
+  "cctvs": {}
+}
