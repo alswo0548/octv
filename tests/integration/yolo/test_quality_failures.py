@@ -9,7 +9,7 @@ from ai.contracts import Frame
 from ai.detection.quality import check_quality
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 
 VIDEO_PATH = (
     ROOT

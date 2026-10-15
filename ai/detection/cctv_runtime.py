@@ -5,7 +5,6 @@ from pathlib import Path
 from threading import Event, Lock, Thread
 from typing import Any, Mapping
 
-import requests
 from dotenv import load_dotenv
 
 from ai.contracts import (
@@ -43,6 +42,9 @@ from ai.detection.yolo_worker import (
     YoloPerformance,
     YoloWorker,
 )
+from ai.detection.utic import (
+    get_utic_stream_url,
+)
 
 from backend.app.cctvs.repository import (
     list_monitored_utic_cctvs,
@@ -73,25 +75,6 @@ BACKEND_ENV_PATH = (
     ROOT
     / "backend"
     / ".env"
-)
-
-
-# =========================================================
-# UTIC URL
-# =========================================================
-
-UTIC_BASE_URL = (
-    "https://www.utic.go.kr"
-)
-
-UTIC_OPEN_DATA_URL = (
-    f"{UTIC_BASE_URL}"
-    "/guide/cctvOpenData.do"
-)
-
-UTIC_CCTV_INFO_URL = (
-    f"{UTIC_BASE_URL}"
-    "/map/getCctvInfoById.do"
 )
 
 
@@ -524,96 +507,6 @@ class CctvDetectionRuntime:
             )
 
     # =====================================================
-    # UTIC Stream Resolver
-    # =====================================================
-
-    @staticmethod
-    def _load_utic_key() -> str:
-
-        key = os.getenv(
-            "UTIC_CCTV_KEY"
-        )
-
-        if not key:
-
-            raise RuntimeError(
-                "backend/.env에 "
-                "UTIC_CCTV_KEY가 없습니다."
-            )
-
-        return key
-
-    @classmethod
-    def _get_utic_stream_url(
-        cls,
-        external_cctv_id: str,
-    ) -> tuple[str, dict]:
-
-        key = (
-            cls._load_utic_key()
-        )
-
-        with requests.Session() as session:
-
-            page_response = session.get(
-                UTIC_OPEN_DATA_URL,
-                params={
-                    "key":
-                        key,
-                },
-                timeout=20,
-            )
-
-            page_response.raise_for_status()
-
-            info_response = session.get(
-                UTIC_CCTV_INFO_URL,
-                params={
-                    "cctvId":
-                        external_cctv_id,
-                },
-                headers={
-                    "Referer":
-                        page_response.url,
-
-                    "X-Requested-With":
-                        "XMLHttpRequest",
-                },
-                timeout=20,
-            )
-
-            info_response.raise_for_status()
-
-            data = (
-                info_response.json()
-            )
-
-        stream_id = (
-            data.get(
-                "ID"
-            )
-        )
-
-        if not stream_id:
-
-            raise RuntimeError(
-                "UTIC CCTV Stream ID가 "
-                "없습니다. "
-                f"external_cctv_id="
-                f"{external_cctv_id}"
-            )
-
-        stream_url = (
-            "https://cctvsec.ktict.co.kr/"
-            + stream_id
-        )
-
-        return (
-            stream_url,
-            data,
-        )
-
-    # =====================================================
     # CaptureWorker Factory
     # =====================================================
 
@@ -664,7 +557,7 @@ class CctvDetectionRuntime:
             (
                 stream_url,
                 info,
-            ) = self._get_utic_stream_url(
+            ) = get_utic_stream_url(
                 external_cctv_id
             )
 

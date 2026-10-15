@@ -1,11 +1,8 @@
 from pathlib import Path
 
-import os
 import time
 from threading import Event, Lock, Thread
 
-import requests
-from dotenv import load_dotenv
 
 from ai.contracts import Detection, Frame
 from ai.detection.capture_worker import CaptureWorker
@@ -13,6 +10,7 @@ from ai.detection.detector import YoloDetector
 from ai.detection.frame_queue import AnalysisFrameQueue
 from ai.detection.frame_sampler import FrameSampler
 from ai.detection.health_monitor import CctvHealthMonitor
+from ai.detection.utic import get_utic_stream_url
 from ai.detection.quality import check_quality
 from ai.detection.sampling_monitor import SamplingPolicyMonitor
 from ai.detection.sampling_policy import apply_sampling_mode
@@ -41,36 +39,11 @@ from backend.app.settings.repository import (
 # 기본 경로 / 환경설정
 # =========================================================
 
-ROOT = Path(__file__).resolve().parents[1]
-
-ENV_PATH = (
-    ROOT
-    / "backend"
-    / ".env"
-)
+ROOT = Path(__file__).resolve().parents[3]
 
 YOLO_MODEL_PATH = (
     ROOT
     / "yolo11s.pt"
-)
-
-
-# =========================================================
-# UTIC URL
-# =========================================================
-
-UTIC_BASE_URL = (
-    "https://www.utic.go.kr"
-)
-
-UTIC_OPEN_DATA_URL = (
-    f"{UTIC_BASE_URL}"
-    "/guide/cctvOpenData.do"
-)
-
-UTIC_CCTV_INFO_URL = (
-    f"{UTIC_BASE_URL}"
-    "/map/getCctvInfoById.do"
 )
 
 
@@ -108,33 +81,6 @@ SAMPLE_INTERVAL_LATE_TOLERANCE_SEC = 4.0
 
 
 # =========================================================
-# UTIC 인증키
-# =========================================================
-
-
-def load_utic_key() -> str:
-    """
-    backend/.env에서 UTIC 인증키를 읽는다.
-    """
-
-    load_dotenv(
-        dotenv_path=ENV_PATH
-    )
-
-    key = os.getenv(
-        "UTIC_CCTV_KEY"
-    )
-
-    if not key:
-        raise RuntimeError(
-            "backend/.env에 "
-            "UTIC_CCTV_KEY가 없습니다."
-        )
-
-    return key
-
-
-# =========================================================
 # DB에서 감시 대상 UTIC CCTV 조회
 # =========================================================
 
@@ -161,82 +107,6 @@ def get_monitored_utic_cctv() -> dict:
         )
 
     return cctvs[0]
-
-
-# =========================================================
-# UTIC Stream Resolver
-# =========================================================
-
-
-def get_utic_stream_url(
-    external_cctv_id: str,
-) -> tuple[str, dict]:
-    """
-    UTIC external_cctv_id를 이용해
-    현재 CCTV 상세정보를 조회하고
-    실제 Stream URL을 만든다.
-
-    최초 연결과 재연결 시
-    매번 새로 조회할 수 있다.
-    """
-
-    key = load_utic_key()
-
-    with requests.Session() as session:
-
-        page_response = session.get(
-            UTIC_OPEN_DATA_URL,
-            params={
-                "key": key,
-            },
-            timeout=20,
-        )
-
-        page_response.raise_for_status()
-
-        info_response = session.get(
-            UTIC_CCTV_INFO_URL,
-            params={
-                "cctvId":
-                    external_cctv_id,
-            },
-            headers={
-                "Referer":
-                    page_response.url,
-
-                "X-Requested-With":
-                    "XMLHttpRequest",
-            },
-            timeout=20,
-        )
-
-        info_response.raise_for_status()
-
-        data = (
-            info_response.json()
-        )
-
-    stream_id = (
-        data.get(
-            "ID"
-        )
-    )
-
-    if not stream_id:
-
-        raise RuntimeError(
-            "UTIC CCTV Stream ID가 없습니다."
-        )
-
-    stream_url = (
-        "https://cctvsec.ktict.co.kr/"
-        + stream_id
-    )
-
-    return (
-        stream_url,
-        data,
-    )
 
 
 # =========================================================

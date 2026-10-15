@@ -16,7 +16,7 @@ from ai.detection.yolo_worker import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 
 MODEL_PATH = (
     ROOT

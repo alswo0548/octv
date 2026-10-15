@@ -17,7 +17,7 @@ from backend.app.settings.repository import get_monitoring_settings
 
 # 기존 단일 UTIC 통합 테스트에서 이미 검증한
 # UTIC 인증 / Stream URL 조회 로직 재사용
-from scripts.test_utic_capture_worker import (
+from ai.detection.utic import (
     get_utic_stream_url,
 )
 

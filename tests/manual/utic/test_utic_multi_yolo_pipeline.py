@@ -50,7 +50,7 @@ from backend.app.settings.repository import (
 
 # 기존 단일 UTIC 테스트에서
 # 이미 검증된 Stream URL 조회 로직 재사용
-from scripts.test_utic_capture_worker import (
+from ai.detection.utic import (
     get_utic_stream_url,
 )
 
@@ -61,7 +61,7 @@ from scripts.test_utic_capture_worker import (
 
 ROOT = Path(
     __file__
-).resolve().parents[1]
+).resolve().parents[3]
 
 YOLO_MODEL_PATH = (
     ROOT
