@@ -878,7 +878,7 @@ def build_cctv_records(
                 "region_code": str(
                     row.REGION_CODE
                 ),
-                "monitored_mode": "BASE",
+                "monitored_mode": "OFF",
             }
         )
 

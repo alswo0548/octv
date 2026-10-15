@@ -1,22 +1,105 @@
-"""CCTV 조회·감시 상태 HTTP 진입점. 현재 업무 API는 501(미구현)을 반환합니다."""
+"""CCTV 조회·감시 상태 HTTP API."""
 
-from fastapi import APIRouter
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+)
+
+from ..dependencies import (
+    get_current_user,
+    require_control_admin,
+)
 from . import schemas, service
 
-router = APIRouter(prefix="/cctvs", tags=["CCTV 조회·감시 상태"])
-# TODO: 구현하는 API부터 dependencies의 인증·권한 검사를 연결하세요.
+
+router = APIRouter(
+    prefix="/cctvs",
+    tags=[
+        "CCTV 조회·감시 상태"
+    ],
+)
 
 
-@router.get("", summary="list_cctvs · 구현 예정")
-def list_cctvs():
-    return service.list_cctvs()
+@router.get(
+    "",
+    response_model=list[
+        schemas.CctvResponse
+    ],
+    summary="CCTV 목록 조회",
+)
+def list_cctvs(
+    region_code: str | None = Query(
+        default=None,
+        description=(
+            "지역 코드 필터"
+        ),
+    ),
+    user=Depends(
+        get_current_user
+    ),
+):
+    return service.list_cctvs(
+        region_code=region_code,
+    )
 
 
-@router.get("/{cctv_id}", summary="get_cctv · 구현 예정")
-def get_cctv(cctv_id: int):
-    return service.get_cctv(cctv_id)
+@router.get(
+    "/summary",
+    response_model=(
+        schemas.CctvSummaryResponse
+    ),
+    summary="CCTV 상태 요약 조회",
+)
+def get_cctv_summary(
+    region_code: str | None = Query(
+        default=None,
+        description=(
+            "지역 코드 필터"
+        ),
+    ),
+    user=Depends(
+        get_current_user
+    ),
+):
+    return service.get_cctv_summary(
+        region_code=region_code,
+    )
 
 
-@router.patch("/{cctv_id}/monitoring", summary="change_monitoring · 구현 예정")
-def change_monitoring(cctv_id: int, body: schemas.MonitoringRequest):
-    return service.change_monitoring(cctv_id, body)
+@router.get(
+    "/{cctv_id}",
+    response_model=(
+        schemas.CctvResponse
+    ),
+    summary="CCTV 상세 조회",
+)
+def get_cctv(
+    cctv_id: int,
+    user=Depends(
+        get_current_user
+    ),
+):
+    return service.get_cctv(
+        cctv_id
+    )
+
+
+@router.patch(
+    "/{cctv_id}/monitoring",
+    response_model=(
+        schemas.CctvResponse
+    ),
+    summary="CCTV 감시 ON/OFF",
+)
+def change_monitoring(
+    cctv_id: int,
+    body: schemas.MonitoringRequest,
+    user=Depends(
+        require_control_admin
+    ),
+):
+    return service.change_monitoring(
+        cctv_id,
+        body,
+    )
