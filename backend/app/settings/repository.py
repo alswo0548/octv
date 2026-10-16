@@ -1,4 +1,4 @@
-"""Monitoring settings DB 조회/저장 Repository."""
+"""Monitoring settings 및 사용자 알림 설정 Repository."""
 
 from ..errors import FeatureNotImplemented
 
@@ -68,14 +68,29 @@ def set_notification_enabled(
     enabled: bool,
 ):
     """
-    사용자의 notification_enabled 설정을 수정한다.
+    로그인한 사용자 본인의
+    Push 알림 ON/OFF 설정을 변경한다.
 
-    현재는 API 구현 전 단계이므로
-    실제 UPDATE 쿼리는 아직 구현하지 않는다.
+    비활성 사용자의 설정은 변경하지 않는다.
     """
 
-    # TODO:
-    # 본인 users.notification_enabled 값만 갱신.
-    raise FeatureNotImplemented(
-        "settings.set_notification_enabled DB 쿼리 구현 예정"
-    )
+    query = """
+        UPDATE users
+        SET notification_enabled = %s
+        WHERE id = %s
+          AND is_active = TRUE
+        RETURNING notification_enabled;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                enabled,
+                user_id,
+            ),
+        )
+
+        row = cursor.fetchone()
+
+    return row
