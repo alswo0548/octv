@@ -96,23 +96,30 @@ class BackendScaffoldTests(unittest.TestCase):
         )
         self.assertNotEqual(status, 501)
 
-    def test_monitoring_and_delivery_do_not_claim_state_change(self):
+    # 아직 미구현인 API가 구현 완료 상태를 잘못 반환하지 않는지 확인합니다.
+    def test_unimplemented_routes_do_not_claim_state_change(self):
         cases = [
             ("/api/cctvs/1/monitoring", "PATCH", {"enabled": False}),
-            (
-                "/api/agencies/incidents/1/deliveries",
-                "POST",
-                {"selections": [{"agency_id": 1, "route_candidate_id": 1}]},
-            ),
             (
                 "/api/support-requests/incidents/1",
                 "POST",
                 {"support_type": "OTHER", "request_content": "개발 환경 확인"},
             ),
         ]
+
         for path, method, body in cases:
             with self.subTest(path=path):
                 self.assertEqual(self.request(path, method, body)[0], 501)
+
+    # 기관 전달 API는 로그인하지 않은 사용자의 요청을 거부해야 합니다.
+    def test_delivery_requires_authentication(self):
+        status, _ = self.request(
+            "/api/agencies/incidents/1/deliveries",
+            "POST",
+            {"selections": [{"agency_id": 1, "route_candidate_id": 1}]},
+        )
+
+        self.assertEqual(status, 401)
 
     def test_api_documentation_contains_all_domains(self):
         status, api = self.request("/openapi.json")
