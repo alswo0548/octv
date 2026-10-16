@@ -1,4 +1,10 @@
-"""DB 조회/저장 작업 위치. SQL은 파라미터 바인딩으로 작성하세요."""
+"""
+감시 기준 DB 작업은 아직 미구현, 본인 Push 수신 설정만 갱신.
+
+파일 흐름
+1. 사용자 알림 ON/OFF 변경 요청에서는 users.notification_enabled만 UPDATE합니다.
+2. 변경된 값을 반환하며 트랜잭션 확정은 Service에서 관리합니다.
+"""
 
 from ..errors import FeatureNotImplemented
 
@@ -17,6 +23,15 @@ def save_monitoring_settings(
     raise FeatureNotImplemented("settings.save_monitoring_settings DB 쿼리 구현 예정")
 
 
+# 로그인한 사용자 본인의 Push ON/OFF 컬럼만 업데이트.
 def set_notification_enabled(connection, user_id: int, enabled: bool):
-    # TODO: 본인 users.notification_enabled 값만 갱신.
-    raise FeatureNotImplemented("settings.set_notification_enabled DB 쿼리 구현 예정")
+    # user_id는 JWT에서 가져오며 비활성 계정의 설정은 변경하지 않습니다.
+    return connection.execute(
+        """
+        UPDATE users
+        SET notification_enabled = %s
+        WHERE id = %s AND is_active = TRUE
+        RETURNING notification_enabled
+        """,
+        (enabled, user_id),
+    ).fetchone()
