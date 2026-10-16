@@ -10,7 +10,10 @@ from ..dependencies import (
     get_current_user,
     require_control_admin,
 )
-from . import schemas, service
+from . import (
+    schemas,
+    service,
+)
 
 
 router = APIRouter(
@@ -39,6 +42,7 @@ def list_cctvs(
         get_current_user
     ),
 ):
+
     return service.list_cctvs(
         region_code=region_code,
     )
@@ -62,8 +66,35 @@ def get_cctv_summary(
         get_current_user
     ),
 ):
+
     return service.get_cctv_summary(
         region_code=region_code,
+    )
+
+
+@router.post(
+    "/{cctv_id}/stream",
+    response_model=(
+        schemas.CctvStreamResponse
+    ),
+    summary="CCTV 실시간 영상 준비",
+)
+def prepare_stream(
+    cctv_id: int,
+    user=Depends(
+        get_current_user
+    ),
+):
+    """
+    현재 감시 중인 CCTV의
+    MediaMTX WebRTC 스트림을 준비한다.
+
+    실제 UTIC 원본 Stream URL은
+    클라이언트에 노출하지 않는다.
+    """
+
+    return service.prepare_stream(
+        cctv_id
     )
 
 
@@ -80,6 +111,7 @@ def get_cctv(
         get_current_user
     ),
 ):
+
     return service.get_cctv(
         cctv_id
     )
@@ -99,6 +131,7 @@ def change_monitoring(
         require_control_admin
     ),
 ):
+
     return service.change_monitoring(
         cctv_id,
         body,

@@ -16,10 +16,15 @@ ALERT / POST_ALERT 상태 전환과
 관리자 수동 감시 ON/OFF를 구분한다.
 """
 
+import requests
 from fastapi import HTTPException
 
 from ..db.session import get_connection
-from . import repository, schemas
+from . import (
+    repository,
+    schemas,
+    streaming,
+)
 
 
 def _to_cctv_response(
@@ -31,44 +36,59 @@ def _to_cctv_response(
 
     return schemas.CctvResponse(
         id=row["id"],
+
         external_cctv_id=(
             row["external_cctv_id"]
         ),
+
         name=row["name"],
+
         provider=row["provider"],
+
         address=row["address"],
+
         latitude=float(
             row["latitude"]
         ),
+
         longitude=float(
             row["longitude"]
         ),
+
         is_monitored=bool(
             row["is_monitored"]
         ),
+
         connection_status=(
             row["connection_status"]
         ),
+
         video_quality_status=(
             row[
                 "video_quality_status"
             ]
         ),
+
         analysis_status=(
             row["analysis_status"]
         ),
+
         last_frame_at=(
             row["last_frame_at"]
         ),
+
         region_code=(
             row["region_code"]
         ),
+
         sido_name=(
             row["sido_name"]
         ),
+
         sigungu_name=(
             row["sigungu_name"]
         ),
+
         monitored_mode=(
             row["monitored_mode"]
         ),
@@ -85,6 +105,7 @@ def list_cctvs(
     """
 
     with get_connection() as connection:
+
         rows = repository.list_cctvs(
             connection,
             region_code=region_code,
@@ -106,12 +127,14 @@ def get_cctv(
     """
 
     with get_connection() as connection:
+
         row = repository.get_cctv(
             connection,
             cctv_id,
         )
 
     if row is None:
+
         raise HTTPException(
             status_code=404,
             detail=(
@@ -132,6 +155,7 @@ def get_cctv_summary(
     """
 
     with get_connection() as connection:
+
         row = (
             repository.get_cctv_summary(
                 connection,
@@ -145,22 +169,123 @@ def get_cctv_summary(
         total_count=(
             row["total_count"]
         ),
+
         monitored_count=(
             row["monitored_count"]
         ),
+
         connected_count=(
             row["connected_count"]
         ),
+
         disconnected_count=(
             row[
                 "disconnected_count"
             ]
         ),
+
         reconnecting_count=(
             row[
                 "reconnecting_count"
             ]
         ),
+    )
+
+
+def prepare_stream(
+    cctv_id: int,
+) -> schemas.CctvStreamResponse:
+    """
+    W04 실시간 CCTV 영상을 준비한다.
+
+    조건:
+    - CCTV가 존재해야 한다.
+    - provider가 UTIC이어야 한다.
+    - is_monitored = TRUE이어야 한다.
+
+    동작:
+    - 최신 UTIC Stream URL 조회
+    - MediaMTX source 형식 변환
+    - MediaMTX path 생성 / 갱신
+    - WebRTC 주소 반환
+    """
+
+    with get_connection() as connection:
+
+        row = repository.get_cctv(
+            connection,
+            cctv_id,
+        )
+
+    if row is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "CCTV를 찾을 수 없습니다."
+            ),
+        )
+
+    if not bool(
+        row["is_monitored"]
+    ):
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "현재 감시 중인 CCTV가 "
+                "아닙니다."
+            ),
+        )
+
+    if str(
+        row["provider"]
+    ).upper() != "UTIC":
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "현재 실시간 스트리밍을 "
+                "지원하지 않는 CCTV입니다."
+            ),
+        )
+
+    try:
+
+        result = (
+            streaming.prepare_cctv_stream(
+                cctv_id=cctv_id,
+                external_cctv_id=str(
+                    row[
+                        "external_cctv_id"
+                    ]
+                ),
+            )
+        )
+
+    except (
+        requests.RequestException,
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:
+
+        print(
+            "[CCTV STREAM ERROR] "
+            f"cctv_id={cctv_id} "
+            f"/ error={exc}"
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "CCTV 실시간 영상을 "
+                "준비하지 못했습니다."
+            ),
+        ) from exc
+
+    return schemas.CctvStreamResponse(
+        **result
     )
 
 
@@ -182,9 +307,13 @@ def change_monitoring(
     POST_ALERT 상태에서 관리자가
     감시 종료 버튼을 누르는 경우도
     enabled=False로 처리한다.
+
+    감시 OFF가 되면 해당 CCTV의
+    MediaMTX path도 정리한다.
     """
 
     with get_connection() as connection:
+
         row = repository.update_monitoring(
             connection,
             cctv_id=cctv_id,
@@ -192,6 +321,7 @@ def change_monitoring(
         )
 
         if row is None:
+
             raise HTTPException(
                 status_code=404,
                 detail=(
@@ -199,6 +329,22 @@ def change_monitoring(
                 ),
             )
 
-    return _to_cctv_response(
-        row
-    )
+        response = (
+            _to_cctv_response(
+                row
+            )
+        )
+
+    # DB 상태 변경은 이미 완료된 뒤다.
+    #
+    # MediaMTX 장애 때문에
+    # CCTV 감시 OFF 자체가 실패하면 안 되므로
+    # remove_cctv_stream() 내부에서
+    # 삭제 실패는 warning만 남긴다.
+    if not body.enabled:
+
+        streaming.remove_cctv_stream(
+            cctv_id
+        )
+
+    return response

@@ -103,3 +103,20 @@ class MonitoringRequest(BaseModel):
     """
 
     enabled: bool
+
+
+class CctvStreamResponse(BaseModel):
+    """
+    W04 CCTV 실시간 영상 재생 정보.
+
+    실제 UTIC source URL은 노출하지 않고
+    MediaMTX WebRTC 재생 주소만 반환한다.
+    """
+
+    cctv_id: int
+
+    path: str
+
+    playback_url: str
+
+    whep_url: str
