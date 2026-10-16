@@ -5,7 +5,8 @@ CREATE TABLE incidents (
     hazard_type VARCHAR(50) NOT NULL,
     confidence DECIMAL(5,4) NOT NULL,
     model_version VARCHAR(100) NOT NULL,
-    detection_image_path VARCHAR(500) NOT NULL,
+    representative_image BYTEA,
+    representative_image_updated_at TIMESTAMP WITHOUT TIME ZONE,
     detection_bbox_json JSON NOT NULL,
     dedup_key VARCHAR(255) NOT NULL,
     status incident_status_enum NOT NULL DEFAULT 'DETECTED',
@@ -20,7 +21,8 @@ COMMENT ON COLUMN incidents.cctv_id IS 'CCTV ID';
 COMMENT ON COLUMN incidents.hazard_type IS '재난 유형';
 COMMENT ON COLUMN incidents.confidence IS '탐지 신뢰도';
 COMMENT ON COLUMN incidents.model_version IS '모델 버전';
-COMMENT ON COLUMN incidents.detection_image_path IS '탐지 이미지 경로';
+COMMENT ON COLUMN incidents.representative_image IS '사건 최신 대표 이미지 JPEG 바이너리';
+COMMENT ON COLUMN incidents.representative_image_updated_at IS '대표 이미지 마지막 갱신 일시';
 COMMENT ON COLUMN incidents.detection_bbox_json IS '탐지 바운딩박스 JSON';
 COMMENT ON COLUMN incidents.dedup_key IS '중복 판별 키';
 COMMENT ON COLUMN incidents.status IS '사건 상태';

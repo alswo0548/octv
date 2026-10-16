@@ -84,7 +84,7 @@ class IncidentPermissionsTests(unittest.TestCase):
             "latitude": Decimal("37.5"),
             "longitude": Decimal("127.0"),
             "region_code": None,
-            "detection_image_path": "test/image.jpg",
+            "representative_image_updated_at": None,
             "detection_bbox_json": {},
         }
 

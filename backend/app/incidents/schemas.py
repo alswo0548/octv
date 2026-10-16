@@ -26,7 +26,7 @@ class IncidentResponse(BaseModel):
     priority: str | None = None
     # Service가 risk_level의 존재 여부로 계산하는 화면용 상태입니다.
     analysis_status: Literal["PENDING", "READY"]
-    detection_image_path: str
+    representative_image_updated_at: datetime | None = None
     detection_bbox_json: dict | list
 
 

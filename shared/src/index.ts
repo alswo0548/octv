@@ -102,7 +102,7 @@ export type IncidentDto = {
   priority_score: number | null;
   priority: string | null;
   analysis_status: "PENDING" | "READY";
-  detection_image_path: string;
+  representative_image_updated_at: string | null;
   detection_bbox_json: Record<string, unknown> | unknown[];
 };
 

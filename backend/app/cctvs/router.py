@@ -1,22 +1,138 @@
-"""CCTV 조회·감시 상태 HTTP 진입점. 현재 업무 API는 501(미구현)을 반환합니다."""
+"""CCTV 조회·감시 상태 HTTP API."""
 
-from fastapi import APIRouter
-from . import schemas, service
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+)
 
-router = APIRouter(prefix="/cctvs", tags=["CCTV 조회·감시 상태"])
-# TODO: 구현하는 API부터 dependencies의 인증·권한 검사를 연결하세요.
+from ..dependencies import (
+    get_current_user,
+    require_control_admin,
+)
+from . import (
+    schemas,
+    service,
+)
 
 
-@router.get("", summary="list_cctvs · 구현 예정")
-def list_cctvs():
-    return service.list_cctvs()
+router = APIRouter(
+    prefix="/cctvs",
+    tags=[
+        "CCTV 조회·감시 상태"
+    ],
+)
 
 
-@router.get("/{cctv_id}", summary="get_cctv · 구현 예정")
-def get_cctv(cctv_id: int):
-    return service.get_cctv(cctv_id)
+@router.get(
+    "",
+    response_model=list[
+        schemas.CctvResponse
+    ],
+    summary="CCTV 목록 조회",
+)
+def list_cctvs(
+    region_code: str | None = Query(
+        default=None,
+        description=(
+            "지역 코드 필터"
+        ),
+    ),
+    user=Depends(
+        get_current_user
+    ),
+):
+
+    return service.list_cctvs(
+        region_code=region_code,
+    )
 
 
-@router.patch("/{cctv_id}/monitoring", summary="change_monitoring · 구현 예정")
-def change_monitoring(cctv_id: int, body: schemas.MonitoringRequest):
-    return service.change_monitoring(cctv_id, body)
+@router.get(
+    "/summary",
+    response_model=(
+        schemas.CctvSummaryResponse
+    ),
+    summary="CCTV 상태 요약 조회",
+)
+def get_cctv_summary(
+    region_code: str | None = Query(
+        default=None,
+        description=(
+            "지역 코드 필터"
+        ),
+    ),
+    user=Depends(
+        get_current_user
+    ),
+):
+
+    return service.get_cctv_summary(
+        region_code=region_code,
+    )
+
+
+@router.post(
+    "/{cctv_id}/stream",
+    response_model=(
+        schemas.CctvStreamResponse
+    ),
+    summary="CCTV 실시간 영상 준비",
+)
+def prepare_stream(
+    cctv_id: int,
+    user=Depends(
+        get_current_user
+    ),
+):
+    """
+    현재 감시 중인 CCTV의
+    MediaMTX WebRTC 스트림을 준비한다.
+
+    실제 UTIC 원본 Stream URL은
+    클라이언트에 노출하지 않는다.
+    """
+
+    return service.prepare_stream(
+        cctv_id
+    )
+
+
+@router.get(
+    "/{cctv_id}",
+    response_model=(
+        schemas.CctvResponse
+    ),
+    summary="CCTV 상세 조회",
+)
+def get_cctv(
+    cctv_id: int,
+    user=Depends(
+        get_current_user
+    ),
+):
+
+    return service.get_cctv(
+        cctv_id
+    )
+
+
+@router.patch(
+    "/{cctv_id}/monitoring",
+    response_model=(
+        schemas.CctvResponse
+    ),
+    summary="CCTV 감시 ON/OFF",
+)
+def change_monitoring(
+    cctv_id: int,
+    body: schemas.MonitoringRequest,
+    user=Depends(
+        require_control_admin
+    ),
+):
+
+    return service.change_monitoring(
+        cctv_id,
+        body,
+    )
