@@ -11,6 +11,11 @@ workers.py 자체가 위험도를 계산하거나 최적의 기관을 선택하�
 ④ workers.py (31번 사건을 받아 판단 함수 실행) ** 현재 파일 **
 ⑤ LangGraph 판단 시스템 (위험도 → 우선순위 → 기관·경로 추천)
 ⑥ 기존 PostgreSQL DB (판단 결과 저장)
+
+추가 흐름 (기존 LangGraph Task와 분리)
+기관 전달 COMMIT → notifications 큐 → send_notification_push → FCM 서버 요청.
+Beat → recover_notification_pushes → 최근 DB 알림의 누락 작업만 다시 큐에 등록.
+기존 Celery 앱은 공유하지만 notifications 큐를 별도 프로세스에서 처리할 수 있습니다.
 """
 
 
@@ -40,7 +45,15 @@ celery_app.conf.update(
     broker_transport_options={
         "visibility_timeout": 900,
     },
-    beat_schedule={},
+    # 기본 OFF. 같은 Celery 앱의 Beat 한 개가 최근 알림 누락을 분당 한 번 확인.
+    beat_schedule={
+        "octv-recover-notification-pushes": {
+            "task": "octv.recover_notification_pushes",
+            "schedule": 60.0,
+            "options": {"queue": "notifications", "expires": 55},
+        },
+    } if (os.environ.get("OCTV_PUSH_ENABLED", "0") == "1"
+          and os.environ.get("OCTV_PUSH_RECOVERY_ENABLED", "0") == "1") else {},
 )
 
 # Redis 대기열에서 Worker가 사건을 가지고 오면 실행됨.
@@ -74,3 +87,33 @@ def analyze_incident(self,incident_id):
             exc=RuntimeError(type(exc).__name__),
             countdown=30
         )
+
+
+# 기존 앱에서 알림 ID를 받아 발송합니다. LangGraph의 분석 Task/재시도 설정은 바꾸지 않습니다.
+@celery_app.task(                                   # Celery 작업으로 등록
+    bind=True,                                      # self로 현재 작업 정보 접근
+    name="octv.send_notification_push",             
+    queue="notifications",                          # 알림 전용 큐에서 처리
+    max_retries=3,                                  # 최초 실행 외 최대 3회 재시도
+)
+def send_notification_push(self, notification_id):
+    from .notifications.service import dispatch_notification_push
+
+    result = dispatch_notification_push(notification_id)
+    delay = result.get("retry_in")                  # 재시도 대기 시간 가져오기
+    if delay is not None and self.request.retries < self.max_retries:
+        # Redis에도 시도 횟수/다음 시각이 있으므로 Beat의 새 Task가 제한을 초기화하지 않습니다.
+        # 원문 Firebase 예외 대신 고정 코드만 Celery에 넘겨 비밀값 노출을 막습니다.
+        raise self.retry(exc=RuntimeError("PUSH_RETRY_SCHEDULED"), countdown=int(delay))
+    return result
+
+
+# Beat가 호출하는 동일 앱의 복구 Task입니다. 스케줄러 중복은 Redis 잠금으로도 제한.
+@celery_app.task(
+    name="octv.recover_notification_pushes",
+    queue="notifications",                          
+)
+def recover_notification_pushes():
+    from .notifications.service import recover_notification_pushes as recover
+
+    return recover()

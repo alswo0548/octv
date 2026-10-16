@@ -28,3 +28,6 @@ python-multipart==0.0.32
 requests==2.34.2
 bcrypt==5.0.0
 celery[redis]
+
+# FCM 서버 발송 (Python 3.12 / 공식 Admin SDK, 자격증명은 Git 외부에 보관)
+firebase-admin==7.7.0

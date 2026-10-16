@@ -158,9 +158,9 @@ def save_delivery(
         "incident_status": incident_status,
         "items": [items_by_agency[selection.agency_id] for selection in selections],
         "created_notification_count": len(notification_ids),
-        "push_status": "NOT_IMPLEMENTED",
+        "push_status": "NOT_QUEUED",
     }
-    # 반환된 알림 ID는 PR 3에서 commit 이후 발송 작업을 연결할 때 활용할 수 있습니다.
+    # 반환된 알림 ID는 Service가 commit 이후 FCM 발송 작업을 등록할 때 사용합니다.
     return result, notification_ids
 
 
@@ -282,5 +282,5 @@ def _create_delivery_notifications(connection: Any, incident_id: int, recommenda
 
 """
 1. 알림 대상 사용자가 0명이어도 기관 전달 자체는 처리됨. 대상 사용자가 반드시 있어야 한다는 조건은 두지 않았음
-2. DB 알림 생성은 휴대폰 알림 발송이 아닌 notifications 테이블에 저장하는 단계고 추후 FCM을 연결해야함
+2. DB 알림 생성은 notifications 테이블에 저장하는 단계이며, FCM 작업 등록은 Service의 commit 이후에 실행함
 """
