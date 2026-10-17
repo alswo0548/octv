@@ -28,5 +28,10 @@
   "packageManager": "npm@11.9.0",
   "devDependencies": {
     "prettier": "3.6.2"
+  },
+  "overrides": {
+    "react-devtools-core": {
+      "shell-quote": "1.12.0"
+    }
   }
 }

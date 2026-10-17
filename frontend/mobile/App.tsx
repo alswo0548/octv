@@ -1,4 +1,10 @@
-import { useState, useRef } from "react";
+/**
+ * 흐름: 기존 화면 유지 → Android 알림 이벤트 연결 → 인증 완료 대기 → 본인 사건 상세 표시.
+ * 주요 기능: 종료 상태의 알림 터치, 계정 변경 시 상세 차단, 샘플 사건과 실제 사건의 분리.
+ * 로그인·JWT 복원은 인증 담당이 connectNotificationSession에 연결합니다.
+ * onLogout에는 인증 담당의 실제 JWT 삭제 함수를 전달하며 로그인 구현은 이 파일에 추가하지 않습니다.
+ */
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import {
   View,
   Text,
@@ -12,7 +18,14 @@ import Svg, { Path } from "react-native-svg";
 import { StatusBar } from "expo-status-bar";
 import { incidentById, mobileScreens, mock } from "@octv/shared";
 import { Background } from "./src/components/Background";
-import { Brand, Link, Dialog, type DialogState } from "./src/components/UI";
+import {
+  Brand,
+  Link,
+  Dialog,
+  Button,
+  T,
+  type DialogState,
+} from "./src/components/UI";
 import { s, color } from "./src/styles/theme";
 import type { Screen, Navigate } from "./src/navigation/types";
 import { AuthScreens } from "./src/screens/AuthScreens";
@@ -22,13 +35,116 @@ import { RoutesScreen } from "./src/screens/RoutesScreen";
 import { RequestScreen } from "./src/screens/RequestScreen";
 import { NotificationScreen } from "./src/screens/NotificationScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
-/** UI navigation only: no auth guard, user object, network or persistence. */
-export default function App() {
+import { notificationController } from "./src/notifications";
+import { createAndroidPushDriver, startAndroidPush } from "./src/push";
+
+// 인증 담당의 기존 화면을 보존하면서 알림이 검증한 사건만 별도 상태로 엽니다.
+export function MobileApp({
+  onLogout,
+}: {
+  onLogout?: () => void | Promise<void>;
+}) {
+  const notification = useSyncExternalStore(
+    notificationController.subscribe,
+    notificationController.getSnapshot,
+    notificationController.getSnapshot,
+  );
+  const [notificationDetail, setNotificationDetail] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushInitialized, setPushInitialized] = useState(false);
+  const navigationVersion = useRef(0);
   const [screen, setScreen] = useState<Screen>("login"),
     [id, setId] = useState("SEL-001"),
     [dialog, setDialog] = useState<DialogState | null>(null);
   const scroll = useRef<ScrollView>(null);
+
+  // 계정이 달라지거나 인증이 풀리면 이전 사용자가 열어 둔 확인창도 닫습니다.
+  useEffect(() => {
+    setDialog(null);
+  }, [notification.user, notification.status]);
+
+  // 리스너는 앱당 한 번 연결하고, 드라이버 준비 전에 앱이 닫히면 뒤늦게 등록하지 않습니다.
+  useEffect(() => {
+    let active = true;
+    const stop = startAndroidPush({
+      onResponse: (data, key) =>
+        notificationController.handleNotificationResponse(data, key),
+      onReceived: () => {
+        void notificationController.refreshNotifications();
+      },
+      onTokenChanged: () => {
+        void notificationController.refreshDeviceRegistration();
+      },
+      shouldPresent: () => {
+        const state = notificationController.getSnapshot();
+        return (
+          state.status === "ready" && !!state.user && state.enabled === true
+        );
+      },
+      onStatus: (status) => {
+        if (active)
+          setPushError(status.state === "ready" ? null : status.message);
+      },
+    });
+    void createAndroidPushDriver()
+      .then((driver) => {
+        if (active) {
+          notificationController.setDeviceDriver(driver);
+          setPushInitialized(true);
+        }
+      })
+      .catch(() => {
+        if (active)
+          setPushError(
+            "알림 연결을 준비하지 못했습니다. 앱을 다시 열어주세요.",
+          );
+      });
+    return () => {
+      active = false;
+      stop();
+      notificationController.setDeviceDriver(null);
+    };
+  }, []);
+
+  // 서버 권한 확인이 완료된 새 사건만 화면을 이동시킵니다. ID를 mock 조회 함수에 넣지 않습니다.
+  useEffect(() => {
+    if (navigationVersion.current === notification.navigationVersion) return;
+    navigationVersion.current = notification.navigationVersion;
+    if (notification.status !== "ready" || !notification.incident) return;
+    setNotificationDetail(true);
+    setScreen("detail");
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [
+    notification.navigationVersion,
+    notification.status,
+    notification.incident,
+  ]);
+
   const go: Navigate = (next, incident) => {
+    // 실제 DB 번호는 항상 서버 상세 조회로 보내고, 알 수 없는 번호를 샘플 사건으로 대체하지 않습니다.
+    if (incident && /^[1-9]\d*$/.test(incident)) {
+      if (next === "detail") void notificationController.openIncident(incident);
+      else
+        setDialog({
+          title: "이용 안내",
+          body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
+          cancel: false,
+        });
+      return;
+    }
+    if (notificationDetail && ["live", "routes", "request"].includes(next)) {
+      setDialog({
+        title: "이용 안내",
+        body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
+        cancel: false,
+      });
+      return;
+    }
+    // 아직 상세가 열리기 전이라도 사용자가 다른 메뉴를 택하면 진행 중인 조회를 취소 처리합니다.
+    if (!(notificationDetail && next === "detail" && !incident)) {
+      setNotificationDetail(false);
+      notificationController.clearOpenedIncident();
+    }
     setScreen(next);
     if (incident) setId(incident);
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -42,7 +158,9 @@ export default function App() {
     d = incidentById(id),
     title = mobileScreens.find((x) => x[2] === screen)?.[1] || "";
   const back: Partial<Record<Screen, [Screen, string]>> = {
-    detail: ["incidents", "사건 목록"],
+    detail: notificationDetail
+      ? ["notifications", "알림 목록"]
+      : ["incidents", "사건 목록"],
     live: ["incidents", "사건 목록"],
     routes: ["detail", "사건 상세"],
     request: ["detail", "사건 상세"],
@@ -129,16 +247,46 @@ export default function App() {
               </Text>
               {(screen === "home" || screen === "incidents") && (
                 <Text style={s.muted}>
-                  {mock.profile.agency}에 전달된 사건입니다.
+                  {notification.user
+                    ? "사건 목록 미리보기입니다. 실제 전달 사건은 알림 목록에서 확인해주세요."
+                    : `${mock.profile.agency}에 전달된 사건입니다.`}
                 </Text>
               )}
             </View>
           )}
           <View
-            key={screen + "|" + id}
+            key={
+              screen +
+              "|" +
+              (notificationDetail
+                ? (notification.incident?.id ?? "restricted")
+                : id)
+            }
             style={{ paddingHorizontal: 20, paddingTop: 20 }}
           >
-            {auth ? (
+            {pushError &&
+              (screen === "notifications" || screen === "settings") && (
+                <View style={s.info}>
+                  <T>{pushError}</T>
+                </View>
+              )}
+            {notificationDetail && screen === "detail" ? (
+              notification.status === "ready" && notification.incident ? (
+                <DetailScreen actualIncident={notification.incident} go={go} />
+              ) : (
+                <View style={s.panel}>
+                  <T>
+                    {notification.error ??
+                      (notification.status === "ready"
+                        ? "사건 정보를 확인하고 있습니다."
+                        : "로그인 후 사건정보를 다시 확인해주세요.")}
+                  </T>
+                  <Button onPress={() => go("notifications")}>
+                    알림 목록으로
+                  </Button>
+                </View>
+              )
+            ) : auth ? (
               <AuthScreens screen={screen} go={go} show={setDialog} />
             ) : screen === "home" || screen === "incidents" ? (
               <IncidentScreens home={screen === "home"} go={go} />
@@ -151,7 +299,12 @@ export default function App() {
             ) : screen === "notifications" ? (
               <NotificationScreen go={go} show={setDialog} />
             ) : (
-              <SettingsScreen go={go} show={setDialog} />
+              <SettingsScreen
+                go={go}
+                show={setDialog}
+                // 설치 UUID를 읽을 준비가 끝나야 기존 기기 연결의 해제를 확인할 수 있습니다.
+                onLogout={pushInitialized ? onLogout : undefined}
+              />
             )}
           </View>
         </ScrollView>
@@ -216,4 +369,9 @@ export default function App() {
       <Dialog value={dialog} close={() => setDialog(null)} />
     </View>
   );
+}
+
+// Expo 진입점은 인자 없이 등록합니다. 인증 담당이 연결할 때 MobileApp의 onLogout을 전달합니다.
+export default function App() {
+  return <MobileApp />;
 }
