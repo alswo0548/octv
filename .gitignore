@@ -78,3 +78,11 @@ firebase-credentials*.json
 secrets/
 celerybeat-schedule*
 celerybeat.pid
+frontend/mobile/google-services.json
+frontend/mobile/android/
+frontend/mobile/ios/
+*.jks
+*.keystore
+*.apk
+*.aab
+credentials.json

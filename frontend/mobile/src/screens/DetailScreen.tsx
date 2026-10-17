@@ -1,18 +1,129 @@
+/**
+ * 흐름: 알림에서 본인 사건 권한 확인 → 실제 IncidentDto 표시 → 필요하면 서버에서 다시 조회.
+ * 기존 샘플 상세는 보존하고, 실제 사건에는 샘플 이미지·기관·경로를 섞지 않습니다.
+ * 주요 기능: 실제 재난·위치·위험도·시각 표시, 미분석 값 구분, 알림 목록 복귀.
+ */
+import { useSyncExternalStore } from "react";
 import { View, Text, Pressable } from "react-native";
-import { mock, type Incident } from "@octv/shared";
+import { mock, type Incident, type IncidentDto } from "@octv/shared";
 import { Badge, T, Button, Panel, Pair } from "../components/UI";
 import { Camera } from "../components/Camera";
 import { s, color } from "../styles/theme";
 import type { Navigate } from "../navigation/types";
+import {
+  notificationController,
+  parseNotificationTime,
+} from "../notifications";
+
+const hazardNames: Record<string, string> = {
+  flood: "침수",
+  fallen_tree: "쓰러진 나무·전봇대",
+  structural_damage: "시설물 파손",
+  road_obstacle: "도로 장애물",
+  sinkhole: "싱크홀",
+};
+
+// API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
+function incidentTime(value: string) {
+  return (
+    parseNotificationTime(value)?.toLocaleString("ko-KR", {
+      timeZone: "Asia/Seoul",
+    }) ?? "시각 확인 불가"
+  );
+}
+
+// 실제 사건에는 API에 없는 기상·경로·샘플 이미지를 채워 넣지 않습니다.
+function DeliveredIncidentDetail({
+  incident,
+  go,
+}: {
+  incident: IncidentDto;
+  go: Navigate;
+}) {
+  const state = useSyncExternalStore(
+    notificationController.subscribe,
+    notificationController.getSnapshot,
+    notificationController.getSnapshot,
+  );
+  return (
+    <>
+      <Badge priority={incident.priority ?? "평가 대기"} />
+      <Text style={[s.title, { marginTop: 13 }]}>
+        {hazardNames[incident.hazard_type.toLowerCase()] ??
+          incident.hazard_type}{" "}
+        · {incident.incident_no}
+      </Text>
+      <T muted>{incident.cctv_name}</T>
+      <View style={[s.info, { marginVertical: 18 }]}>
+        <T>수신 기관 · {state.user?.agency_name ?? "소속기관 확인 필요"}</T>
+        <T muted>현재 계정에 허용된 사건정보입니다.</T>
+      </View>
+      <Panel title="사건 정보">
+        <Pair label="사건 번호" value={incident.incident_no} />
+        <Pair label="상태" value={incident.status} />
+        <Pair label="CCTV" value={incident.cctv_name} />
+        <Pair
+          label="위도 / 경도"
+          value={`${incident.latitude} / ${incident.longitude}`}
+        />
+        <Pair label="최초 탐지" value={incidentTime(incident.detected_at)} />
+        <Pair
+          label="최근 탐지"
+          value={incidentTime(incident.last_detected_at)}
+        />
+        <T muted>시각은 한국 시간입니다.</T>
+      </Panel>
+      <Panel title="위험도 및 우선순위">
+        <Pair
+          label="분석 상태"
+          value={
+            incident.analysis_status === "READY" ? "분석 완료" : "분석 대기"
+          }
+        />
+        <Pair label="위험도" value={incident.risk_level ?? "분석 대기"} />
+        <Pair label="위험도 점수" value={incident.risk_score ?? "분석 대기"} />
+        <Pair label="우선순위" value={incident.priority ?? "분석 대기"} />
+        <Pair
+          label="우선순위 점수"
+          value={incident.priority_score ?? "분석 대기"}
+        />
+        <Pair
+          label="탐지 신뢰도"
+          value={`${(incident.confidence * 100).toFixed(1)}%`}
+        />
+      </Panel>
+      <Button
+        onPress={() => void notificationController.openIncident(incident.id)}
+      >
+        사건 정보 새로고침
+      </Button>
+      <Button secondary onPress={() => go("notifications")}>
+        알림 목록으로
+      </Button>
+    </>
+  );
+}
+
+// 호출부에서 실제 사건과 기존 미리보기 사건을 명시적으로 구분합니다.
 export function DetailScreen({
   incident: d,
+  actualIncident,
   live = false,
   go,
 }: {
-  incident: Incident;
+  incident?: Incident;
+  actualIncident?: IncidentDto;
   live?: boolean;
   go: Navigate;
 }) {
+  if (actualIncident)
+    return <DeliveredIncidentDetail incident={actualIncident} go={go} />;
+  if (!d)
+    return (
+      <Panel>
+        <T>표시할 사건정보가 없습니다.</T>
+      </Panel>
+    );
   const camera = mock.cctvs.find((c) => c.id === d.camera),
     connected = camera?.connected !== false;
   return (
