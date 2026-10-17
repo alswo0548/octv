@@ -9,7 +9,7 @@ Router는 WEB에서 들어오는 API 요청을 받아 적절한 Service 함수�
 
 주요 기능
 - GET 추천·경로 후보 조회 / POST 기관 전달 및 DB 알림 생성
-- 알림 조회·읽음 및 FCM 발송은 후속 범위.
+- DB 저장 후 Service에서 FCM 작업을 등록하며, 실제 발송은 기존 Celery Worker가 담당.
 """
 
 from typing import Annotated
@@ -48,7 +48,7 @@ def list_recommendations(incident_id: IncidentId, user: AdminUser):
     return service.list_recommendations(incident_id, user)
 
 
-# 선택한 기관에 전달하고 DB 알림을 저장하며, 휴대폰 Push는 아직 발송하지 않습니다.
+# 선택한 기관에 전달하고 DB 알림을 저장한 뒤, 별도 Worker에 Push 작업 등록을 요청.
 @router.post(
     "/incidents/{incident_id}/deliveries",
     response_model=schemas.DeliveryResponse,

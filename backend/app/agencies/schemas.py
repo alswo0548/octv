@@ -94,4 +94,8 @@ class DeliveryResponse(BaseModel):
     incident_status: Literal["CONFIRMED", "SENT"]
     items: list[DeliveryItem]
     created_notification_count: int = Field(ge=0)
-    push_status: Literal["NOT_IMPLEMENTED"] = "NOT_IMPLEMENTED"
+    # 큐 등록 결과이지 FCM 접수나 휴대폰 표시 성공 여부가 아닙니다.
+    push_status: Literal[
+        "NOT_QUEUED", "QUEUED", "PARTIALLY_QUEUED", "QUEUE_UNCONFIRMED",
+        "DISABLED", "NO_NEW_NOTIFICATIONS",
+    ] = "NOT_QUEUED"
