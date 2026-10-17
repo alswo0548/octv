@@ -1,19 +1,25 @@
 name: Development checks
+
 on:
   pull_request:
   push:
     branches: [main]
+
 permissions:
   contents: read
+
 jobs:
   ui:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
+
       - run: npm ci
       - run: npm run format:check
       - run: npm run typecheck
@@ -22,25 +28,38 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
           cache: pip
           cache-dependency-path: backend/requirements.txt
+
       - run: python -m pip install -r backend/requirements.txt
       - run: python -m pip check
       - run: python -m compileall -q backend ai
-      - run: python -m unittest discover -s tests -p "test_*.py"
+
+      # backend job은 backend 의존성만 설치하므로
+      # AI / CCTV 영상 / DB 통합 테스트까지 전체 discovery하지 않는다.
+      #
+      # 전체 Python 테스트는 아래 python-environment job에서
+      # requirements.txt 전체 환경을 설치한 뒤 수행한다.
+      - run: python -m unittest tests.test_backend tests.test_incident_permissions
+
   python-environment:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+
     runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
@@ -49,19 +68,26 @@ jobs:
             requirements.txt
             backend/requirements.txt
             ai/requirements.txt
+
       - run: python -m pip install -r requirements.txt
       - run: python -m pip check
       - run: python scripts/check-python-env.py
       - run: python -m unittest discover -s tests -p "test_*.py"
+
   requirements-encoding:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
-      # 한국어 Windows의 기존 pip에서 중첩된 requirements까지 읽는지 검사합니다.
+
+      # 한국어 Windows의 기존 pip에서
+      # 중첩된 requirements까지 읽는지 검사합니다.
       - run: python -m pip install pip==24.2
+
       - name: Parse requirements with the CP949 locale fallback
         shell: python
         run: |
@@ -70,38 +96,81 @@ jobs:
           from pip._internal.network.session import PipSession
           from pip._internal.req.req_file import parse_requirements
 
-          with patch.object(locale, "getpreferredencoding", return_value="cp949"):
+          with patch.object(
+              locale,
+              "getpreferredencoding",
+              return_value="cp949",
+          ):
               with PipSession() as session:
-                  requirements = list(parse_requirements("requirements.txt", session=session))
-          assert requirements, "No package requirements were parsed"
-          print(f"CP949 fallback: parsed {len(requirements)} requirements successfully")
+                  requirements = list(
+                      parse_requirements(
+                          "requirements.txt",
+                          session=session,
+                      )
+                  )
+
+          assert requirements, (
+              "No package requirements were parsed"
+          )
+
+          print(
+              "CP949 fallback: parsed "
+              f"{len(requirements)} "
+              "requirements successfully"
+          )
+
   database:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:17.11-bookworm
+
         env:
           POSTGRES_DB: octv_test
           POSTGRES_USER: octv_test
           POSTGRES_PASSWORD: local_ci_only
-        ports: ["5432:5432"]
+
+        ports:
+          - "5432:5432"
+
         options: >-
-          --health-cmd "pg_isready -U octv_test -d octv_test"
-          --health-interval 5s --health-timeout 5s --health-retries 12
+          --health-cmd
+          "pg_isready -U octv_test -d octv_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
     env:
       PGHOST: 127.0.0.1
       PGUSER: octv_test
       PGPASSWORD: local_ci_only
       PGDATABASE: octv_test
+
     steps:
       - uses: actions/checkout@v4
-      - run: psql -X -v ON_ERROR_STOP=1 -f database/schema.sql
-      - run: psql -X -v ON_ERROR_STOP=1 -f tests/database_contract.sql
-      - run: psql -X -v ON_ERROR_STOP=1 -f tests/database_behavior.sql
+
+      - run: >
+          psql -X
+          -v ON_ERROR_STOP=1
+          -f database/schema.sql
+
+      - run: >
+          psql -X
+          -v ON_ERROR_STOP=1
+          -f tests/database_contract.sql
+
+      - run: >
+          psql -X
+          -v ON_ERROR_STOP=1
+          -f tests/database_behavior.sql
+
       - uses: actions/setup-python@v5
         with:
           python-version-file: .python-version
+
       - run: python -m pip install -r backend/requirements.txt
+
       - run: python scripts/check-db.py
         env:
           DATABASE_URL: postgresql://octv_test:local_ci_only@127.0.0.1:5432/octv_test

@@ -1,56 +1,116 @@
-
 name: octv
 
 services:
+
+  # =======================================================
+  # PostgreSQL
+  # =======================================================
+
   db:
     image: postgres:17.11-bookworm
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-octv_dev}
       POSTGRES_USER: ${POSTGRES_USER:-octv_dev}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env}
+
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
       - type: bind
         source: ./database/init
         target: /docker-entrypoint-initdb.d
         read_only: true
         bind:
           create_host_path: false
+
       - type: bind
         source: ./database
         target: /opt/octv/database
         read_only: true
         bind:
           create_host_path: false
+
       - type: bind
         source: ./backend/app
         target: /opt/octv/backend/app
         read_only: true
         bind:
           create_host_path: false
+
       - type: bind
         source: ./tests
         target: /opt/octv/tests
         read_only: true
         bind:
           create_host_path: false
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""
+        ]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 20s
 
-  # AI 판단 작업을 Redis 대기열에 보관하고 Celery Worker에 전달
-  redis:                                              # Redis 서버를 Docker 컨테이너로 실행
+
+  # =======================================================
+  # Redis
+  # =======================================================
+
+  redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes"
+      ]
+
     ports:
       - "127.0.0.1:6379:6379"
+
     volumes:
       - redis_data:/data
+
+
+  # =======================================================
+  # MediaMTX
+  # UTIC HLS -> WebRTC
+  # =======================================================
+
+  mediamtx:
+    image: bluenviron/mediamtx:1
+
+    restart: unless-stopped
+
+    ports:
+
+      # WebRTC HTTP / WHEP
+      - "127.0.0.1:8889:8889"
+
+      # MediaMTX Control API
+      # FastAPI가 CCTV path를 동적으로 등록할 때 사용
+      - "127.0.0.1:9997:9997"
+
+      # WebRTC ICE media
+      - "127.0.0.1:8189:8189/udp"
+
+    volumes:
+      - type: bind
+        source: ./mediamtx.yml
+        target: /mediamtx.yml
+        read_only: true
+        bind:
+          create_host_path: false
+
 
 volumes:
   postgres_data:

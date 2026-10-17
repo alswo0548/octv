@@ -1,0 +1,64 @@
+logLevel: info
+
+# =========================================================
+# Authentication
+# =========================================================
+# 현재는 로컬 개발용 설정.
+# Control API 포트는 compose에서 127.0.0.1에만 공개한다.
+authMethod: internal
+
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: read
+        path:
+      - action: playback
+        path:
+      - action: api
+
+# =========================================================
+# Control API
+# =========================================================
+api: true
+apiAddress: :9997
+apiAllowOrigins: ["*"]
+
+# =========================================================
+# 사용하지 않는 출력 프로토콜
+# =========================================================
+rtsp: false
+rtmp: false
+hls: false
+srt: false
+
+# =========================================================
+# WebRTC
+# =========================================================
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+
+# WebRTC 실제 미디어 전송용 ICE/UDP
+webrtcLocalUDPAddress: :8189
+
+# 현재 Windows 로컬 개발에서만 사용.
+# 배포 때에는 서버의 공인 IP 또는 도메인으로 변경한다.
+webrtcAdditionalHosts:
+  - 127.0.0.1
+
+# =========================================================
+# Stream Path 기본 정책
+# =========================================================
+pathDefaults:
+
+  # 실제 브라우저 시청자가 있을 때만
+  # UTIC 원본 영상을 가져온다.
+  sourceOnDemand: true
+
+  sourceOnDemandStartTimeout: 15s
+  sourceOnDemandCloseAfter: 10s
+
+# CCTV path는 FastAPI가 동적으로 등록할 예정.
+paths: {}

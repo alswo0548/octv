@@ -25,19 +25,19 @@ INSERT INTO cctvs (id,external_cctv_id,name,provider,latitude,longitude) VALUES
     (-1,'camera-1','Test','provider-a',37,127),(-2,'camera-1','Test','provider-b',37,127);
 SELECT pg_temp.expect_unique($q$INSERT INTO cctvs (external_cctv_id,name,provider,latitude,longitude)
     VALUES ('camera-1','Different name','provider-a',37,127)$q$,'uq_cctvs_provider_external');
-INSERT INTO incidents (id,incident_no,cctv_id,hazard_type,confidence,model_version,detection_image_path,detection_bbox_json,dedup_key,status)
-    VALUES (-1,'TEST-1',-1,'test',0.9,'test','test','{}','same-location-window','DETECTED');
-SELECT pg_temp.expect_unique($q$INSERT INTO incidents (incident_no,cctv_id,hazard_type,confidence,model_version,detection_image_path,detection_bbox_json,dedup_key)
-    VALUES ('TEST-1',-2,'test',0.9,'test','test','{}','other')$q$,'uq_incidents_incident_no');
-SELECT pg_temp.expect_unique($q$INSERT INTO incidents (incident_no,cctv_id,hazard_type,confidence,model_version,detection_image_path,detection_bbox_json,dedup_key,status)
-    VALUES ('TEST-2',-1,'test',0.9,'test','test','{}','same-location-window','SENT')$q$,'uq_incidents_active_dedup');
+INSERT INTO incidents (id,incident_no,cctv_id,hazard_type,confidence,model_version,detection_bbox_json,dedup_key,status)
+    VALUES (-1,'TEST-1',-1,'test',0.9,'test','{}','same-location-window','DETECTED');
+SELECT pg_temp.expect_unique($q$INSERT INTO incidents (incident_no,cctv_id,hazard_type,confidence,model_version,detection_bbox_json,dedup_key)
+    VALUES ('TEST-1',-2,'test',0.9,'test','{}','other')$q$,'uq_incidents_incident_no');
+SELECT pg_temp.expect_unique($q$INSERT INTO incidents (incident_no,cctv_id,hazard_type,confidence,model_version,detection_bbox_json,dedup_key,status)
+    VALUES ('TEST-2',-1,'test',0.9,'test','{}','same-location-window','SENT')$q$,'uq_incidents_active_dedup');
 -- Terminal cases free the dedup key; another CCTV and another hazard may also use it.
 UPDATE incidents SET status='RESOLVED' WHERE id=-1;
-INSERT INTO incidents (id,incident_no,cctv_id,hazard_type,confidence,model_version,detection_image_path,detection_bbox_json,dedup_key,status)
-    VALUES (-2,'TEST-2',-1,'test',0.9,'test','test','{}','same-location-window','CONFIRMED'),
-           (-3,'TEST-3',-1,'test',0.9,'test','test','{}','same-location-window','FALSE_POSITIVE'),
-           (-4,'TEST-4',-2,'test',0.9,'test','test','{}','same-location-window','DETECTED'),
-           (-5,'TEST-5',-1,'another-hazard',0.9,'test','test','{}','same-location-window','DETECTED');
+INSERT INTO incidents (id,incident_no,cctv_id,hazard_type,confidence,model_version,detection_bbox_json,dedup_key,status)
+    VALUES (-2,'TEST-2',-1,'test',0.9,'test','{}','same-location-window','CONFIRMED'),
+           (-3,'TEST-3',-1,'test',0.9,'test','{}','same-location-window','FALSE_POSITIVE'),
+           (-4,'TEST-4',-2,'test',0.9,'test','{}','same-location-window','DETECTED'),
+           (-5,'TEST-5',-1,'another-hazard',0.9,'test','{}','same-location-window','DETECTED');
 SELECT pg_temp.expect_unique($q$UPDATE incidents SET status='DETECTED' WHERE id=-1$q$,'uq_incidents_active_dedup');
 INSERT INTO weather_alerts (id,external_alert_id,alert_type,alert_level,title,issued_at,region_code)
     VALUES (-1,'weather-1','rain','warning','Test',CURRENT_TIMESTAMP,'test-r1'),

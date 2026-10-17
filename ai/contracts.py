@@ -3,12 +3,16 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+import numpy as np
+
 
 @dataclass(frozen=True)
 class Frame:
     cctv_id: int
     captured_at: datetime
-    image_path: str
+    image: np.ndarray
+    # OpenCV에서 Decode된 BGR 이미지.
+    # 디스크에 저장하지 않고 메모리에서 다음 AI 단계로 전달한다.
 
 
 @dataclass(frozen=True)

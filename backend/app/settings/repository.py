@@ -1,37 +1,96 @@
-"""
-감시 기준 DB 작업은 아직 미구현, 본인 Push 수신 설정만 갱신.
-
-파일 흐름
-1. 사용자 알림 ON/OFF 변경 요청에서는 users.notification_enabled만 UPDATE합니다.
-2. 변경된 값을 반환하며 트랜잭션 확정은 Service에서 관리합니다.
-"""
+"""Monitoring settings 및 사용자 알림 설정 Repository."""
 
 from ..errors import FeatureNotImplemented
 
-# db/session.py의 연결을 전달받습니다. commit/rollback 범위는 서비스에서 관리합니다.
-
 
 def get_monitoring_settings(connection):
-    # TODO: monitoring_settings 조회. 활성 설정 행 선택/버전 정책은 팀과 합의.
-    raise FeatureNotImplemented("settings.get_monitoring_settings DB 쿼리 구현 예정")
+    """
+    현재 OCTV 감시·분석 설정을 조회한다.
+
+    monitoring_settings에 데이터가 없으면
+    None을 반환한다.
+
+    현재 테이블에는 active/version 컬럼이 없으므로,
+    여러 행이 존재할 경우 가장 최근 id의 설정을 사용한다.
+    """
+
+    query = """
+        SELECT
+            id,
+            base_analysis_interval_sec,
+            alert_analysis_interval_sec,
+            verify_analysis_interval_sec,
+            candidate_confidence_threshold,
+            candidate_min_detection_count,
+            temporal_validation_sec,
+            incident_confidence_threshold,
+            reconnect_interval_sec,
+            max_reconnect_attempts,
+            quality_threshold,
+            updated_by,
+            updated_at
+        FROM monitoring_settings
+        ORDER BY id DESC
+        LIMIT 1;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        row = cursor.fetchone()
+
+    return row
 
 
 def save_monitoring_settings(
-    connection, settings_id: int, values: dict, updated_by: int
+    connection,
+    settings_id: int,
+    values: dict,
+    updated_by: int,
 ):
-    # TODO: 허용 필드만 갱신하고 updated_by·updated_at도 명시적으로 갱신.
-    raise FeatureNotImplemented("settings.save_monitoring_settings DB 쿼리 구현 예정")
+    """
+    monitoring_settings를 수정한다.
+
+    현재는 API 구현 전 단계이므로
+    실제 UPDATE 쿼리는 아직 구현하지 않는다.
+    """
+
+    # TODO:
+    # 허용 필드만 갱신하고
+    # updated_by·updated_at도 명시적으로 갱신.
+    raise FeatureNotImplemented(
+        "settings.save_monitoring_settings DB 쿼리 구현 예정"
+    )
 
 
-# 로그인한 사용자 본인의 Push ON/OFF 컬럼만 업데이트.
-def set_notification_enabled(connection, user_id: int, enabled: bool):
-    # user_id는 JWT에서 가져오며 비활성 계정의 설정은 변경하지 않습니다.
-    return connection.execute(
-        """
+def set_notification_enabled(
+    connection,
+    user_id: int,
+    enabled: bool,
+):
+    """
+    로그인한 사용자 본인의
+    Push 알림 ON/OFF 설정을 변경한다.
+
+    비활성 사용자의 설정은 변경하지 않는다.
+    """
+
+    query = """
         UPDATE users
         SET notification_enabled = %s
-        WHERE id = %s AND is_active = TRUE
-        RETURNING notification_enabled
-        """,
-        (enabled, user_id),
-    ).fetchone()
+        WHERE id = %s
+          AND is_active = TRUE
+        RETURNING notification_enabled;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                enabled,
+                user_id,
+            ),
+        )
+
+        row = cursor.fetchone()
+
+    return row
