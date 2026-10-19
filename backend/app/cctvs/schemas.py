@@ -1,9 +1,9 @@
-"""CCTV 조회·감시 상태 API Schema."""
+"""CCTV 조회·감시 상태 API Schema. DB의 마지막 프레임 UTC 시각을 명시적으로 반환합니다."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 ConnectionStatus = Literal[
@@ -77,6 +77,13 @@ class CctvResponse(BaseModel):
         MonitoredMode
         | None
     ) = None
+
+    @field_validator("last_frame_at")
+    @classmethod
+    def explicit_utc(cls, value):
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 class CctvSummaryResponse(BaseModel):
