@@ -99,3 +99,12 @@ class DeliveryResponse(BaseModel):
         "NOT_QUEUED", "QUEUED", "PARTIALLY_QUEUED", "QUEUE_UNCONFIRMED",
         "DISABLED", "NO_NEW_NOTIFICATIONS",
     ] = "NOT_QUEUED"
+
+
+# 현장 대응 완료 결과
+class DeliveryCompletionResponse(BaseModel):
+    incident_id: int
+    agency_id: int
+    agency_recommendation_id: int
+    recommendation_status: Literal["COMPLETED"]
+    incident_status: Literal["SENT", "RESOLVED"]

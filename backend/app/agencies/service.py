@@ -11,6 +11,9 @@ from fastapi import HTTPException
 from ..db.session import (
     get_connection,
 )
+from ..incidents import (
+    repository as incident_repository,
+)
 from . import (
     repository,
     schemas,
@@ -239,3 +242,101 @@ def deliver(
         )
 
     return response
+
+
+# ------------------------------------------------------------
+# 현장 대응 완료
+# ------------------------------------------------------------
+
+def complete_delivery(
+    incident_id: int,
+    user: dict[str, Any],
+):
+    """
+    현장대응자가 자기 기관의 대응을 완료한다.
+
+    기관 상태 변경과 Incident 전체 완료 판단은
+    하나의 DB 트랜잭션에서 처리한다.
+    """
+
+    if (
+        user.get("is_active")
+        is not True
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "활성 사용자만 "
+                "대응 완료 처리할 수 있습니다."
+            ),
+        )
+
+    if (
+        user.get("role")
+        != "RESPONDER"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "현장대응자만 "
+                "대응 완료 처리할 수 있습니다."
+            ),
+        )
+
+    agency_id = user.get(
+        "agency_id"
+    )
+
+    if agency_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "소속 기관 정보가 "
+                "필요합니다."
+            ),
+        )
+
+    with get_connection() as connection:
+
+        completed = (
+            repository.complete_delivery(
+                connection,
+                incident_id,
+                int(agency_id),
+            )
+        )
+
+        incident = (
+            incident_repository
+            .resolve_if_all_deliveries_completed(
+                connection,
+                incident_id,
+            )
+        )
+
+        if incident is None:
+            raise HTTPException(
+                status_code=404,
+                detail="사건이 없습니다.",
+            )
+
+        return {
+            "incident_id":
+                incident_id,
+
+            "agency_id":
+                int(agency_id),
+
+            "agency_recommendation_id":
+                completed[
+                    "agency_recommendation_id"
+                ],
+
+            "recommendation_status":
+                completed[
+                    "recommendation_status"
+                ],
+
+            "incident_status":
+                incident["status"],
+        }
