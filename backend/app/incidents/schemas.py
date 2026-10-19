@@ -1,7 +1,7 @@
 """사건 목록·상세 응답의 필드와 검증 조건을 정의합니다."""
 
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Any, Literal
 from datetime import datetime
 
 
@@ -28,6 +28,11 @@ class IncidentResponse(BaseModel):
     analysis_status: Literal["PENDING", "READY"]
     representative_image_updated_at: datetime | None = None
     detection_bbox_json: dict | list
+
+class IncidentDetailResponse(IncidentResponse):
+    risk_breakdown_json: dict[str, Any] | None = None
+    priority_breakdown_json: dict[str, Any] | None = None
+    rule_version: str | None = None
 
 
 # 현재 페이지 목록과 검색 조건에 맞는 전체 건수를 묶습니다.

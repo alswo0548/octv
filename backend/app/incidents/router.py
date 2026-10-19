@@ -225,10 +225,11 @@ def get_incident_image(
     )
 
 
+# 목록은 기존 응답을 유지하고, 상세 조회에서만 위험도·우선순위 근거를 반환.
 @router.get(
     "/{incident_id}",
-    response_model=schemas.IncidentResponse,
-    summary="사건 상세 조회",
+    response_model=schemas.IncidentDetailResponse,
+    summary="사건 상세·판단 근거 조회",
 )
 def get_incident(
     incident_id: int,
