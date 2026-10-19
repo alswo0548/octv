@@ -9,6 +9,7 @@ from fastapi.encoders import jsonable_encoder
 
 from ..analysis_requests import after_incident_committed
 from ..db.session import get_connection
+from ..agencies import repository as agencies_repository
 from . import repository
 
 
@@ -197,6 +198,8 @@ def get_incident(
 
     with get_connection() as connection:
 
+        agency_id = None
+
         if (
             user["role"]
             != "CONTROL_ADMIN"
@@ -231,6 +234,7 @@ def get_incident(
                     ),
                 )
 
+        # 사건 기본정보 + 최신 위험도/우선순위
         row = (
             repository.find_detail(
                 connection,
@@ -238,15 +242,34 @@ def get_incident(
             )
         )
 
-    if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail="사건이 없습니다.",
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="사건이 없습니다.",
+            )
+
+        # 추천 기관 + 기관별 경로 후보
+        recommendation_result = (
+            agencies_repository.list_recommendations(
+                connection,
+                incident_id,
+                agency_id=agency_id,
+            )
         )
 
-    return serialize_incident(
+    item = serialize_incident(
         row
     )
+
+    item["recommendations"] = (
+        jsonable_encoder(
+            recommendation_result[
+                "items"
+            ]
+        )
+    )
+
+    return item
 
 
 def get_incident_image(
@@ -572,99 +595,3 @@ def mark_false_positive(
     )
 
 
-# ------------------------------------------------------------
-# CONFIRMED → SENT
-#
-# 이 함수 자체는 기관 전송을 수행하지 않습니다.
-# 실제 기관 전달 기능이 성공한 뒤
-# 사건 상태를 기록할 때 호출합니다.
-# ------------------------------------------------------------
-def mark_sent(
-    incident_id: int,
-    user: dict,
-):
-    _require_control_admin(
-        user
-    )
-
-    with get_connection() as connection:
-
-        current = (
-            _find_status_or_404(
-                connection,
-                incident_id,
-            )
-        )
-
-        current_status = (
-            current["status"]
-        )
-
-        if (
-            current_status
-            == "SENT"
-        ):
-            row = (
-                _find_detail_or_404(
-                    connection,
-                    incident_id,
-                )
-            )
-
-            return serialize_incident(
-                row
-            )
-
-        if (
-            current_status
-            != "CONFIRMED"
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "사건 확인(CONFIRMED) 상태에서만 "
-                    "전달 완료로 변경할 수 있습니다."
-                ),
-            )
-
-        changed = (
-            repository.update_status(
-                connection,
-                incident_id,
-                "SENT",
-                (
-                    "CONFIRMED",
-                ),
-            )
-        )
-
-        if changed is None:
-            current = (
-                _find_status_or_404(
-                    connection,
-                    incident_id,
-                )
-            )
-
-            if (
-                current["status"]
-                != "SENT"
-            ):
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "사건 상태가 변경되어 "
-                        "전달 완료 처리할 수 없습니다."
-                    ),
-                )
-
-        row = (
-            _find_detail_or_404(
-                connection,
-                incident_id,
-            )
-        )
-
-    return serialize_incident(
-        row
-    )

@@ -156,27 +156,6 @@ def mark_false_positive(
     )
 
 
-# ------------------------------------------------------------
-# 실제 기관 전달 성공 후 상태 기록
-# CONFIRMED → SENT
-#
-# 이 API가 기관 전달 자체를 수행하는 것은 아닙니다.
-# ------------------------------------------------------------
-@router.patch(
-    "/{incident_id}/sent",
-    response_model=schemas.IncidentResponse,
-    summary="사건 전달 완료 처리",
-)
-def mark_sent(
-    incident_id: int,
-    user=Depends(
-        require_control_admin
-    ),
-):
-    return service.mark_sent(
-        incident_id,
-        user,
-    )
 
 
 # 관리자가 특정 사건의 AI 판단을
