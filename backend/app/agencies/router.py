@@ -135,3 +135,34 @@ def deliver(
         body,
         user,
     )
+
+
+# ------------------------------------------------------------
+# 현장 대응 완료
+# ------------------------------------------------------------
+
+@router.patch(
+    "/incidents/{incident_id}/complete",
+    response_model=(
+        schemas.DeliveryCompletionResponse
+    ),
+    summary=(
+        "현장 대응 완료 처리"
+    ),
+)
+def complete_delivery(
+    incident_id: IncidentId,
+    user: CurrentUser,
+):
+    """
+    현장대응자가 자신의 소속 기관에 전달된
+    사건의 대응 완료를 처리합니다.
+
+    마지막 대응 기관까지 완료되면
+    Incident도 RESOLVED로 변경됩니다.
+    """
+
+    return service.complete_delivery(
+        incident_id,
+        user,
+    )

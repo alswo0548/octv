@@ -581,6 +581,168 @@ def save_delivery(
 
 
 # ------------------------------------------------------------
+# 현장 대응 완료
+# ------------------------------------------------------------
+
+def complete_delivery(
+    connection: Any,
+    incident_id: int,
+    agency_id: int,
+) -> dict:
+    """
+    현장대응자의 소속 기관에 전달된 사건을
+    DELIVERED → COMPLETED 상태로 변경한다.
+
+    같은 사건에 대한 기관 전달/완료 작업의
+    잠금 순서를 맞추기 위해 Incident를 먼저 잠근다.
+    """
+
+    # --------------------------------------------------------
+    # 1. Incident 잠금
+    # --------------------------------------------------------
+
+    incident = (
+        connection.execute(
+            """
+            SELECT
+                id,
+                status
+            FROM incidents
+            WHERE id = %s
+            FOR UPDATE
+            """,
+            (
+                incident_id,
+            ),
+        )
+        .fetchone()
+    )
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="사건이 없습니다.",
+        )
+
+    if incident["status"] not in (
+        "SENT",
+        "RESOLVED",
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "기관에 전달된 사건만 "
+                "대응 완료 처리할 수 있습니다."
+            ),
+        )
+
+    # --------------------------------------------------------
+    # 2. 로그인 사용자의 기관 전달 건 잠금
+    # --------------------------------------------------------
+
+    recommendation = (
+        connection.execute(
+            """
+            SELECT
+                id,
+                agency_id,
+                recommendation_status
+            FROM incident_agency_recommendations
+            WHERE incident_id = %s
+              AND agency_id = %s
+            FOR UPDATE
+            """,
+            (
+                incident_id,
+                agency_id,
+            ),
+        )
+        .fetchone()
+    )
+
+    if recommendation is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "사건이 없거나 "
+                "소속 기관에 전달되지 않았습니다."
+            ),
+        )
+
+    previous_status = (
+        recommendation[
+            "recommendation_status"
+        ]
+    )
+
+    # 이미 완료된 요청은 같은 결과를 반환합니다.
+    if previous_status == "COMPLETED":
+        return {
+            "agency_recommendation_id":
+                recommendation["id"],
+            "agency_id":
+                recommendation["agency_id"],
+            "recommendation_status":
+                "COMPLETED",
+        }
+
+    if previous_status != "DELIVERED":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "전달 완료된 기관 사건만 "
+                "대응 완료 처리할 수 있습니다."
+            ),
+        )
+
+    # RESOLVED인데 아직 DELIVERED가 남아 있다면
+    # 정상적인 상태 조합이 아니므로 변경하지 않습니다.
+    if incident["status"] == "RESOLVED":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "이미 종료된 사건의 기관 상태를 "
+                "변경할 수 없습니다."
+            ),
+        )
+
+    # --------------------------------------------------------
+    # 3. DELIVERED → COMPLETED
+    # --------------------------------------------------------
+
+    completed = (
+        connection.execute(
+            """
+            UPDATE incident_agency_recommendations
+            SET recommendation_status = 'COMPLETED'
+            WHERE id = %s
+              AND recommendation_status = 'DELIVERED'
+            RETURNING
+                id AS agency_recommendation_id,
+                agency_id,
+                recommendation_status
+            """,
+            (
+                recommendation["id"],
+            ),
+        )
+        .fetchone()
+    )
+
+    if completed is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "기관 대응 완료 상태 변경에 "
+                "실패했습니다."
+            ),
+        )
+
+    return completed
+
+
+
+# ------------------------------------------------------------
 # LangGraph 추천 결과 저장
 # ------------------------------------------------------------
 
