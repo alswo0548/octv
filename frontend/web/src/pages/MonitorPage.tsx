@@ -1,30 +1,58 @@
 import { useState } from "react";
-import { mock, incidentById } from "@octv/shared";
+/** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
+import { formatSeoulTime, type WebIncidentSession } from "../incidentData";
 import {
-  Panel,
-  Pair,
-  Select,
-  ActionPreview,
-  type ShowModal,
-} from "../components/Primitives";
-import { Camera } from "../components/Camera";
+  useOperations,
+  monitoringLabels,
+  statusLabel,
+  type Cctv,
+} from "../operationsData";
+import { Panel, Pair, type ShowModal } from "../components/Primitives";
+import { LiveCamera } from "../components/LiveCamera";
 import { go } from "../routing/useRoute";
 export function MonitorPage({
-  initial = "CCTV-012",
-  show,
+  initial,
+  session,
 }: {
   initial?: string;
   show: ShowModal;
+  session: WebIncidentSession;
 }) {
-  const [id, setId] = useState(initial),
-    c = mock.cctvs.find((x) => x.id === id) || mock.cctvs[0],
-    source =
-      mock.incidents.find((x) => x.camera === id) || incidentById("SEL-001"),
-    d = { ...source, camera: c.id, location: c.region + " " + c.road };
+  const [id, setId] = useState(initial ?? "");
+  const [revision, setRevision] = useState(0);
+  const [query, setQuery] = useState("");
+  const [errorsOnly, setErrorsOnly] = useState(false);
+  const { data, loading, error } = useOperations<Cctv[]>(
+    session,
+    "/api/cctvs",
+    revision,
+  );
+  const rows = (data ?? []).filter(
+    (x) =>
+      (!errorsOnly || x.connection_status !== "CONNECTED") &&
+      `${x.external_cctv_id} ${x.name} ${x.address ?? ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  const c =
+    rows.find((x) => String(x.id) === id || x.external_cctv_id === id) ??
+    rows[0];
+  const cards: [string, number | string][] = [
+    ["전체 CCTV", data?.length ?? "–"],
+    ["감시 중", data?.filter((x) => x.is_monitored).length ?? "–"],
+    [
+      "연결됨",
+      data?.filter((x) => x.connection_status === "CONNECTED").length ?? "–",
+    ],
+    [
+      "연결 확인 필요",
+      data?.filter((x) => x.connection_status !== "CONNECTED").length ?? "–",
+    ],
+  ];
   return (
     <>
       <div className="stat-grid">
-        {mock.uiSnapshot.monitorCards.map(([t, n]) => (
+        {cards.map(([t, n]) => (
           <div className="panel stat-card" key={t}>
             <span>{t}</span>
             <strong>
@@ -35,31 +63,56 @@ export function MonitorPage({
         ))}
       </div>
       <div className="monitor-filter">
-        <Select label="연결 상태" options={["전체 CCTV", "연결 오류 CCTV"]} />
+        <label>
+          연결 상태
+          <select
+            value={String(errorsOnly)}
+            onChange={(e) => setErrorsOnly(e.target.value === "true")}
+          >
+            <option value="false">전체 CCTV</option>
+            <option value="true">연결 확인 필요</option>
+          </select>
+        </label>
         <label>
           검색
-          <input placeholder="CCTV ID / 위치 검색" />
+          <input
+            placeholder="CCTV ID / 위치 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </label>
       </div>
+      {loading && <p role="status">CCTV 상태 조회 중</p>}
+      {error && <p role="alert">{error}</p>}
+      <button className="secondary" onClick={() => setRevision((v) => v + 1)}>
+        현재 상태 새로고침
+      </button>
       <div className="monitor-layout">
         <Panel title="CCTV 목록" className="monitor-list-panel">
           <div className="camera-list">
-            {mock.cctvs.map((c) => (
+            {rows.map((camera) => (
               <button
-                key={c.id}
-                className={c.id === id ? "active" : ""}
-                onClick={() => setId(c.id)}
+                key={camera.external_cctv_id}
+                className={camera.id === c?.id ? "active" : ""}
+                onClick={() => setId(String(camera.id))}
               >
-                <strong>{c.id}</strong>
+                <strong>{camera.external_cctv_id}</strong>
                 <p>
-                  {c.region} {c.road}
+                  {camera.name} · {camera.address}
                 </p>
                 <span
-                  className={"status " + (c.connected ? "detect" : "check")}
+                  className={
+                    "status " +
+                    (camera.connection_status === "CONNECTED"
+                      ? "detect"
+                      : "check")
+                  }
                 >
-                  {c.connected ? "연결 정상" : "연결 끊김"}
+                  {statusLabel(camera.connection_status)}
                 </span>
-                <p className="camera-mode">{c.mode}</p>
+                <p className="camera-mode">
+                  {monitoringLabels[camera.monitored_mode ?? "OFF"]}
+                </p>
               </button>
             ))}
           </div>
@@ -68,36 +121,58 @@ export function MonitorPage({
           title="선택 CCTV 영상 및 분석 상태"
           className="monitor-detail-panel"
         >
-          <Camera incident={d} connected={c.connected} />
-          <div className="status-grid">
-            <dl>
-              <Pair
-                label="연결 / 분석"
-                value={c.connected ? "정상 / 분석 중" : "연결 끊김 / 분석 중지"}
-              />
-              <Pair
-                label="마지막 프레임"
-                value={mock.uiSnapshot.cameraStatus.lastFrame}
-              />
-              <Pair
-                label="영상 품질"
-                value={c.connected ? "양호" : "확인 불가"}
-              />
-            </dl>
-            <dl>
-              <Pair label="감시 모드" value={c.mode} />
-              <Pair
-                label="현재 분석 주기"
-                value={mock.uiSnapshot.cameraStatus.interval}
-              />
-              <Pair
-                label="위험 후보"
-                value={mock.uiSnapshot.cameraStatus.candidate}
-              />
-            </dl>
-          </div>
+          {!c && (
+            <div className="camera live-camera-empty">
+              {loading
+                ? "목록 조회 중"
+                : error
+                  ? "CCTV 목록을 조회하지 못했습니다."
+                  : "표시할 CCTV가 없습니다."}
+            </div>
+          )}
+          {c && (
+            <LiveCamera
+              key={`${session.version}:${c.id}:${c.is_monitored}`}
+              session={session}
+              camera={c}
+            />
+          )}
+          {c && (
+            <>
+              <div className="status-grid">
+                <dl>
+                  <Pair
+                    label="연결 / 분석"
+                    value={`${statusLabel(c.connection_status)} / ${statusLabel(c.analysis_status)}`}
+                  />
+                  <Pair
+                    label="마지막 프레임"
+                    value={
+                      c.last_frame_at
+                        ? formatSeoulTime(c.last_frame_at)
+                        : "수신 기록 없음"
+                    }
+                  />
+                  <Pair
+                    label="영상 품질"
+                    value={statusLabel(c.video_quality_status)}
+                  />
+                </dl>
+                <dl>
+                  <Pair
+                    label="감시 모드"
+                    value={monitoringLabels[c.monitored_mode ?? "OFF"]}
+                  />
+                  <Pair
+                    label="현재 분석 주기"
+                    value="Runtime 기준 · 현재 주기 미제공"
+                  />
+                  <Pair label="위험 후보" value="현재 후보 수 미제공" />
+                </dl>
+              </div>
+            </>
+          )}
           <div className="action-row">
-            <ActionPreview label="재연결 시도" show={show} />
             <button className="primary" onClick={() => go("settings")}>
               감시 기준 변경
             </button>

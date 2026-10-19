@@ -1,0 +1,217 @@
+/** 기존 경로 비교 레이아웃에 실제 추천 기관·저장 경로를 연결합니다. 경로 재계산·전달 상태 변경은 하지 않습니다. */
+import { useState } from "react";
+import { hazardLabel } from "@octv/shared";
+import type { IncidentDetailDto, WebIncidentSession } from "../incidentData";
+import { useOperations } from "../operationsData";
+import { LiveMap, geometryLines } from "../components/LiveMap";
+import { Badge, type ShowModal } from "../components/Primitives";
+import type { RouteResponse } from "../../../mobile/src/liveRoutes";
+
+type Agency = {
+  agency_id: number;
+  agency_name: string;
+  recommendation_rank: number;
+  recommendation_status: string;
+};
+export function LiveRoutesPage({
+  session,
+  incidentId,
+  openPicker,
+}: {
+  session: WebIncidentSession;
+  incidentId: number;
+  openPicker: () => void;
+  show: ShowModal;
+}) {
+  const [agencyId, setAgencyId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [revision, setRevision] = useState(0);
+  const incident = useOperations<IncidentDetailDto>(
+    session,
+    `/api/incidents/${incidentId}`,
+    revision,
+  );
+  const agencies = useOperations<{ items: Agency[] }>(
+    session,
+    `/api/agencies/incidents/${incidentId}/recommendations`,
+    revision,
+  );
+  const agency =
+    agencies.data?.items.find((a) => a.agency_id === agencyId) ??
+    agencies.data?.items[0];
+  const routes = useOperations<RouteResponse>(
+    session,
+    agency
+      ? `/api/routes/incidents/${incidentId}/agencies/${agency.agency_id}`
+      : null,
+    revision,
+  );
+  const active =
+    routes.data?.items.find((r) => r.id === selectedId) ??
+    routes.data?.items.find((r) => r.navigation_available) ??
+    routes.data?.items[0];
+  const lines = (routes.data?.items ?? []).flatMap((r) =>
+    geometryLines(r.id, r.route_path_json),
+  );
+  const error = incident.error ?? agencies.error ?? routes.error;
+  return (
+    <>
+      <a className="back-link" href="#/incidents">
+        ‹ 사건관리
+      </a>
+      <div className="page-heading">
+        <div>
+          <h2>
+            {incident.data
+              ? `${incident.data.incident_no} · ${hazardLabel(incident.data.hazard_type)}`
+              : "사건 경로 조회"}{" "}
+            {incident.data?.priority && (
+              <Badge priority={incident.data.priority} />
+            )}
+          </h2>
+          <p>{incident.data?.cctv_name}</p>
+        </div>
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {(incident.loading || agencies.loading || routes.loading) && (
+        <p role="status">저장된 경로 조회 중</p>
+      )}
+      <div className="section-title">
+        <h2>기관별 추천경로</h2>
+        <div className="action-row">
+          <button
+            className="secondary"
+            onClick={() => setRevision((v) => v + 1)}
+          >
+            다시 조회
+          </button>
+          <button
+            className="primary"
+            disabled={
+              !incident.data ||
+              !["CONFIRMED", "SENT"].includes(incident.data.status)
+            }
+            onClick={openPicker}
+          >
+            기관 선택·전달
+          </button>
+        </div>
+      </div>
+      <div
+        className="agency-tabs"
+        role="tablist"
+        aria-label="현재 경로 조회 기관"
+      >
+        {agencies.data?.items.map((a) => (
+          <button
+            key={a.agency_id}
+            role="tab"
+            aria-selected={agency?.agency_id === a.agency_id}
+            onClick={() => {
+              setAgencyId(a.agency_id);
+              setSelectedId(null);
+            }}
+          >
+            {a.agency_name}
+            <small>
+              추천 {a.recommendation_rank}순위 · {a.recommendation_status}
+            </small>
+          </button>
+        ))}
+      </div>
+      {agencies.data?.items.length === 0 && (
+        <p>추천된 기관이 없습니다. 분석 상태를 확인해주세요.</p>
+      )}
+      <p className="agency-origin">
+        현재 조회: <strong>{agency?.agency_name ?? "미선택"}</strong> →{" "}
+        {incident.data?.cctv_name ?? "사건 위치"}
+      </p>
+      <LiveMap
+        lines={lines}
+        selectedId={active?.id}
+        markers={
+          incident.data
+            ? [
+                {
+                  id: incidentId,
+                  label: incident.data.incident_no,
+                  longitude: incident.data.longitude,
+                  latitude: incident.data.latitude,
+                },
+              ]
+            : []
+        }
+        onSelect={setSelectedId}
+      />
+      <section className="panel page-section section-gap">
+        <div className="table-scroll">
+          <table className="route-table">
+            <caption>후보 경로 · {agency?.agency_name ?? "미선택"}</caption>
+            <thead>
+              <tr>
+                {[
+                  "후보",
+                  "거리 / 시간",
+                  "총점",
+                  "추천 근거 및 확인 정보",
+                  "판정",
+                ].map((t) => (
+                  <th key={t}>{t}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {routes.data?.items.map((r) => (
+                <tr
+                  key={r.id}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`경로 ${r.route_name} 확인`}
+                  className={
+                    (active?.id === r.id ? "chosen " : "") +
+                    (!r.navigation_available ? "blocked" : "")
+                  }
+                  onClick={() => setSelectedId(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setSelectedId(r.id);
+                  }}
+                >
+                  <td>{r.route_name}</td>
+                  <td>
+                    {(r.distance_m / 1000).toFixed(1)} km /{" "}
+                    {Math.ceil(r.duration_sec / 60)}분
+                  </td>
+                  <td>{r.total_score ?? "미평가"}</td>
+                  <td>
+                    {r.disqualify_reason ??
+                      (r.requires_review
+                        ? "통제 정보 추가 확인 필요"
+                        : "저장된 경로 평가")}
+                  </td>
+                  <td>{r.verification_status ?? "미확인"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {routes.data?.items.length === 0 && (
+          <p>저장된 경로가 없습니다. ({routes.data.result_status})</p>
+        )}
+        {active && (
+          <p className="route-feedback">
+            조회 중: {active.route_name} ·{" "}
+            {active.requires_review
+              ? "통제 미확인 — 현장 확인 필요"
+              : active.navigation_available
+                ? "저장된 평가 기준"
+                : "제외된 경로"}
+          </p>
+        )}
+        <p className="content-footnote">
+          현장 내비 실행은 기존 Android 카카오내비 기능에서 제공합니다. 외부
+          내비 경로는 다시 계산될 수 있습니다.
+        </p>
+      </section>
+    </>
+  );
+}

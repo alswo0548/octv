@@ -3,7 +3,7 @@
  * - 로그인 화면에서 검증해 전달한 관리자 세션만 실제 사건 API에 사용합니다.
  * - 실제 사건 ID를 선택하면 기존 delivery.ts에 전달합니다.
  * - 로그인 세션이 없으면 로그인 안내를 표시합니다.
- * - 기존 다른 페이지(CCTV·설정·통계)의 구현은 수정하지 않습니다.
+ * - 운영·CCTV·통계도 같은 관리자 세션으로 연결하며 기존 로그인·전달 흐름을 유지합니다.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRoute, go } from "./routing/useRoute";
@@ -13,6 +13,7 @@ import { LiveAgencyPicker } from "./components/AgencyPicker";
 import { AuthPage } from "./pages/AuthPage";
 import { LiveOverviewPage } from "./pages/LiveOverviewPage";
 import { LiveIncidentsPage } from "./pages/LiveIncidentsPage";
+import { LiveRoutesPage } from "./pages/LiveRoutesPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { StatsPage } from "./pages/StatsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -41,6 +42,13 @@ export default function App() {
   const route = useRoute();
   const [raw, id] = route.split("/");
   const page = titles[raw] ? raw : "login";
+  const routeIncidentId =
+    page === "routes" &&
+    /^\d+$/.test(id ?? "") &&
+    Number.isSafeInteger(Number(id)) &&
+    Number(id) > 0
+      ? Number(id)
+      : null;
   const session = useSyncExternalStore(
     subscribeWebIncidentSession,
     getWebIncidentSession,
@@ -64,15 +72,19 @@ export default function App() {
     if (
       !session ||
       !api ||
-      selectedId === null ||
-      (page !== "incidents" && page !== "overview")
+      (routeIncidentId ?? selectedId) === null ||
+      !["incidents", "overview", "routes"].includes(page)
     ) {
       setDeliveryContext(null);
       return;
     }
-    setDeliveryContext({ user: session.user, api, incidentId: selectedId });
+    setDeliveryContext({
+      user: session.user,
+      api,
+      incidentId: (routeIncidentId ?? selectedId)!,
+    });
     return () => setDeliveryContext(null);
-  }, [session, selectedId, page]);
+  }, [session, selectedId, page, routeIncidentId]);
 
   useEffect(() => {
     document.title = "OCTV · " + titles[page];
@@ -115,10 +127,9 @@ export default function App() {
   );
   const routePending = (
     <section className="panel live-placeholder" role="status">
-      <h2>실제 경로 화면 연결 대기</h2>
+      <h2>조회할 사건을 선택해주세요.</h2>
       <p>
-        후속-02의 경로 조회 API는 준비돼 있습니다. 지도·경로 비교 화면은
-        후속-05에서 연결하며, 샘플 A/B/C 경로를 실제 경로로 표시하지 않습니다.
+        사건 상세에서 경로 비교를 열면 해당 사건의 저장된 경로를 조회합니다.
       </p>
       <button className="secondary" onClick={() => go("incidents")}>
         사건관리로 돌아가기
@@ -162,15 +173,57 @@ export default function App() {
             loginRequired
           )
         ) : page === "routes" ? (
-          routePending
+          session ? (
+            routeIncidentId ? (
+              <LiveRoutesPage
+                key={`${session.version}:${routeIncidentId}:${refreshKey}`}
+                session={session}
+                incidentId={routeIncidentId}
+                openPicker={() => setPicker(true)}
+                show={setModal}
+              />
+            ) : (
+              routePending
+            )
+          ) : (
+            loginRequired
+          )
         ) : page === "monitor" ? (
-          <MonitorPage key={id} initial={id} show={setModal} />
+          session ? (
+            <MonitorPage
+              key={`${session.version}:${id}`}
+              session={session}
+              initial={id}
+              show={setModal}
+            />
+          ) : (
+            loginRequired
+          )
         ) : page === "stats" ? (
-          <StatsPage />
+          session ? (
+            <StatsPage key={session.version} session={session} />
+          ) : (
+            loginRequired
+          )
         ) : page === "settings" ? (
-          <SettingsPage tab={id} show={setModal} />
+          session ? (
+            <SettingsPage
+              key={session.version}
+              session={session}
+              tab={id}
+              show={setModal}
+            />
+          ) : (
+            loginRequired
+          )
+        ) : session ? (
+          <TargetsPage
+            key={session.version}
+            session={session}
+            show={setModal}
+          />
         ) : (
-          <TargetsPage show={setModal} />
+          loginRequired
         )}
       </WebLayout>
       {picker && session && <LiveAgencyPicker close={closePicker} />}

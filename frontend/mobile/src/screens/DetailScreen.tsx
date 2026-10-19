@@ -21,7 +21,8 @@ const hazardNames: Record<string, string> = {
   fallen_tree: "쓰러진 나무·전봇대",
   structural_damage: "시설물 파손",
   road_obstacle: "도로 장애물",
-  sinkhole: "싱크홀",
+  severe_road_damage: "심각한 도로 파손",
+  sinkhole: "sinkhole · 과거 유형",
 };
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.

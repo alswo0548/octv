@@ -4,8 +4,13 @@
  * 샘플 사건번호 SEL-001, 샘플 영상·경로·지원 요청을 실제 서버 결과에 섞지 않습니다.
  */
 import { useEffect, useState } from "react";
-import type { IncidentDto, PageDto } from "@octv/shared";
-import { type ShowModal } from "../components/Primitives";
+import {
+  hazardLabel,
+  hazardLabels,
+  type IncidentDto,
+  type PageDto,
+} from "@octv/shared";
+import { Badge, type ShowModal } from "../components/Primitives";
 import { LiveSupportRequestsPanel } from "../components/LiveSupportRequestsPanel";
 import {
   changeServerIncident,
@@ -17,6 +22,9 @@ import {
   type IncidentDetailDto,
   type WebIncidentSession,
 } from "../incidentData";
+import { IncidentContext } from "../components/IncidentContext";
+import { statusLabel } from "../operationsData";
+import { go } from "../routing/useRoute";
 import "../styles/live-incidents.css";
 
 type Props = {
@@ -91,22 +99,39 @@ function RepresentativeImage({
     };
   }, [incident.id, incident.representative_image_updated_at, session.version]);
   return (
-    <section className="panel live-incident-image">
-      <h2>사건 대표 이미지</h2>
-      {url ? (
-        <img src={url} alt={`${incident.incident_no} 사건 대표 JPEG`} />
-      ) : (
-        <p className="subtle" role="status">
-          {unavailable
-            ? "대표 이미지를 조회할 수 없습니다."
-            : incident.representative_image_updated_at
-              ? "대표 이미지 불러오는 중"
-              : "저장된 대표 이미지가 없습니다."}
-        </p>
-      )}
-      <p className="subtle">
-        실시간 LIVE 영상이 아닌 저장된 사건 이미지입니다.
-      </p>
+    <section className="panel camera-panel live-incident-image">
+      <div className="camera stored-camera">
+        <div className="camera-overlay-label">
+          저장 이미지 · {incident.cctv_name}
+        </div>
+        {url ? (
+          <img
+            src={url}
+            onError={() => {
+              setUnavailable(true);
+              setUrl(null);
+            }}
+            alt={`${incident.incident_no} 사건 대표 JPEG`}
+          />
+        ) : (
+          <p className="live-image-empty" role="status">
+            {unavailable
+              ? "대표 이미지를 조회할 수 없습니다."
+              : incident.representative_image_updated_at
+                ? "대표 이미지 불러오는 중"
+                : "저장된 대표 이미지가 없습니다."}
+          </p>
+        )}
+      </div>
+      <div className="camera-caption">
+        <span>사건 대표 이미지 · 저장 시점 기준</span>
+      </div>
+      <button
+        className="primary camera-live-button"
+        onClick={() => go(`monitor/${incident.cctv_id}`)}
+      >
+        실시간 CCTV 영상
+      </button>
     </section>
   );
 }
@@ -242,23 +267,26 @@ export function LiveIncidentsPage({
       <section className="panel list-panel">
         <div className="section-title">
           <h2>
-            실제 사건 목록 <span className="count">{list?.total ?? "–"}</span>
+            사건 목록 <span className="count">{list?.total ?? "–"}</span>
           </h2>
-          <span className="subtle">PostgreSQL · 최신 탐지순</span>
+          <span className="subtle">탐지 시각 기준 · 한국시간</span>
         </div>
         <div className="filters live-filters">
-          <label>
-            우선순위
-            <select
-              value={priority}
-              onChange={(e) => resetPage(setPriority)(e.target.value)}
-            >
-              <option value="">전체</option>
-              <option value="P1">P1</option>
-              <option value="P2">P2</option>
-              <option value="P3">P3</option>
-            </select>
-          </label>
+          <div className="priority-filter">
+            <label>우선순위</label>
+            <div className="segments">
+              {["", "P1", "P2", "P3"].map((value) => (
+                <button
+                  key={value}
+                  className={priority === value ? "selected" : ""}
+                  aria-pressed={priority === value}
+                  onClick={() => resetPage(setPriority)(value)}
+                >
+                  {value || "전체"}
+                </button>
+              ))}
+            </div>
+          </div>
           <label>
             상태
             <select
@@ -280,11 +308,11 @@ export function LiveIncidentsPage({
               onChange={(e) => resetPage(setHazard)(e.target.value)}
             >
               <option value="">유형 전체</option>
-              <option value="flood">침수</option>
-              <option value="fallen_tree">쓰러진 나무</option>
-              <option value="road_obstacle">도로 장애물</option>
-              <option value="severe_road_damage">심각한 도로 파손</option>
-              <option value="sinkhole">싱크홀</option>
+              {Object.entries(hazardLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -356,9 +384,15 @@ export function LiveIncidentsPage({
                   aria-label={`${row.incident_no} 상세 보기`}
                 >
                   <td>{row.incident_no}</td>
-                  <td>{row.hazard_type}</td>
-                  <td>{row.priority ?? "분석 대기"}</td>
-                  <td>{row.status}</td>
+                  <td>{hazardLabel(row.hazard_type)}</td>
+                  <td>
+                    {row.priority ? (
+                      <Badge priority={row.priority} />
+                    ) : (
+                      "분석 대기"
+                    )}
+                  </td>
+                  <td>{statusLabel(row.status)}</td>
                   <td>{row.cctv_name}</td>
                   <td>{formatSeoulTime(row.detected_at)}</td>
                 </tr>
@@ -405,10 +439,10 @@ export function LiveIncidentsPage({
       </section>
       <section className="selected-heading">
         <div>
-          <span className="eyebrow">SERVER INCIDENT DETAIL</span>
+          <span className="eyebrow">SELECTED INCIDENT</span>
           <h2>
             {detail
-              ? `${detail.hazard_type} · ${detail.incident_no}`
+              ? `${hazardLabel(detail.hazard_type)} · ${detail.incident_no}`
               : "선택 사건 상세"}
           </h2>
         </div>
@@ -420,9 +454,53 @@ export function LiveIncidentsPage({
         <p role="status">선택 사건 상세를 조회하고 있습니다.</p>
       )}
       {detailError && <p role="alert">{detailError}</p>}
+      {!detail && (
+        <div
+          className="detail-grid restored-detail-grid"
+          aria-busy={loadingDetail}
+        >
+          <section className="panel camera-panel">
+            <div className="camera">
+              <div className="live-image-empty">
+                {loadingDetail
+                  ? "선택 사건 조회 중"
+                  : detailError
+                    ? "사건 정보를 불러오지 못했습니다."
+                    : "조회할 사건을 선택해주세요."}
+              </div>
+            </div>
+            <div className="camera-caption">사건 대표 이미지</div>
+          </section>
+          <section className="panel info">
+            <h2>사건 정보</h2>
+            <p className="subtle">
+              {loadingDetail ? "조회 중" : "선택 사건 없음"}
+            </p>
+          </section>
+          <section className="panel risk">
+            <h2>위험도 · 우선순위</h2>
+            <div className="scores">
+              <div>
+                <strong>
+                  –<small> / 100</small>
+                </strong>
+              </div>
+              <div>
+                <strong>
+                  –<small> / 100</small>
+                </strong>
+              </div>
+            </div>
+          </section>
+          <section className="panel external">
+            <h2>외부 상황</h2>
+            <p className="subtle">조회 대기</p>
+          </section>
+        </div>
+      )}
       {detail && (
         <>
-          <div className="detail-grid live-detail-grid">
+          <div className="detail-grid restored-detail-grid">
             <RepresentativeImage
               key={detail.id}
               session={session}
@@ -455,10 +533,23 @@ export function LiveIncidentsPage({
                   <dd>{formatSeoulTime(detail.last_detected_at)}</dd>
                 </div>
                 <div>
-                  <dt>모델 탐지 신뢰도</dt>
-                  <dd>{(detail.confidence * 100).toFixed(1)}%</dd>
+                  <dt>상태</dt>
+                  <dd>{statusLabel(detail.status)}</dd>
                 </div>
               </dl>
+              <div className="analysis-note">
+                <span>AI DETECTION</span>
+                <div>
+                  <strong>
+                    {(detail.confidence * 100).toFixed(1)}
+                    <small>%</small>
+                  </strong>
+                  <div className="confidence-track">
+                    <i style={{ width: `${detail.confidence * 100}%` }} />
+                  </div>
+                </div>
+                <small>모델 탐지 신뢰도</small>
+              </div>
               <div className="live-actions">
                 {detail.status === "DETECTED" && (
                   <button
@@ -483,29 +574,48 @@ export function LiveIncidentsPage({
               </div>
             </section>
             <section className="panel risk live-risk">
-              <h2>LangGraph 판단 근거</h2>
-              <dl>
+              <div className="section-title">
+                <h2>위험도 · 우선순위</h2>
+                <span className="subtle">
+                  {detail.analysis_status === "READY"
+                    ? "분석 완료"
+                    : "분석 대기"}
+                </span>
+              </div>
+              <div className="scores">
                 <div>
-                  <dt>분석 상태</dt>
-                  <dd>{detail.analysis_status}</dd>
+                  <label>
+                    위험도{" "}
+                    <span>
+                      {detail.risk_level
+                        ? statusLabel(detail.risk_level)
+                        : "미분석"}
+                    </span>
+                  </label>
+                  <strong>
+                    {detail.risk_score ?? "–"}
+                    <small> / 100</small>
+                  </strong>
+                  <div className="bar red">
+                    <i style={{ width: `${detail.risk_score ?? 0}%` }} />
+                  </div>
                 </div>
                 <div>
-                  <dt>위험도</dt>
-                  <dd>
-                    {detail.risk_level ?? "미분석"} {detail.risk_score ?? ""}
-                  </dd>
+                  <label>
+                    대응 우선순위 <span>{detail.priority ?? "미분석"}</span>
+                  </label>
+                  <strong>
+                    {detail.priority_score ?? "–"}
+                    <small> / 100</small>
+                  </strong>
+                  <div className="bar blue">
+                    <i style={{ width: `${detail.priority_score ?? 0}%` }} />
+                  </div>
                 </div>
-                <div>
-                  <dt>우선순위</dt>
-                  <dd>
-                    {detail.priority ?? "미분석"} {detail.priority_score ?? ""}
-                  </dd>
-                </div>
-                <div>
-                  <dt>규칙 버전</dt>
-                  <dd>{detail.rule_version ?? "없음"}</dd>
-                </div>
-              </dl>
+              </div>
+              <p className="content-footnote">
+                규칙: {detail.rule_version ?? "분석 결과 없음"}
+              </p>
               {detail.risk_breakdown_json && (
                 <JsonDetails
                   title="위험도 계산 근거·외부 Context"
@@ -522,11 +632,17 @@ export function LiveIncidentsPage({
                 <p>분석 결과가 아직 저장되지 않았습니다.</p>
               )}
             </section>
+            <IncidentContext incident={detail} />
           </div>
           <section className="panel page-section live-delivery">
             <div className="section-title">
               <h2>기관 추천 · 선택 전달</h2>
-              <span className="subtle">기존 기관 추천/전달 API 사용</span>
+              <button
+                className="secondary"
+                onClick={() => go(`routes/${detail.id}`)}
+              >
+                경로 비교 상세
+              </button>
             </div>
             <p>
               사건 상태를 확인한 뒤 실제 추천 기관을 조회하고 사람의 선택으로

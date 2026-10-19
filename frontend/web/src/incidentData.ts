@@ -135,6 +135,9 @@ async function read<T>(
   return response;
 }
 
+// 운영 화면도 동일한 JWT·세션 취소 경계를 사용합니다.
+export { read as requestWebApi };
+
 export async function listServerIncidents(
   sessionVersion: number,
   filters: IncidentFilters,

@@ -32,10 +32,12 @@
 .live-incident-image img {
   display: block;
   width: 100%;
-  height: 240px;
+  height: 100%;
   object-fit: contain;
   background: #07131d;
-  margin-top: 14px;
+  margin: 0;
+  filter: none;
+  transform: none;
 }
 .live-incident-image .subtle {
   margin: 12px 0 0;
@@ -93,6 +95,9 @@
   margin-top: 10px;
 }
 @media (max-width: 900px) {
+  .detail-grid.restored-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .live-filters {
     flex-wrap: wrap;
   }
@@ -104,5 +109,125 @@
   }
   .live-detail-grid .panel {
     margin-bottom: 14px;
+  }
+}
+
+/* 기존 카드 배치·영상 비율을 유지하면서 빈 상태와 실제 재생을 구분합니다. */
+.restored-detail-grid > .info,
+.restored-detail-grid > .risk,
+.restored-detail-grid > .external {
+  min-width: 0;
+}
+.stored-camera,
+.live-camera {
+  background: #0a1821;
+}
+.live-image-empty,
+.live-camera-empty {
+  height: 100%;
+  min-height: 285px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  margin: 0;
+}
+.camera-overlay-label {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 1;
+  font-size: 11px;
+  color: #d1edf3;
+  background: #07131dcc;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.live-camera video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.live-risk h2 {
+  margin-top: 0;
+}
+.setting-item .content-footnote {
+  margin: 0 0 16px;
+  font-size: 11px;
+}
+.setting-item input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.inline-filter {
+  flex-wrap: wrap;
+}
+.hourly-bars {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(22px, 1fr));
+  gap: 5px;
+  align-items: end;
+  overflow-x: auto;
+  min-height: 170px;
+}
+.hourly-bars > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: end;
+  height: 150px;
+  font-size: 11px;
+}
+.hourly-bars i {
+  display: block;
+  width: 65%;
+  min-height: 1px;
+  background: #69d5e7;
+  border-radius: 3px 3px 0 0;
+}
+.hourly-bars span {
+  color: var(--muted);
+}
+.map-empty {
+  height: 430px;
+  display: grid;
+  place-content: center;
+  color: var(--muted);
+}
+.map-caption {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 8px;
+  font-size: 11px;
+}
+.live-filters .priority-filter {
+  min-width: 170px;
+}
+.live-filters > form {
+  min-width: 0;
+}
+.live-filters > form input {
+  min-width: 0;
+}
+@media (max-width: 1100px) {
+  .live-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .live-filters > form {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 700px) {
+  .live-filters {
+    grid-template-columns: 1fr;
+  }
+  .selected-heading {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .map-caption {
+    flex-wrap: wrap;
   }
 }
