@@ -1,15 +1,6 @@
 """
-기관 목록 조회 및 관제 관리자의 기관 추천 조회·전달 작업을 처리.
-Service는 기관 전달이 가능한지 판단하고, Reposittory에 실제 DB 작업을 요청
-
-파일 흐름
-1. 기관 추천 조회·전달 요청은 활성 관제 관리자 권한을 다시 확인합니다.
-2. 기존 DB 연결 한 개에서 추천·경로 조회 또는 기관 전달·DB 알림 저장을 수행합니다.
-3. 전달 결과를 검증한 뒤 트랜잭션 commit이 끝나야 성공 응답을 반환합니다.
-4. commit 후 알림 ID만 기존 Celery에 등록합니다. 큐 오류로 DB 저장을 되돌리지 않습니다.
-
-주요 기능
-- 기존 get_connection() 사용, 관리자 권한 확인, 전체 성공 또는 전체 rollback
+기관 목록 조회와 추천·경로 조회,
+관제 관리자의 기관 전달 작업을 처리합니다.
 """
 
 import logging
@@ -17,54 +8,234 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from ..db.session import get_connection
-from . import repository, schemas
+from ..db.session import (
+    get_connection,
+)
+from . import (
+    repository,
+    schemas,
+)
 
-log = logging.getLogger(__name__) # 오류 기록용 Python 모듈
+
+log = logging.getLogger(
+    __name__
+)
 
 
-# DB 연결을 열고 Repository의 기관 목록을 반환합니다.
+# ------------------------------------------------------------
+# 회원가입용 기관 목록
+# ------------------------------------------------------------
+
 def list_agencies():
     with get_connection() as connection:
-        return repository.list_agencies(connection)
+        return repository.list_agencies(
+            connection
+        )
 
 
-# Router를 통하지 않고 호출해도 비활성 계정·기관 사용자는 전달하지 못하게 확인.
-# 기관 전달은 관제 관리자만 실행할 수 있도록 제한
-def _require_admin(user: dict[str, Any]) -> None:
-    if user.get("role") != "CONTROL_ADMIN" or user.get("is_active") is not True:
-        raise HTTPException(status_code=403, detail="활성 관제 관리자 권한이 필요합니다.")
+# ------------------------------------------------------------
+# 공통 권한 확인
+# ------------------------------------------------------------
+
+def _recommendation_scope(
+    user: dict[str, Any],
+) -> int | None:
+    """
+    추천기관/경로 조회 범위를 결정한다.
+
+    CONTROL_ADMIN
+        → None
+        → 모든 추천기관 조회
+
+    AGENCY_STAFF / RESPONDER
+        → 자신의 agency_id
+        → 전달된 자기 기관 추천만 조회
+    """
+
+    if (
+        user.get(
+            "is_active"
+        )
+        is not True
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "활성 사용자만 "
+                "접근할 수 있습니다."
+            ),
+        )
+
+    role = user.get(
+        "role"
+    )
+
+    if (
+        role
+        == "CONTROL_ADMIN"
+    ):
+        return None
+
+    if role in (
+        "AGENCY_STAFF",
+        "RESPONDER",
+    ):
+        agency_id = user.get(
+            "agency_id"
+        )
+
+        if agency_id is None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "소속 기관 정보가 "
+                    "필요합니다."
+                ),
+            )
+
+        return int(
+            agency_id
+        )
+
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "접근 권한이 없습니다."
+        ),
+    )
 
 
-# 관리자 권한 확인 후, LangGraph가 기존 DB에 저장해 둔 기관 추천과 경로 후보만 조회합니다.
-def list_recommendations(incident_id: int, user: dict[str, Any]) -> schemas.DeliveryCandidatesResponse:
-    _require_admin(user)
+def _require_admin(
+    user: dict[str, Any],
+) -> None:
+    """
+    기관 전달은 관제 관리자만 가능하다.
+    """
+
+    if (
+        user.get(
+            "role"
+        )
+        != "CONTROL_ADMIN"
+        or user.get(
+            "is_active"
+        )
+        is not True
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "활성 관제 관리자 "
+                "권한이 필요합니다."
+            ),
+        )
+
+
+# ------------------------------------------------------------
+# 추천기관 / 경로 조회
+# ------------------------------------------------------------
+
+def list_recommendations(
+    incident_id: int,
+    user: dict[str, Any],
+) -> schemas.DeliveryCandidatesResponse:
+    """
+    로그인 사용자의 역할에 따라
+    추천기관 및 경로 조회 범위를 제한한다.
+    """
+
+    agency_id = (
+        _recommendation_scope(
+            user
+        )
+    )
+
     with get_connection() as connection:
-        result = repository.list_recommendations(connection, incident_id)
-        return schemas.DeliveryCandidatesResponse.model_validate(result)
+        result = (
+            repository.list_recommendations(
+                connection,
+                incident_id,
+                agency_id=agency_id,
+            )
+        )
+
+    return (
+        schemas.DeliveryCandidatesResponse
+        .model_validate(
+            result
+        )
+    )
 
 
-# 관리자 권한 확인 후 선택 기관 상태 변경과 사용자 DB 알림을 한 트랜잭션으로 처리합니다.
+# ------------------------------------------------------------
+# 기관 전달
+# ------------------------------------------------------------
+
 def deliver(
-    incident_id: int, body: schemas.DeliveryRequest, user: dict[str, Any],
+    incident_id: int,
+    body: schemas.DeliveryRequest,
+    user: dict[str, Any],
 ) -> schemas.DeliveryResponse:
-    _require_admin(user)
+    """
+    관제 관리자가 선택한 기관에 사건을 전달한다.
+    """
+
+    _require_admin(
+        user
+    )
+
     with get_connection() as connection:
-        result, notification_ids = repository.save_delivery(connection, incident_id, body.selections)
-        # commit 전에 응답 형식을 검사해 저장은 됐는데 응답 데이터만 잘못된 상황을 막습니다.
-        response = schemas.DeliveryResponse.model_validate(result)
-        if response.created_notification_count != len(notification_ids):
-            raise RuntimeError("생성된 DB 알림 개수가 처리 결과와 다릅니다.")
+        (
+            result,
+            notification_ids,
+        ) = (
+            repository.save_delivery(
+                connection,
+                incident_id,
+                body.selections,
+            )
+        )
 
-    # get_connection() 정상 종료 시 commit되며 오류 시 rollback합니다.
-    # 기관 전달은 저장됐는데 응답 검사만 실패하는 상황을 줄이기 위해, commit 전에 검증하는 구조
+        # commit 전에 응답 구조 검증
+        response = (
+            schemas.DeliveryResponse
+            .model_validate(
+                result
+            )
+        )
+
+        if (
+            response.created_notification_count
+            != len(
+                notification_ids
+            )
+        ):
+            raise RuntimeError(
+                "생성된 DB 알림 개수가 "
+                "처리 결과와 다릅니다."
+            )
+
+    # 기존 기관 전달 이후 Push 로직은 보존한다.
     try:
-        # 순환 import와 Worker 설정 의존성을 피하려고 COMMIT 이후 호출할 때만 가져옵니다.
-        from ..notifications.service import enqueue_notification_pushes
+        from ..notifications.service import (
+            enqueue_notification_pushes,
+        )
 
-        response.push_status = enqueue_notification_pushes(notification_ids)
+        response.push_status = (
+            enqueue_notification_pushes(
+                notification_ids
+            )
+        )
+
     except Exception:
-        # DB 저장 성공과 큐 등록 확인은 별개입니다. 원문 예외·토큰·URL은 기록하지 않습니다.
-        log.warning("push_enqueue_unconfirmed incident_id=%s", incident_id)
-        response.push_status = "QUEUE_UNCONFIRMED"
+        log.warning(
+            "push_enqueue_unconfirmed "
+            "incident_id=%s",
+            incident_id,
+        )
+
+        response.push_status = (
+            "QUEUE_UNCONFIRMED"
+        )
+
     return response

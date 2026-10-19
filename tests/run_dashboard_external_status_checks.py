@@ -20,6 +20,17 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 
+ADMIN_USER = {
+    "id": -1,
+    "email": "dashboard-test@octv.local",
+    "name": "Dashboard Test Admin",
+    "role": "CONTROL_ADMIN",
+    "agency_id": None,
+    "notification_enabled": True,
+    "is_active": True,
+}
+
+
 ROOT = Path(
     __file__
 ).resolve().parents[1]
@@ -315,7 +326,8 @@ def _check_external_status():
             ):
                 result = (
                     service.get_external_status(
-                        incident_id
+                        incident_id,
+                        user=ADMIN_USER,
                     )
                 )
 
