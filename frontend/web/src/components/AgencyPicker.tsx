@@ -337,8 +337,8 @@ function LiveDeliveryPicker({
         </button>
       </div>
       <p className="agency-help">
-        서버에서 사건 정보와 추천 기관을 다시 조회했습니다. 이 창의
-        사건번호와 CCTV를 확인한 뒤 전달 기관을 선택해 주세요.
+        서버에서 사건 정보와 추천 기관을 다시 조회했습니다. 이 창의 사건번호와
+        CCTV를 확인한 뒤 전달 기관을 선택해 주세요.
       </p>
       {loading && (
         <p role="status">
@@ -511,10 +511,17 @@ export function LiveAgencyPicker({ close }: { close: () => void }) {
   return (
     <dialog ref={ref} aria-label="실제 기관 선택·전달" onCancel={close}>
       {context ? (
-        <LiveDeliveryPicker key={context.version} context={context} close={close} />
+        <LiveDeliveryPicker
+          key={context.version}
+          context={context}
+          close={close}
+        />
       ) : (
-        <p role="status">사건·로그인 연결이 변경됐습니다. 창을 닫고 다시 조회해 주세요.
-          <button className="secondary" onClick={close}>닫기</button>
+        <p role="status">
+          사건·로그인 연결이 변경됐습니다. 창을 닫고 다시 조회해 주세요.
+          <button className="secondary" onClick={close}>
+            닫기
+          </button>
         </p>
       )}
     </dialog>

@@ -26,9 +26,15 @@ import {
 } from "./incidentData";
 
 const titles: Record<string, string> = {
-  login: "로그인", signup: "회원가입", overview: "통합관제", incidents: "사건관리",
-  routes: "사건관리 · 경로 평가", monitor: "CCTV 모니터링",
-  stats: "CCTV 운영통계", settings: "시스템 설정", targets: "대상 CCTV 설정",
+  login: "로그인",
+  signup: "회원가입",
+  overview: "통합관제",
+  incidents: "사건관리",
+  routes: "사건관리 · 경로 평가",
+  monitor: "CCTV 모니터링",
+  stats: "CCTV 운영통계",
+  settings: "시스템 설정",
+  targets: "대상 CCTV 설정",
 };
 
 export default function App() {
@@ -56,7 +62,9 @@ export default function App() {
   useEffect(() => {
     const api = session ? getWebIncidentApi(session.version) : null;
     if (
-      !session || !api || selectedId === null ||
+      !session ||
+      !api ||
+      selectedId === null ||
       (page !== "incidents" && page !== "overview")
     ) {
       setDeliveryContext(null);
@@ -66,7 +74,9 @@ export default function App() {
     return () => setDeliveryContext(null);
   }, [session, selectedId, page]);
 
-  useEffect(() => { document.title = "OCTV · " + titles[page]; }, [page]);
+  useEffect(() => {
+    document.title = "OCTV · " + titles[page];
+  }, [page]);
 
   // 인증 화면의 JWT 삭제 책임은 기존 로그인 담당 logout 함수에 있습니다.
   const logout = () => {
@@ -94,33 +104,63 @@ export default function App() {
   const loginRequired = (
     <section className="panel live-placeholder" role="status">
       <h2>실제 사건 조회를 위한 로그인 연결 대기</h2>
-      <p>샘플 사건을 보여주지 않습니다. 인증 담당 코드에서 검증한 관리자 세션을 incidentData.ts에 전달하면 실제 DB 사건 목록이 표시됩니다.</p>
-      <button className="secondary" onClick={() => go("login")}>로그인 화면으로 이동</button>
+      <p>
+        샘플 사건을 보여주지 않습니다. 인증 담당 코드에서 검증한 관리자 세션을
+        incidentData.ts에 전달하면 실제 DB 사건 목록이 표시됩니다.
+      </p>
+      <button className="secondary" onClick={() => go("login")}>
+        로그인 화면으로 이동
+      </button>
     </section>
   );
   const routePending = (
     <section className="panel live-placeholder" role="status">
       <h2>실제 경로 화면 연결 대기</h2>
-      <p>후속-02의 경로 조회 API는 준비돼 있습니다. 지도·경로 비교 화면은 후속-05에서 연결하며, 샘플 A/B/C 경로를 실제 경로로 표시하지 않습니다.</p>
-      <button className="secondary" onClick={() => go("incidents")}>사건관리로 돌아가기</button>
+      <p>
+        후속-02의 경로 조회 API는 준비돼 있습니다. 지도·경로 비교 화면은
+        후속-05에서 연결하며, 샘플 A/B/C 경로를 실제 경로로 표시하지 않습니다.
+      </p>
+      <button className="secondary" onClick={() => go("incidents")}>
+        사건관리로 돌아가기
+      </button>
     </section>
   );
 
   return (
     <>
-      <WebLayout page={page} title={titles[page]} show={setModal} onLogout={logout}>
+      <WebLayout
+        page={page}
+        title={titles[page]}
+        show={setModal}
+        onLogout={logout}
+      >
         {page === "login" || page === "signup" ? (
           <AuthPage key={page} signup={page === "signup"} show={setModal} />
         ) : page === "overview" ? (
-          session ? <LiveOverviewPage key={session.version} session={session} openIncident={openIncident} /> : loginRequired
+          session ? (
+            <LiveOverviewPage
+              key={session.version}
+              session={session}
+              openIncident={openIncident}
+            />
+          ) : (
+            loginRequired
+          )
         ) : page === "incidents" ? (
           session ? (
             <LiveIncidentsPage
-              key={session.version} session={session} selectedId={selectedId} onSelect={setSelectedId}
-              openPicker={() => setPicker(true)} show={setModal}
-              refreshKey={refreshKey} onRefresh={refresh}
+              key={session.version}
+              session={session}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              openPicker={() => setPicker(true)}
+              show={setModal}
+              refreshKey={refreshKey}
+              onRefresh={refresh}
             />
-          ) : loginRequired
+          ) : (
+            loginRequired
+          )
         ) : page === "routes" ? (
           routePending
         ) : page === "monitor" ? (

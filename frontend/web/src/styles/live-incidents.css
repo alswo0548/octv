@@ -1,23 +1,108 @@
 /* 후속-03: 실제 사건 조회 화면 전용. 기존 샘플 화면 스타일에 영향 없음. */
-.live-filters { flex-wrap: wrap; align-items: flex-end; }
-.live-filters > label { display: flex; flex-direction: column; gap: 6px; }
-.live-filters > form { display: flex; align-items: flex-end; gap: 8px; }
-.live-filters > form label { display: flex; flex-direction: column; gap: 6px; }
-.live-filters select, .live-filters input { min-height: 37px; }
-.live-detail-grid { align-items: start; }
-.live-detail-grid .panel { padding: 20px; min-width: 0; }
-.live-incident-image img { display: block; width: 100%; height: 240px; object-fit: contain; background: #07131d; margin-top: 14px; }
-.live-incident-image .subtle { margin: 12px 0 0; }
-.live-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
-.live-json { margin-top: 14px; }
-.live-json summary { cursor: pointer; color: #a8dce9; }
-.live-json pre { max-height: 260px; overflow: auto; padding: 10px; background: #0b1925; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.live-delivery { margin-top: 18px; }
-.live-delivery .subtle { margin-top: 10px; }
-.live-overview-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 18px; }
-.live-source-label { font-size: 21px !important; }
-.live-placeholder { padding: 30px; }
-.live-placeholder h2 { margin: 0 0 12px; }
-.live-placeholder p { color: var(--muted); }
-.live-placeholder button { margin-top: 10px; }
-@media (max-width: 900px) { .live-filters { flex-wrap: wrap; } .live-filters > form { flex-wrap: wrap; } .live-detail-grid { display: block; } .live-detail-grid .panel { margin-bottom: 14px; } }
+.live-filters {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.live-filters > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.live-filters > form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.live-filters > form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.live-filters select,
+.live-filters input {
+  min-height: 37px;
+}
+.live-detail-grid {
+  align-items: start;
+}
+.live-detail-grid .panel {
+  padding: 20px;
+  min-width: 0;
+}
+.live-incident-image img {
+  display: block;
+  width: 100%;
+  height: 240px;
+  object-fit: contain;
+  background: #07131d;
+  margin-top: 14px;
+}
+.live-incident-image .subtle {
+  margin: 12px 0 0;
+}
+.live-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.live-json {
+  margin-top: 14px;
+}
+.live-json summary {
+  cursor: pointer;
+  color: #a8dce9;
+}
+.live-json pre {
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px;
+  background: #0b1925;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.live-delivery {
+  margin-top: 18px;
+}
+.live-delivery .subtle {
+  margin-top: 10px;
+}
+.live-overview-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+.live-source-label {
+  font-size: 21px !important;
+}
+.live-placeholder {
+  padding: 30px;
+}
+.live-placeholder h2 {
+  margin: 0 0 12px;
+}
+.live-placeholder p {
+  color: var(--muted);
+}
+.live-placeholder button {
+  margin-top: 10px;
+}
+@media (max-width: 900px) {
+  .live-filters {
+    flex-wrap: wrap;
+  }
+  .live-filters > form {
+    flex-wrap: wrap;
+  }
+  .live-detail-grid {
+    display: block;
+  }
+  .live-detail-grid .panel {
+    margin-bottom: 14px;
+  }
+}

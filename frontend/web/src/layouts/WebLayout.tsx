@@ -84,7 +84,9 @@ export function WebLayout({
           </div>
           <div className="header-right">
             <time>
-              {isLiveIncidentPage ? "사건 시각 KST 기준" : mock.uiSnapshot.header.date}
+              {isLiveIncidentPage
+                ? "사건 시각 KST 기준"
+                : mock.uiSnapshot.header.date}
               {!isLiveIncidentPage && <b>{mock.uiSnapshot.header.time}</b>}
             </time>
             <span className="signal">

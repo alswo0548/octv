@@ -61,7 +61,9 @@ const listeners = new Set<() => void>();
 const isId = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 
-export function setWebIncidentSession(input: WebIncidentSessionInput | null): void {
+export function setWebIncidentSession(
+  input: WebIncidentSessionInput | null,
+): void {
   active?.controller.abort();
   active = null;
   version += 1;
@@ -184,19 +186,24 @@ export async function loadIncidentImageUrl(
     signal: combined,
     cache: "no-store",
   });
-  if (!result.ok) throw new ApiError(result.status, "대표 이미지를 불러올 수 없습니다.");
+  if (!result.ok)
+    throw new ApiError(result.status, "대표 이미지를 불러올 수 없습니다.");
   const blob = await result.blob();
-  if (active !== session || combined.aborted) throw new Error("세션이 변경되었습니다.");
-  if (!blob.type.startsWith("image/")) throw new Error("이미지 형식을 확인할 수 없습니다.");
+  if (active !== session || combined.aborted)
+    throw new Error("세션이 변경되었습니다.");
+  if (!blob.type.startsWith("image/"))
+    throw new Error("이미지 형식을 확인할 수 없습니다.");
   return URL.createObjectURL(blob);
 }
 
 export function incidentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
+    if (error.status === 401)
+      return "로그인이 만료되었습니다. 다시 로그인해 주세요.";
     if (error.status === 403) return "이 작업을 수행할 권한이 없습니다.";
     if (error.status === 404) return "사건이 없거나 조회 권한이 없습니다.";
-    if (error.status === 409) return "사건 상태가 변경됐습니다. 다시 조회해 주세요.";
+    if (error.status === 409)
+      return "사건 상태가 변경됐습니다. 다시 조회해 주세요.";
     if (error.status === 422) return "검색 조건이나 입력값을 확인해 주세요.";
   }
   return "서버 조회에 실패했습니다. 연결 상태를 확인한 뒤 다시 조회해 주세요.";
@@ -208,7 +215,11 @@ export function formatSeoulTime(value: string): string {
   if (Number.isNaN(timestamp.getTime())) return "시각 확인 필요";
   return new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   }).format(timestamp);
 }
