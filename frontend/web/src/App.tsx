@@ -1,8 +1,8 @@
 /**
  * 후속-03 · 실제 사건 화면 조립
- * - 수연 담당 로그인에서 주입한 세션만 실제 사건 API에 사용합니다.
+ * - 로그인 화면에서 검증해 전달한 관리자 세션만 실제 사건 API에 사용합니다.
  * - 실제 사건 ID를 선택하면 기존 delivery.ts에 전달합니다.
- * - 인증이 아직 연결되지 않았다면 샘플 사건을 실제 사건처럼 보여주지 않습니다.
+ * - 로그인 세션이 없으면 로그인 안내를 표시합니다.
  * - 기존 다른 페이지(CCTV·설정·통계)의 구현은 수정하지 않습니다.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -103,10 +103,10 @@ export default function App() {
 
   const loginRequired = (
     <section className="panel live-placeholder" role="status">
-      <h2>실제 사건 조회를 위한 로그인 연결 대기</h2>
+      <h2>로그인이 필요합니다.</h2>
       <p>
-        샘플 사건을 보여주지 않습니다. 인증 담당 코드에서 검증한 관리자 세션을
-        incidentData.ts에 전달하면 실제 DB 사건 목록이 표시됩니다.
+        상황실 관리자 계정으로 로그인하면 실제 사건과 지원요청을 확인할 수
+        있습니다.
       </p>
       <button className="secondary" onClick={() => go("login")}>
         로그인 화면으로 이동

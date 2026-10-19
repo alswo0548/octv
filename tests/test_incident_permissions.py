@@ -380,125 +380,125 @@ class IncidentPermissionsTests(unittest.TestCase):
                 )
 
 
-def test_responder_completes_delivery_and_incident_stays_sent(self):
-    with (
-        patch.object(
-            agency_repository,
-            "complete_delivery",
-            return_value={
-                "agency_recommendation_id": 12,
+    def test_responder_completes_delivery_and_incident_stays_sent(self):
+        with (
+            patch.object(
+                agency_repository,
+                "complete_delivery",
+                return_value={
+                    "agency_recommendation_id": 12,
+                    "agency_id": 7,
+                    "recommendation_status": "COMPLETED",
+                },
+            ) as complete,
+            patch.object(
+                incident_repository,
+                "resolve_if_all_deliveries_completed",
+                return_value={
+                    "id": 31,
+                    "status": "SENT",
+                },
+            ) as resolve,
+        ):
+            response = self.client.patch(
+                "/api/agencies/incidents/31/complete",
+                headers=self.headers(),
+            )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "incident_id": 31,
                 "agency_id": 7,
-                "recommendation_status": "COMPLETED",
-            },
-        ) as complete,
-        patch.object(
-            incident_repository,
-            "resolve_if_all_deliveries_completed",
-            return_value={
-                "id": 31,
-                "status": "SENT",
-            },
-        ) as resolve,
-    ):
-        response = self.client.patch(
-            "/api/agencies/incidents/31/complete",
-            headers=self.headers(),
-        )
-
-    self.assertEqual(
-        response.status_code,
-        200,
-    )
-
-    self.assertEqual(
-        response.json(),
-        {
-            "incident_id": 31,
-            "agency_id": 7,
-            "agency_recommendation_id": 12,
-            "recommendation_status": "COMPLETED",
-            "incident_status": "SENT",
-        },
-    )
-
-    complete.assert_called_once_with(
-        self.connection,
-        31,
-        7,
-    )
-
-    resolve.assert_called_once_with(
-        self.connection,
-        31,
-    )
-
-
-def test_last_responder_completion_resolves_incident(self):
-    with (
-        patch.object(
-            agency_repository,
-            "complete_delivery",
-            return_value={
                 "agency_recommendation_id": 12,
-                "agency_id": 7,
                 "recommendation_status": "COMPLETED",
+                "incident_status": "SENT",
             },
-        ),
-        patch.object(
-            incident_repository,
-            "resolve_if_all_deliveries_completed",
-            return_value={
-                "id": 31,
-                "status": "RESOLVED",
-            },
-        ),
-    ):
-        response = self.client.patch(
-            "/api/agencies/incidents/31/complete",
-            headers=self.headers(),
         )
 
-    self.assertEqual(
-        response.status_code,
-        200,
-    )
-
-    self.assertEqual(
-        response.json()["recommendation_status"],
-        "COMPLETED",
-    )
-
-    self.assertEqual(
-        response.json()["incident_status"],
-        "RESOLVED",
-    )
-
-
-def test_agency_staff_cannot_complete_delivery(self):
-    self.user["role"] = "AGENCY_STAFF"
-
-    with (
-        patch.object(
-            agency_repository,
-            "complete_delivery",
-        ) as complete,
-        patch.object(
-            incident_repository,
-            "resolve_if_all_deliveries_completed",
-        ) as resolve,
-    ):
-        response = self.client.patch(
-            "/api/agencies/incidents/31/complete",
-            headers=self.headers(),
+        complete.assert_called_once_with(
+            self.connection,
+            31,
+            7,
         )
 
-    self.assertEqual(
-        response.status_code,
-        403,
-    )
+        resolve.assert_called_once_with(
+            self.connection,
+            31,
+        )
 
-    complete.assert_not_called()
-    resolve.assert_not_called()
+
+    def test_last_responder_completion_resolves_incident(self):
+        with (
+            patch.object(
+                agency_repository,
+                "complete_delivery",
+                return_value={
+                    "agency_recommendation_id": 12,
+                    "agency_id": 7,
+                    "recommendation_status": "COMPLETED",
+                },
+            ),
+            patch.object(
+                incident_repository,
+                "resolve_if_all_deliveries_completed",
+                return_value={
+                    "id": 31,
+                    "status": "RESOLVED",
+                },
+            ),
+        ):
+            response = self.client.patch(
+                "/api/agencies/incidents/31/complete",
+                headers=self.headers(),
+            )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            response.json()["recommendation_status"],
+            "COMPLETED",
+        )
+
+        self.assertEqual(
+            response.json()["incident_status"],
+            "RESOLVED",
+        )
+
+
+    def test_agency_staff_cannot_complete_delivery(self):
+        self.user["role"] = "AGENCY_STAFF"
+
+        with (
+            patch.object(
+                agency_repository,
+                "complete_delivery",
+            ) as complete,
+            patch.object(
+                incident_repository,
+                "resolve_if_all_deliveries_completed",
+            ) as resolve,
+        ):
+            response = self.client.patch(
+                "/api/agencies/incidents/31/complete",
+                headers=self.headers(),
+            )
+
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
+
+        complete.assert_not_called()
+        resolve.assert_not_called()
 
 
     def test_internal_service_requires_user(self):
