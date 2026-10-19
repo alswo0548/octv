@@ -1,12 +1,28 @@
-"""DB 조회/저장 작업 위치. SQL은 파라미터 바인딩으로 작성하세요."""
-
-from ..errors import FeatureNotImplemented
-
 # db/session.py의 연결을 전달받습니다. commit/rollback 범위는 서비스에서 관리합니다.
 
 
 # 04번 07 코드 · 기존 경로 테이블 저장과 조회
 from psycopg.types.json import Jsonb
+
+# 경로를 조회하기 전에 사건과 기관이 어떤 상태인지 확인
+def find_route_scope(connection, incident_id: int, agency_id: int):
+    return connection.execute(
+        """
+        SELECT i.id AS incident_id,
+               EXISTS (
+                   SELECT 1
+                   FROM incident_assessments a
+                   WHERE a.incident_id = i.id
+               ) AS has_assessment,
+               ar.id AS recommendation_id,
+               ar.recommendation_status
+        FROM incidents i
+        LEFT JOIN incident_agency_recommendations ar
+          ON ar.incident_id = i.id AND ar.agency_id = %s
+        WHERE i.id = %s
+        """,
+        (agency_id, incident_id),
+    ).fetchone()
 
 
 def list_candidates(connection, incident_id: int, agency_id: int):
