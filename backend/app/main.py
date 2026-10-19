@@ -12,6 +12,7 @@ from .notifications.router import router as notifications_router
 from .support_requests.router import router as support_requests_router
 from .settings.router import router as settings_router
 from .stats.router import router as stats_router
+from .dashboard.router import router as dashboard_router
 
 app = FastAPI(title="OCTV 개발용 API 골격", version="0.1.0")
 
@@ -40,3 +41,4 @@ app.include_router(notifications_router, prefix="/api")
 app.include_router(support_requests_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
