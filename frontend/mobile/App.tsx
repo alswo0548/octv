@@ -1,8 +1,8 @@
 /**
  * 흐름: 기존 화면 유지 → Android 알림 이벤트 연결 → 인증 완료 대기 → 본인 사건 상세 표시.
  * 주요 기능: 종료 상태의 알림 터치, 계정 변경 시 상세 차단, 샘플 사건과 실제 사건의 분리.
- * 로그인·JWT 복원은 인증 담당이 connectNotificationSession에 연결합니다.
- * onLogout에는 인증 담당의 실제 JWT 삭제 함수를 전달하며 로그인 구현은 이 파일에 추가하지 않습니다.
+ * 기존 인증 Backend를 모바일 화면에 연결하고 JWT 복원 후 connectNotificationSession을 재사용합니다.
+ * onLogout에서는 기존 알림 기기 해제가 성공한 뒤 저장된 JWT만 삭제합니다.
  */
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import {
@@ -29,7 +29,7 @@ import {
 import { s, color } from "./src/styles/theme";
 import type { Screen, Navigate } from "./src/navigation/types";
 import { AuthScreens } from "./src/screens/AuthScreens";
-import { IncidentScreens } from "./src/screens/IncidentScreens";
+import { LiveIncidentScreens } from "./src/screens/LiveIncidentScreens";
 import { DetailScreen } from "./src/screens/DetailScreen";
 import { RoutesScreen } from "./src/screens/RoutesScreen";
 import { RequestScreen } from "./src/screens/RequestScreen";
@@ -37,6 +37,7 @@ import { NotificationScreen } from "./src/screens/NotificationScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { notificationController } from "./src/notifications";
 import { createAndroidPushDriver, startAndroidPush } from "./src/push";
+import { mobileSession } from "./src/mobileSession";
 
 // 인증 담당의 기존 화면을 보존하면서 알림이 검증한 사건만 별도 상태로 엽니다.
 export function MobileApp({
@@ -49,14 +50,57 @@ export function MobileApp({
     notificationController.getSnapshot,
     notificationController.getSnapshot,
   );
+  const currentSession = useSyncExternalStore(
+    mobileSession.subscribe,
+    mobileSession.getSnapshot,
+    mobileSession.getSnapshot,
+  );
   const [notificationDetail, setNotificationDetail] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushInitialized, setPushInitialized] = useState(false);
   const navigationVersion = useRef(0);
+  const detailOrigin = useRef<"notifications" | "incidents">("notifications");
   const [screen, setScreen] = useState<Screen>("login"),
     [id, setId] = useState("SEL-001"),
     [dialog, setDialog] = useState<DialogState | null>(null);
   const scroll = useRef<ScrollView>(null);
+
+  // 앱 시작 시 저장된 Android JWT를 서버에서 재검증하고 알림 세션에 인계합니다.
+  useEffect(() => {
+    void mobileSession.restore();
+  }, []);
+
+  // 만료·로그아웃 상태에서는 이전 계정의 사건 화면을 즉시 닫습니다.
+  useEffect(() => {
+    if (currentSession.status === "ready") {
+      setScreen((old) =>
+        ["login", "signup-basic", "signup-agency", "signup-complete"].includes(
+          old,
+        )
+          ? "home"
+          : old,
+      );
+    } else if (currentSession.status === "waiting") {
+      setNotificationDetail(false);
+      setScreen((old) =>
+        ["login", "signup-basic", "signup-agency", "signup-complete"].includes(
+          old,
+        )
+          ? old
+          : "login",
+      );
+    }
+  }, [currentSession.status, currentSession.user?.id]);
+
+  // 알림 API가 401로 세션을 끊으면 저장된 JWT도 만료 처리합니다.
+  useEffect(() => {
+    if (
+      currentSession.status === "ready" &&
+      notification.status === "waiting"
+    ) {
+      void mobileSession.invalidate(currentSession.api ?? undefined);
+    }
+  }, [currentSession.status, currentSession.api, notification.status]);
 
   // 계정이 달라지거나 인증이 풀리면 이전 사용자가 열어 둔 확인창도 닫습니다.
   useEffect(() => {
@@ -111,6 +155,8 @@ export function MobileApp({
     if (navigationVersion.current === notification.navigationVersion) return;
     navigationVersion.current = notification.navigationVersion;
     if (notification.status !== "ready" || !notification.incident) return;
+    if (notification.openedNotificationId)
+      detailOrigin.current = "notifications";
     setNotificationDetail(true);
     setScreen("detail");
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -121,10 +167,30 @@ export function MobileApp({
   ]);
 
   const go: Navigate = (next, incident) => {
+    // 기존 로그인 화면을 거치지 않고 샘플 사건 화면으로 진입하지 않게 합니다.
+    if (
+      currentSession.status !== "ready" &&
+      !["login", "signup-basic", "signup-agency", "signup-complete"].includes(
+        next,
+      )
+    ) {
+      setScreen("login");
+      return;
+    }
     // 실제 DB 번호는 항상 서버 상세 조회로 보내고, 알 수 없는 번호를 샘플 사건으로 대체하지 않습니다.
     if (incident && /^[1-9]\d*$/.test(incident)) {
-      if (next === "detail") void notificationController.openIncident(incident);
-      else
+      if (next === "detail") {
+        detailOrigin.current = "incidents";
+        void notificationController.openIncident(incident).then((opened) => {
+          if (!opened && mobileSession.getSnapshot().status === "ready") {
+            setDialog({
+              title: "사건 조회 안내",
+              body: "사건 상세를 확인하지 못했습니다. 목록에서 다시 시도해주세요.",
+              cancel: false,
+            });
+          }
+        });
+      } else
         setDialog({
           title: "이용 안내",
           body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
@@ -159,7 +225,9 @@ export function MobileApp({
     title = mobileScreens.find((x) => x[2] === screen)?.[1] || "";
   const back: Partial<Record<Screen, [Screen, string]>> = {
     detail: notificationDetail
-      ? ["notifications", "알림 목록"]
+      ? detailOrigin.current === "notifications"
+        ? ["notifications", "알림 목록"]
+        : ["incidents", "사건 목록"]
       : ["incidents", "사건 목록"],
     live: ["incidents", "사건 목록"],
     routes: ["detail", "사건 상세"],
@@ -247,9 +315,9 @@ export function MobileApp({
               </Text>
               {(screen === "home" || screen === "incidents") && (
                 <Text style={s.muted}>
-                  {notification.user
-                    ? "사건 목록 미리보기입니다. 실제 전달 사건은 알림 목록에서 확인해주세요."
-                    : `${mock.profile.agency}에 전달된 사건입니다.`}
+                  {currentSession.status === "ready"
+                    ? "현재 로그인 기관에 전달된 실제 사건 목록입니다."
+                    : "로그인 후 소속기관에 전달된 사건을 확인할 수 있습니다."}
                 </Text>
               )}
             </View>
@@ -270,9 +338,17 @@ export function MobileApp({
                   <T>{pushError}</T>
                 </View>
               )}
-            {notificationDetail && screen === "detail" ? (
+            {currentSession.status === "checking" ? (
+              <View style={s.panel}>
+                <T>저장된 로그인 상태를 확인하고 있습니다.</T>
+              </View>
+            ) : notificationDetail && screen === "detail" ? (
               notification.status === "ready" && notification.incident ? (
-                <DetailScreen actualIncident={notification.incident} go={go} />
+                <DetailScreen
+                  actualIncident={notification.incident}
+                  go={go}
+                  backTo={detailOrigin.current}
+                />
               ) : (
                 <View style={s.panel}>
                   <T>
@@ -281,15 +357,29 @@ export function MobileApp({
                         ? "사건 정보를 확인하고 있습니다."
                         : "로그인 후 사건정보를 다시 확인해주세요.")}
                   </T>
-                  <Button onPress={() => go("notifications")}>
-                    알림 목록으로
+                  <Button onPress={() => go(detailOrigin.current)}>
+                    {detailOrigin.current === "notifications"
+                      ? "알림 목록으로"
+                      : "사건 목록으로"}
                   </Button>
                 </View>
               )
             ) : auth ? (
-              <AuthScreens screen={screen} go={go} show={setDialog} />
+              <>
+                {currentSession.message && screen === "login" && (
+                  <View style={s.info}>
+                    <T>{currentSession.message}</T>
+                  </View>
+                )}
+                <AuthScreens
+                  screen={screen}
+                  go={go}
+                  show={setDialog}
+                  onLogin={mobileSession.login}
+                />
+              </>
             ) : screen === "home" || screen === "incidents" ? (
-              <IncidentScreens home={screen === "home"} go={go} />
+              <LiveIncidentScreens home={screen === "home"} go={go} />
             ) : screen === "detail" || screen === "live" ? (
               <DetailScreen incident={d} live={screen === "live"} go={go} />
             ) : screen === "routes" ? (
@@ -303,7 +393,14 @@ export function MobileApp({
                 go={go}
                 show={setDialog}
                 // 설치 UUID를 읽을 준비가 끝나야 기존 기기 연결의 해제를 확인할 수 있습니다.
-                onLogout={pushInitialized ? onLogout : undefined}
+                onLogout={
+                  pushInitialized
+                    ? async () => {
+                        await onLogout?.();
+                        await mobileSession.logout();
+                      }
+                    : undefined
+                }
               />
             )}
           </View>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { mock } from "@octv/shared";
 import {
@@ -17,11 +18,45 @@ export function AuthScreens({
   screen,
   go,
   show,
+  onLogin,
 }: {
   screen: Screen;
   go: Navigate;
   show: ShowDialog;
+  onLogin?: (email: string, password: string) => Promise<void>;
 }) {
+  // 기존 로그인 입력창·회원가입 화면을 유지하고 로그인할 때만 Backend를 호출합니다.
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  async function submitLogin() {
+    if (loggingIn) return;
+    if (!onLogin) {
+      show({
+        title: "로그인 연결 대기",
+        body: "로그인 기능을 연결한 후 다시 시도해주세요.",
+        cancel: false,
+      });
+      return;
+    }
+    setLoggingIn(true);
+    try {
+      await onLogin(email, password);
+      setPassword("");
+      go("home");
+    } catch (error) {
+      show({
+        title: "로그인 확인",
+        body:
+          error instanceof Error
+            ? error.message
+            : "로그인에 실패했습니다. 다시 시도해주세요.",
+        cancel: false,
+      });
+    } finally {
+      setLoggingIn(false);
+    }
+  }
   if (screen === "signup-complete")
     return (
       <>
@@ -145,16 +180,29 @@ export function AuthScreens({
           </View>
         </>
       ) : (
-        <Field label="이메일" placeholder="name@example.com" />
+        <Field
+          label="이메일"
+          placeholder="name@example.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
       )}
       <Field
         label="비밀번호"
         placeholder={signup ? "8~10자, 영문·숫자·특수문자 포함" : "비밀번호"}
         secureTextEntry
+        {...(!signup ? { value: password, onChangeText: setPassword } : {})}
       />
       {signup && <Field label="비밀번호 확인" secureTextEntry />}
-      <Button onPress={() => go(signup ? "signup-agency" : "home")}>
-        {signup ? "다음: 소속기관 선택" : "로그인"}
+      <Button
+        disabled={!signup && loggingIn}
+        onPress={() => {
+          if (signup) go("signup-agency");
+          else void submitLogin();
+        }}
+      >
+        {signup ? "다음: 소속기관 선택" : loggingIn ? "로그인 중…" : "로그인"}
       </Button>
       {signup ? (
         <View

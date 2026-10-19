@@ -4,11 +4,12 @@
  * 주요 기능: 실제 재난·위치·위험도·시각 표시, 미분석 값 구분, 알림 목록 복귀.
  */
 import { useSyncExternalStore } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Image } from "react-native";
 import { mock, type Incident, type IncidentDto } from "@octv/shared";
 import { Badge, T, Button, Panel, Pair } from "../components/UI";
 import { Camera } from "../components/Camera";
 import { s, color } from "../styles/theme";
+import { mobileSession } from "../mobileSession";
 import type { Navigate } from "../navigation/types";
 import {
   notificationController,
@@ -36,15 +37,19 @@ function incidentTime(value: string) {
 function DeliveredIncidentDetail({
   incident,
   go,
+  backTo,
 }: {
   incident: IncidentDto;
   go: Navigate;
+  backTo: "notifications" | "incidents";
 }) {
   const state = useSyncExternalStore(
     notificationController.subscribe,
     notificationController.getSnapshot,
     notificationController.getSnapshot,
   );
+  // 로그인 JWT를 이미지 주소에 붙이지 않고 인증 헤더로 전달합니다.
+  const imageSource = mobileSession.incidentImageSource(incident);
   return (
     <>
       <Badge priority={incident.priority ?? "평가 대기"} />
@@ -58,6 +63,15 @@ function DeliveredIncidentDetail({
         <T>수신 기관 · {state.user?.agency_name ?? "소속기관 확인 필요"}</T>
         <T muted>현재 계정에 허용된 사건정보입니다.</T>
       </View>
+      {incident.representative_image_updated_at && imageSource && (
+        <Panel title="대표 탐지 이미지">
+          <Image
+            source={imageSource}
+            resizeMode="contain"
+            style={{ width: "100%", height: 200 }}
+          />
+        </Panel>
+      )}
       <Panel title="사건 정보">
         <Pair label="사건 번호" value={incident.incident_no} />
         <Pair label="상태" value={incident.status} />
@@ -97,8 +111,8 @@ function DeliveredIncidentDetail({
       >
         사건 정보 새로고침
       </Button>
-      <Button secondary onPress={() => go("notifications")}>
-        알림 목록으로
+      <Button secondary onPress={() => go(backTo)}>
+        {backTo === "notifications" ? "알림 목록으로" : "사건 목록으로"}
       </Button>
     </>
   );
@@ -110,14 +124,22 @@ export function DetailScreen({
   actualIncident,
   live = false,
   go,
+  backTo = "notifications",
 }: {
   incident?: Incident;
   actualIncident?: IncidentDto;
   live?: boolean;
   go: Navigate;
+  backTo?: "notifications" | "incidents";
 }) {
   if (actualIncident)
-    return <DeliveredIncidentDetail incident={actualIncident} go={go} />;
+    return (
+      <DeliveredIncidentDetail
+        incident={actualIncident}
+        go={go}
+        backTo={backTo}
+      />
+    );
   if (!d)
     return (
       <Panel>
