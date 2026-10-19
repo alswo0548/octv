@@ -1,0 +1,552 @@
+/**
+ * 후속-03 · 관제 웹 실제 사건관리 화면
+ * 목록 API → 사건 ID 선택 → 상세/판단 근거 → 관리자 확인 → 기존 기관 전달 모달.
+ * 샘플 사건번호 SEL-001, 샘플 영상·경로·지원 요청을 실제 서버 결과에 섞지 않습니다.
+ */
+import { useEffect, useState } from "react";
+import type { IncidentDto, PageDto } from "@octv/shared";
+import { type ShowModal } from "../components/Primitives";
+import {
+  changeServerIncident,
+  formatSeoulTime,
+  getServerIncident,
+  incidentErrorMessage,
+  listServerIncidents,
+  loadIncidentImageUrl,
+  type IncidentDetailDto,
+  type WebIncidentSession,
+} from "../incidentData";
+import "../styles/live-incidents.css";
+
+type Props = {
+  session: WebIncidentSession;
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  openPicker: () => void;
+  show: ShowModal;
+  refreshKey: number;
+  onRefresh: () => void;
+};
+
+type Period = "all" | "today" | "week";
+const PAGE_SIZE = 5;
+
+// 브라우저 위치와 관계없이 서울 날짜의 00:00(KST)을 ISO(UTC)로 전송합니다.
+function periodStart(period: Period): string | undefined {
+  if (period === "all") return undefined;
+  const koreaDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const parts = Object.fromEntries(
+    koreaDate.map((part) => [part.type, part.value]),
+  );
+  const start = new Date(
+    `${parts.year}-${parts.month}-${parts.day}T00:00:00+09:00`,
+  );
+  if (period === "week") start.setUTCDate(start.getUTCDate() - 6);
+  return start.toISOString();
+}
+
+function JsonDetails({ title, data }: { title: string; data: unknown }) {
+  return (
+    <details className="live-json">
+      <summary>{title}</summary>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </details>
+  );
+}
+
+// JPEG를 Authorization 헤더로 별도 조회합니다. 사건/세션 변경 시 URL을 해제합니다.
+function RepresentativeImage({
+  session,
+  incident,
+}: {
+  session: WebIncidentSession;
+  incident: IncidentDetailDto;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  useEffect(() => {
+    setUrl(null);
+    setUnavailable(false);
+    if (!incident.representative_image_updated_at) return;
+    const controller = new AbortController();
+    let resource: string | null = null;
+    void loadIncidentImageUrl(session.version, incident.id, controller.signal)
+      .then((next) => {
+        resource = next;
+        if (!controller.signal.aborted) setUrl(next);
+        else URL.revokeObjectURL(next);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setUnavailable(true);
+      });
+    return () => {
+      controller.abort();
+      if (resource) URL.revokeObjectURL(resource);
+    };
+  }, [incident.id, incident.representative_image_updated_at, session.version]);
+  return (
+    <section className="panel live-incident-image">
+      <h2>사건 대표 이미지</h2>
+      {url ? (
+        <img src={url} alt={`${incident.incident_no} 사건 대표 JPEG`} />
+      ) : (
+        <p className="subtle" role="status">
+          {unavailable
+            ? "대표 이미지를 조회할 수 없습니다."
+            : incident.representative_image_updated_at
+              ? "대표 이미지 불러오는 중"
+              : "저장된 대표 이미지가 없습니다."}
+        </p>
+      )}
+      <p className="subtle">
+        실시간 LIVE 영상이 아닌 저장된 사건 이미지입니다.
+      </p>
+    </section>
+  );
+}
+
+export function LiveIncidentsPage({
+  session,
+  selectedId,
+  onSelect,
+  openPicker,
+  show,
+  refreshKey,
+  onRefresh,
+}: Props) {
+  const [page, setPage] = useState(1);
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("");
+  const [hazard, setHazard] = useState("");
+  const [period, setPeriod] = useState<Period>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [list, setList] = useState<PageDto<IncidentDto> | null>(null);
+  const [detail, setDetail] = useState<IncidentDetailDto | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  // 필터가 바뀌면 1페이지부터 실제 서버 목록을 조회합니다.
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadingList(true);
+    setListError(null);
+    setList(null);
+    void listServerIncidents(
+      session.version,
+      {
+        page,
+        page_size: PAGE_SIZE,
+        priority: (priority || undefined) as "P1" | "P2" | "P3" | undefined,
+        status: (status || undefined) as IncidentDto["status"] | undefined,
+        hazard_type: hazard || undefined,
+        q: search || undefined,
+        start: periodStart(period),
+      },
+      controller.signal,
+    )
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setList(result);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setListError(incidentErrorMessage(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingList(false);
+      });
+    return () => controller.abort();
+  }, [
+    session.version,
+    page,
+    priority,
+    status,
+    hazard,
+    period,
+    search,
+    refreshKey,
+  ]);
+
+  // 목록 조회가 처음 완료됐고 선택된 사건이 없다면 첫 번째 실제 DB ID를 선택합니다.
+  useEffect(() => {
+    if (selectedId === null && list?.items.length) onSelect(list.items[0].id);
+  }, [selectedId, list, onSelect]);
+
+  // 선택된 숫자 DB ID로만 상세 조회. 다른 사건의 늦은 응답은 폐기합니다.
+  useEffect(() => {
+    if (selectedId === null) {
+      setDetail(null);
+      setDetailError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setLoadingDetail(true);
+    setDetail(null);
+    setDetailError(null);
+    void getServerIncident(session.version, selectedId, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setDetail(result);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          setDetailError(incidentErrorMessage(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingDetail(false);
+      });
+    return () => controller.abort();
+  }, [session.version, selectedId, refreshKey]);
+
+  // PATCH 후 서버를 다시 조회합니다. 충돌(409) 때는 같은 PATCH를 자동 재시도하지 않습니다.
+  const changeStatus = async (operation: "confirm" | "false-positive") => {
+    if (!detail || updating) return;
+    setUpdating(true);
+    setDetailError(null);
+    try {
+      await changeServerIncident(session.version, detail.id, operation);
+    } catch (error) {
+      setDetailError(incidentErrorMessage(error));
+    } finally {
+      setUpdating(false);
+      onRefresh();
+    }
+  };
+  const confirmAction = (operation: "confirm" | "false-positive") => {
+    if (!detail || updating) return;
+    show({
+      title: operation === "confirm" ? "사건 확인" : "오탐 처리",
+      body: `${detail.incident_no} 사건을 ${operation === "confirm" ? "확인" : "오탐"} 처리할까요?`,
+      confirm: operation === "confirm" ? "사건 확인" : "오탐 처리",
+      onConfirm: () => {
+        void changeStatus(operation);
+      },
+    });
+  };
+  const resetPage = (setValue: (value: string) => void) => (value: string) => {
+    setPage(1);
+    setValue(value);
+  };
+  const pages = Math.ceil((list?.total ?? 0) / PAGE_SIZE);
+  return (
+    <>
+      <section className="panel list-panel">
+        <div className="section-title">
+          <h2>
+            실제 사건 목록 <span className="count">{list?.total ?? "–"}</span>
+          </h2>
+          <span className="subtle">PostgreSQL · 최신 탐지순</span>
+        </div>
+        <div className="filters live-filters">
+          <label>
+            우선순위
+            <select
+              value={priority}
+              onChange={(e) => resetPage(setPriority)(e.target.value)}
+            >
+              <option value="">전체</option>
+              <option value="P1">P1</option>
+              <option value="P2">P2</option>
+              <option value="P3">P3</option>
+            </select>
+          </label>
+          <label>
+            상태
+            <select
+              value={status}
+              onChange={(e) => resetPage(setStatus)(e.target.value)}
+            >
+              <option value="">상태 전체</option>
+              <option value="DETECTED">탐지됨</option>
+              <option value="CONFIRMED">사건 확인</option>
+              <option value="SENT">전달 완료</option>
+              <option value="RESOLVED">기존 종결 상태</option>
+              <option value="FALSE_POSITIVE">오탐 이력</option>
+            </select>
+          </label>
+          <label>
+            유형
+            <select
+              value={hazard}
+              onChange={(e) => resetPage(setHazard)(e.target.value)}
+            >
+              <option value="">유형 전체</option>
+              <option value="flood">침수</option>
+              <option value="fallen_tree">쓰러진 나무</option>
+              <option value="road_obstacle">도로 장애물</option>
+              <option value="severe_road_damage">심각한 도로 파손</option>
+              <option value="sinkhole">싱크홀</option>
+            </select>
+          </label>
+          <label>
+            기간
+            <select
+              value={period}
+              onChange={(e) => {
+                setPage(1);
+                setPeriod(e.target.value as Period);
+              }}
+            >
+              <option value="all">전체 기간</option>
+              <option value="today">오늘</option>
+              <option value="week">최근 7일</option>
+            </select>
+          </label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              setSearch(searchInput.trim());
+            }}
+          >
+            <label>
+              검색
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="사건번호 / CCTV명"
+              />
+            </label>
+            <button className="secondary" type="submit">
+              조회
+            </button>
+          </form>
+        </div>
+        {loadingList && <p role="status">사건 목록을 조회하고 있습니다.</p>}
+        {listError && (
+          <p role="alert">
+            {listError} <button onClick={onRefresh}>다시 조회</button>
+          </p>
+        )}
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {[
+                  "사건번호",
+                  "유형",
+                  "우선순위",
+                  "상태",
+                  "CCTV",
+                  "발생시각",
+                ].map((text) => (
+                  <th key={text}>{text}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {list?.items.map((row) => (
+                <tr
+                  key={row.id}
+                  tabIndex={0}
+                  className={selectedId === row.id ? "selected" : ""}
+                  onClick={() => onSelect(row.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSelect(row.id);
+                  }}
+                  aria-label={`${row.incident_no} 상세 보기`}
+                >
+                  <td>{row.incident_no}</td>
+                  <td>{row.hazard_type}</td>
+                  <td>{row.priority ?? "분석 대기"}</td>
+                  <td>{row.status}</td>
+                  <td>{row.cctv_name}</td>
+                  <td>{formatSeoulTime(row.detected_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {list?.items.length === 0 && !loadingList && (
+          <p>조건에 맞는 사건이 없습니다.</p>
+        )}
+        <div className="table-footer">
+          <span>
+            총 {list?.total ?? 0}건 / {page}페이지
+          </span>
+          <nav className="pagination" aria-label="사건 목록 페이지">
+            <button
+              disabled={page <= 1 || loadingList}
+              onClick={() => setPage(page - 1)}
+            >
+              이전
+            </button>
+            {Array.from({ length: Math.min(pages, 7) }, (_, idx) => {
+              const first = Math.max(1, Math.min(page - 3, pages - 6));
+              const current = first + idx;
+              return (
+                <button
+                  key={current}
+                  aria-current={page === current ? "page" : undefined}
+                  className={page === current ? "current" : ""}
+                  onClick={() => setPage(current)}
+                >
+                  {current}
+                </button>
+              );
+            })}
+            <button
+              disabled={page >= pages || loadingList}
+              onClick={() => setPage(page + 1)}
+            >
+              다음
+            </button>
+          </nav>
+        </div>
+      </section>
+      <section className="selected-heading">
+        <div>
+          <span className="eyebrow">SERVER INCIDENT DETAIL</span>
+          <h2>
+            {detail
+              ? `${detail.hazard_type} · ${detail.incident_no}`
+              : "선택 사건 상세"}
+          </h2>
+        </div>
+        <button className="secondary" onClick={onRefresh}>
+          서버 정보 새로고침
+        </button>
+      </section>
+      {loadingDetail && (
+        <p role="status">선택 사건 상세를 조회하고 있습니다.</p>
+      )}
+      {detailError && <p role="alert">{detailError}</p>}
+      {detail && (
+        <>
+          <div className="detail-grid live-detail-grid">
+            <RepresentativeImage
+              key={detail.id}
+              session={session}
+              incident={detail}
+            />
+            <section className="panel info">
+              <div className="section-title">
+                <h2>사건 정보</h2>
+                <span className="tag">{detail.status}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>CCTV</dt>
+                  <dd>
+                    {detail.cctv_name} (#{detail.cctv_id})
+                  </dd>
+                </div>
+                <div>
+                  <dt>좌표</dt>
+                  <dd>
+                    {detail.latitude}, {detail.longitude}
+                  </dd>
+                </div>
+                <div>
+                  <dt>최초 탐지</dt>
+                  <dd>{formatSeoulTime(detail.detected_at)}</dd>
+                </div>
+                <div>
+                  <dt>최근 탐지</dt>
+                  <dd>{formatSeoulTime(detail.last_detected_at)}</dd>
+                </div>
+                <div>
+                  <dt>모델 탐지 신뢰도</dt>
+                  <dd>{(detail.confidence * 100).toFixed(1)}%</dd>
+                </div>
+              </dl>
+              <div className="live-actions">
+                {detail.status === "DETECTED" && (
+                  <button
+                    className="primary"
+                    disabled={updating}
+                    onClick={() => confirmAction("confirm")}
+                  >
+                    사건 확인
+                  </button>
+                )}
+                {(["DETECTED", "CONFIRMED"] as string[]).includes(
+                  detail.status,
+                ) && (
+                  <button
+                    className="secondary"
+                    disabled={updating}
+                    onClick={() => confirmAction("false-positive")}
+                  >
+                    오탐 처리
+                  </button>
+                )}
+              </div>
+            </section>
+            <section className="panel risk live-risk">
+              <h2>LangGraph 판단 근거</h2>
+              <dl>
+                <div>
+                  <dt>분석 상태</dt>
+                  <dd>{detail.analysis_status}</dd>
+                </div>
+                <div>
+                  <dt>위험도</dt>
+                  <dd>
+                    {detail.risk_level ?? "미분석"} {detail.risk_score ?? ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt>우선순위</dt>
+                  <dd>
+                    {detail.priority ?? "미분석"} {detail.priority_score ?? ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt>규칙 버전</dt>
+                  <dd>{detail.rule_version ?? "없음"}</dd>
+                </div>
+              </dl>
+              {detail.risk_breakdown_json && (
+                <JsonDetails
+                  title="위험도 계산 근거·외부 Context"
+                  data={detail.risk_breakdown_json}
+                />
+              )}
+              {detail.priority_breakdown_json && (
+                <JsonDetails
+                  title="우선순위 계산 근거"
+                  data={detail.priority_breakdown_json}
+                />
+              )}
+              {detail.analysis_status === "PENDING" && (
+                <p>분석 결과가 아직 저장되지 않았습니다.</p>
+              )}
+            </section>
+          </div>
+          <section className="panel page-section live-delivery">
+            <div className="section-title">
+              <h2>기관 추천 · 선택 전달</h2>
+              <span className="subtle">기존 기관 추천/전달 API 사용</span>
+            </div>
+            <p>
+              사건 상태를 확인한 뒤 실제 추천 기관을 조회하고 사람의 선택으로
+              전달합니다.
+            </p>
+            <button
+              className="primary"
+              disabled={
+                updating || !["CONFIRMED", "SENT"].includes(detail.status)
+              }
+              onClick={openPicker}
+            >
+              추천 기관 확인·전달
+            </button>
+            <p className="subtle">
+              경로 지도·내비게이션은 후속-05, 현장 지원 요청은 후속-06에서
+              연결합니다.
+            </p>
+          </section>
+        </>
+      )}
+    </>
+  );
+}

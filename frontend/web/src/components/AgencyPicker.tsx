@@ -337,8 +337,8 @@ function LiveDeliveryPicker({
         </button>
       </div>
       <p className="agency-help">
-        상위 화면의 예시 사건과 별도로 연결된 실제 사건입니다. 이 창의
-        사건번호와 CCTV를 확인한 뒤 전달 기관을 선택해 주세요.
+        서버에서 사건 정보와 추천 기관을 다시 조회했습니다. 이 창의 사건번호와
+        CCTV를 확인한 뒤 전달 기관을 선택해 주세요.
       </p>
       {loading && (
         <p role="status">
@@ -493,5 +493,37 @@ function LiveDeliveryPicker({
         </button>
       </div>
     </>
+  );
+}
+
+// 후속-03: 실제 사건 선택 시 mock 미리보기로 되돌아가지 않는 전달 모달입니다.
+// LiveDeliveryPicker 자체의 검증·POST·결과 표시는 기존 코드 그대로 재사용합니다.
+export function LiveAgencyPicker({ close }: { close: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const context = useSyncExternalStore(
+    subscribeDeliveryContext,
+    getDeliveryContext,
+    () => null,
+  );
+  useEffect(() => {
+    if (ref.current && !ref.current.open) ref.current.showModal();
+  }, []);
+  return (
+    <dialog ref={ref} aria-label="실제 기관 선택·전달" onCancel={close}>
+      {context ? (
+        <LiveDeliveryPicker
+          key={context.version}
+          context={context}
+          close={close}
+        />
+      ) : (
+        <p role="status">
+          사건·로그인 연결이 변경됐습니다. 창을 닫고 다시 조회해 주세요.
+          <button className="secondary" onClick={close}>
+            닫기
+          </button>
+        </p>
+      )}
+    </dialog>
   );
 }
