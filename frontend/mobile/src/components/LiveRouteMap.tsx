@@ -28,22 +28,50 @@ export function LiveRouteMap({
     if (nextWidth > 0 && nextWidth !== width) setWidth(nextWidth);
   };
   if (!view)
-    return <Text style={{ color: "#b3ccdc" }}>유효한 경로 좌표가 없어 지도를 표시할 수 없습니다.</Text>;
+    return (
+      <Text style={{ color: "#b3ccdc" }}>
+        유효한 경로 좌표가 없어 지도를 표시할 수 없습니다.
+      </Text>
+    );
   return (
-    <View onLayout={onLayout} style={{ height: HEIGHT, borderRadius: 10, overflow: "hidden", backgroundColor: "#102534", borderWidth: 1, borderColor: "#2b4152" }}>
+    <View
+      onLayout={onLayout}
+      style={{
+        height: HEIGHT,
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#102534",
+        borderWidth: 1,
+        borderColor: "#2b4152",
+      }}
+    >
       {view.tiles.map((tile) => (
         <Image
           key={tile.key}
           source={{
             uri: tile.uri,
             // OSM 타일 사용 정책: 앱을 식별하고 HTTP 캐시를 사용합니다.
-            headers: { "User-Agent": "OCTV-RouteView/0.1 (+https://github.com/alswo0548/octv)" },
+            headers: {
+              "User-Agent":
+                "OCTV-RouteView/0.1 (+https://github.com/alswo0548/octv)",
+            },
             cache: "force-cache",
           }}
-          style={{ position: "absolute", left: tile.x, top: tile.y, width: 256, height: 256 }}
+          style={{
+            position: "absolute",
+            left: tile.x,
+            top: tile.y,
+            width: 256,
+            height: 256,
+          }}
         />
       ))}
-      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} style={{ position: "absolute", left: 0, top: 0 }}>
+      <Svg
+        width="100%"
+        height={HEIGHT}
+        viewBox={`0 0 ${width} ${HEIGHT}`}
+        style={{ position: "absolute", left: 0, top: 0 }}
+      >
         {view.paths.map((path) => (
           <Polyline
             key={path.id}
@@ -57,10 +85,27 @@ export function LiveRouteMap({
           />
         ))}
         {view.destination && (
-          <Circle cx={view.destination.x} cy={view.destination.y} r={8} stroke="#fff" strokeWidth={2} fill="#fa7070" />
+          <Circle
+            cx={view.destination.x}
+            cy={view.destination.y}
+            r={8}
+            stroke="#fff"
+            strokeWidth={2}
+            fill="#fa7070"
+          />
         )}
       </Svg>
-      <Text style={{ position: "absolute", right: 3, bottom: 3, padding: 3, fontSize: 9, color: "#fff", backgroundColor: "#142a34cc" }}>
+      <Text
+        style={{
+          position: "absolute",
+          right: 3,
+          bottom: 3,
+          padding: 3,
+          fontSize: 9,
+          color: "#fff",
+          backgroundColor: "#142a34cc",
+        }}
+      >
         © OpenStreetMap contributors
       </Text>
     </View>

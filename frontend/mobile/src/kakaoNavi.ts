@@ -9,9 +9,15 @@ import { Platform } from "react-native";
 import type { IncidentDto } from "@octv/shared";
 import { validDestination } from "./liveRoutes";
 
-export type KakaoNaviLaunch = "opened" | "install" | "not-configured" | "unsupported";
+export type KakaoNaviLaunch =
+  | "opened"
+  | "install"
+  | "not-configured"
+  | "unsupported";
 
-export async function openKakaoNavi(incident: IncidentDto): Promise<KakaoNaviLaunch> {
+export async function openKakaoNavi(
+  incident: IncidentDto,
+): Promise<KakaoNaviLaunch> {
   if (Platform.OS !== "android") return "unsupported";
   if (!validDestination(incident))
     throw new Error("사건 목적지의 위도·경도를 확인할 수 없습니다.");

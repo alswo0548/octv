@@ -14,16 +14,24 @@ export type MapViewport = {
 const TILE_SIZE = 256;
 const MAX_LAT = 85.05112878;
 function worldPoint([lon, lat]: LonLat, zoom: number): PixelPoint {
-  const latRadians = (Math.max(-MAX_LAT, Math.min(MAX_LAT, lat)) * Math.PI) / 180;
+  const latRadians =
+    (Math.max(-MAX_LAT, Math.min(MAX_LAT, lat)) * Math.PI) / 180;
   const scale = TILE_SIZE * 2 ** zoom;
   return {
     x: ((lon + 180) / 360) * scale,
-    y: ((1 - Math.log(Math.tan(latRadians) + 1 / Math.cos(latRadians)) / Math.PI) / 2) * scale,
+    y:
+      ((1 -
+        Math.log(Math.tan(latRadians) + 1 / Math.cos(latRadians)) / Math.PI) /
+        2) *
+      scale,
   };
 }
 // 많은 CCTV 프레임에서 저장된 긴 경로도 Math.max(...배열) 인자 수 한도에 걸리지 않게 계산합니다.
 function bounds(points: readonly LonLat[], zoom: number) {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (const point of points) {
     const pixel = worldPoint(point, zoom);
     minX = Math.min(minX, pixel.x);
@@ -82,10 +90,12 @@ export function makeMapViewport(
     tiles,
     paths: lines.map((line) => ({
       id: line.id,
-      points: line.coords.map((point) => {
-        const p = translate(point);
-        return `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
-      }).join(" "),
+      points: line.coords
+        .map((point) => {
+          const p = translate(point);
+          return `${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+        })
+        .join(" "),
     })),
     destination: destination ? translate(destination) : null,
   };
