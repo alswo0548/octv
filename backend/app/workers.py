@@ -1,119 +1,301 @@
 """
-Redis에 등록된 사건 판단 요청을 받아서 실제 AI 판단 기능을 실행하는 파일
+Redis에 등록된 사건 판단 요청을 받아
+실제 AI 판단 기능을 실행하는 파일
 
-오해하지 말것! 
-workers.py 자체가 위험도를 계산하거나 최적의 기관을 선택하는게 아니며,
-실제 판단은 LangGraph 함수에 맡기고, worker.py 는 그 작업을 실행하고 오류가 발생하면 재시도하는 역할. 
+workers.py 자체가 위험도를 계산하거나
+최적 기관을 직접 선택하지 않습니다.
 
-① 사건 DB 저장 완료 (사건 ID: 31)
-② analysis_requests.py (31번 사건 판단 요청)
-③ Redis (판단 요청을 대기열에 보관)
-④ workers.py (31번 사건을 받아 판단 함수 실행) ** 현재 파일 **
-⑤ LangGraph 판단 시스템 (위험도 → 우선순위 → 기관·경로 추천)
-⑥ 기존 PostgreSQL DB (판단 결과 저장)
+실제 판단은 LangGraph에 맡기고,
+workers.py는 Celery Task 실행 및 재시도를 담당합니다.
 
-추가 흐름 (기존 LangGraph Task와 분리)
-기관 전달 COMMIT → notifications 큐 → send_notification_push → FCM 서버 요청.
-Beat → recover_notification_pushes → 최근 DB 알림의 누락 작업만 다시 큐에 등록.
-기존 Celery 앱은 공유하지만 notifications 큐를 별도 프로세스에서 처리할 수 있습니다.
+① 사건 DB 저장 완료
+② analysis_requests.py
+③ Redis
+④ workers.py
+⑤ LangGraph
+⑥ PostgreSQL 결과 저장
 """
 
-
+import logging
 import os
-from celery import Celery
+from pathlib import Path
 
-# Celery : 파이썬에서 시간이 걸리는 작업을 백그라운드로 처리하도록 도와주는 도구
-celery_app=Celery(
-    'octv',
-    broker=os.environ['OCTV_REDIS_URL']
+from celery import Celery
+from dotenv import load_dotenv
+
+
+# 프로젝트 루트: C:\KDT2604\octv
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Celery Worker는 FastAPI와 별도 프로세스로 실행되므로
+# 프로젝트 루트의 .env를 명시적으로 로드합니다.
+load_dotenv(PROJECT_ROOT / ".env")
+
+
+from .analysis_lock import (
+    release_analysis_lock,
 )
+
+
+log = logging.getLogger(__name__)
+
+
+# Celery
+celery_app = Celery(
+    "octv",
+    broker=os.environ["OCTV_REDIS_URL"],
+)
+
+
 celery_app.conf.update(
-    task_serializer="json",                 # 요청 데이터를 JSON 형태로 전송
+    task_serializer="json",
     accept_content=["json"],
     task_ignore_result=True,
-    task_acks_late=True,                    # 작업이 끝난 후 처리 확인
+
+    # Worker가 실제 작업을 끝낸 뒤 ACK
+    task_acks_late=True,
+
+    # Worker 자체가 죽으면 작업을 다시 전달
     task_reject_on_worker_lost=True,
-    worker_prefetch_multiplier=1,           # Worker가 작업을 미리 과도하게 가져오는 것 제한
-    task_time_limit=240,                    # 작업 실행 시간 최대 240초
+
+    # 한 Worker가 작업을 과도하게 선점하지 않도록 제한
+    worker_prefetch_multiplier=1,
+
+    # 한 번의 Task 실행 시간 제한
+    task_time_limit=240,
+
     task_publish_retry=True,
+
     task_publish_retry_policy={
-        "max_retries": 3,                   # 지정된 일시적 오류 시 최대 3번 재시도
+        "max_retries": 3,
         "interval_start": 0,
         "interval_step": 1,
         "interval_max": 2,
     },
+
     broker_transport_options={
         "visibility_timeout": 900,
     },
-    # 기본 OFF. 같은 Celery 앱의 Beat 한 개가 최근 알림 누락을 분당 한 번 확인.
+
     beat_schedule={
         "octv-recover-notification-pushes": {
-            "task": "octv.recover_notification_pushes",
+            "task": (
+                "octv.recover_notification_pushes"
+            ),
             "schedule": 60.0,
-            "options": {"queue": "notifications", "expires": 55},
+            "options": {
+                "queue": "notifications",
+                "expires": 55,
+            },
         },
-    } if (os.environ.get("OCTV_PUSH_ENABLED", "0") == "1"
-          and os.environ.get("OCTV_PUSH_RECOVERY_ENABLED", "0") == "1") else {},
+    }
+    if (
+        os.environ.get(
+            "OCTV_PUSH_ENABLED",
+            "0",
+        )
+        == "1"
+        and os.environ.get(
+            "OCTV_PUSH_RECOVERY_ENABLED",
+            "0",
+        )
+        == "1"
+    )
+    else {},
 )
 
-# Redis 대기열에서 Worker가 사건을 가지고 오면 실행됨.
-# queue='analysis'는 여러 작업 대기열 중 사건 판단용 대기열 사용을 의미.
-@celery_app.task(
-    bind=True,
-    name='octv.analyze_incident',
-    queue='analysis',
-    max_retries=3
-)
-def analyze_incident(self,incident_id):
-    if os.environ.get('OCTV_DECISION_ENABLED','0')!='1':            # AI 판단 기능을 실행할 준비가 되었는지 확인하는 코드
-        return {'incident_id':incident_id,'skipped':'DISABLED'}
-    
-    # 아래 실제 판단 함수는 추후 작성합니다.
-    import httpx
-    from psycopg import OperationalError
-    from ai.config import get_runtime_config
-    from ai.orchestration.pipeline import run_pipeline
-    from ai.risk_priority.rules import InsufficientContext
+
+def _release_analysis_lock_safely(
+    incident_id,
+    lock_token,
+):
+    """
+    분석 완료 또는 최종 실패 시
+    Redis Lock을 안전하게 제거합니다.
+
+    Lock 해제 실패 자체 때문에
+    이미 끝난 분석 Task를 실패 처리하지는 않습니다.
+    """
+
+    if not lock_token:
+        return
+
     try:
-        return run_pipeline(incident_id,get_runtime_config())
-    # 판단 중 오류 발생 시 재시도
-    except (
-        httpx.HTTPError,
-        OperationalError,
-        InsufficientContext
-    ) as exc:
-        # URL·API 키가 들어갈 수 있는 원문 예외를 Task 로그에 넘기지 않습니다.
-        raise self.retry(
-            exc=RuntimeError(type(exc).__name__),
-            countdown=30
+        release_analysis_lock(
+            incident_id,
+            lock_token,
+        )
+
+    except Exception as exc:
+        log.warning(
+            "analysis_lock_release_failed "
+            "incident=%s error=%s",
+            incident_id,
+            type(exc).__name__,
         )
 
 
-# 기존 앱에서 알림 ID를 받아 발송합니다. LangGraph의 분석 Task/재시도 설정은 바꾸지 않습니다.
-@celery_app.task(                                   # Celery 작업으로 등록
-    bind=True,                                      # self로 현재 작업 정보 접근
-    name="octv.send_notification_push",             
-    queue="notifications",                          # 알림 전용 큐에서 처리
-    max_retries=3,                                  # 최초 실행 외 최대 3회 재시도
+# ---------------------------------------------------------
+# Incident AI 분석 Task
+# ---------------------------------------------------------
+@celery_app.task(
+    bind=True,
+    name="octv.analyze_incident",
+    queue="analysis",
+    max_retries=3,
 )
-def send_notification_push(self, notification_id):
-    from .notifications.service import dispatch_notification_push
+def analyze_incident(
+    self,
+    incident_id,
+    lock_token=None,
+):
+    # 분석 기능을 끈 상태라면
+    # Lock을 남겨두지 않습니다.
+    if (
+        os.environ.get(
+            "OCTV_DECISION_ENABLED",
+            "0",
+        )
+        != "1"
+    ):
+        _release_analysis_lock_safely(
+            incident_id,
+            lock_token,
+        )
 
-    result = dispatch_notification_push(notification_id)
-    delay = result.get("retry_in")                  # 재시도 대기 시간 가져오기
-    if delay is not None and self.request.retries < self.max_retries:
-        # Redis에도 시도 횟수/다음 시각이 있으므로 Beat의 새 Task가 제한을 초기화하지 않습니다.
-        # 원문 Firebase 예외 대신 고정 코드만 Celery에 넘겨 비밀값 노출을 막습니다.
-        raise self.retry(exc=RuntimeError("PUSH_RETRY_SCHEDULED"), countdown=int(delay))
+        return {
+            "incident_id": incident_id,
+            "skipped": "DISABLED",
+        }
+
+    import httpx
+
+    from psycopg import OperationalError
+
+    from ai.config import (
+        get_runtime_config,
+    )
+    from ai.orchestration.pipeline import (
+        run_pipeline,
+    )
+    from ai.risk_priority.rules import (
+        InsufficientContext,
+    )
+
+    try:
+        result = run_pipeline(
+            incident_id,
+            get_runtime_config(),
+        )
+
+    except (
+        httpx.HTTPError,
+        OperationalError,
+        InsufficientContext,
+    ) as exc:
+
+        # -------------------------------------------------
+        # 재시도 가능 오류
+        #
+        # retry 중에는 Lock을 유지합니다.
+        # 그래야 같은 Incident가 또 큐에 등록되지 않습니다.
+        # -------------------------------------------------
+
+        if (
+            self.request.retries
+            >= self.max_retries
+        ):
+            # 최대 재시도까지 실패한 경우
+            # 다음 탐지에서 다시 분석을 요청할 수 있도록
+            # Lock을 해제합니다.
+            _release_analysis_lock_safely(
+                incident_id,
+                lock_token,
+            )
+
+            raise
+
+        raise self.retry(
+            exc=RuntimeError(
+                type(exc).__name__
+            ),
+            countdown=30,
+        )
+
+    except Exception:
+        # 재시도 대상으로 지정하지 않은 오류라면
+        # Task는 실패시키되 Lock은 제거합니다.
+        _release_analysis_lock_safely(
+            incident_id,
+            lock_token,
+        )
+
+        raise
+
+    # -----------------------------------------------------
+    # LangGraph 분석 정상 완료
+    # -----------------------------------------------------
+    _release_analysis_lock_safely(
+        incident_id,
+        lock_token,
+    )
+
     return result
 
 
-# Beat가 호출하는 동일 앱의 복구 Task입니다. 스케줄러 중복은 Redis 잠금으로도 제한.
+# ---------------------------------------------------------
+# Push Notification Task
+# ---------------------------------------------------------
+@celery_app.task(
+    bind=True,
+    name="octv.send_notification_push",
+    queue="notifications",
+    max_retries=3,
+)
+def send_notification_push(
+    self,
+    notification_id,
+):
+    from .notifications.service import (
+        dispatch_notification_push,
+    )
+
+    result = (
+        dispatch_notification_push(
+            notification_id
+        )
+    )
+
+    delay = result.get(
+        "retry_in"
+    )
+
+    if (
+        delay is not None
+        and self.request.retries
+        < self.max_retries
+    ):
+        raise self.retry(
+            exc=RuntimeError(
+                "PUSH_RETRY_SCHEDULED"
+            ),
+            countdown=int(delay),
+        )
+
+    return result
+
+
+# ---------------------------------------------------------
+# Notification 복구 Task
+# ---------------------------------------------------------
 @celery_app.task(
     name="octv.recover_notification_pushes",
-    queue="notifications",                          
+    queue="notifications",
 )
 def recover_notification_pushes():
-    from .notifications.service import recover_notification_pushes as recover
+    from .notifications.service import (
+        recover_notification_pushes
+        as recover,
+    )
 
     return recover()

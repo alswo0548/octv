@@ -466,38 +466,31 @@ def list_incidents(
     # --------------------------------------------------------
     # 관제 목록 정렬
     #
-    # 1. 아직 확인하지 않은 DETECTED 사건 우선
-    # 2. DETECTED 내부에서는 최신 사건 우선
-    # 3. 그 외는 우선순위 점수 높은 순
-    # 4. 같은 우선순위에서는 최신 사건 우선
+    # 1. 상태: DETECTED → CONFIRMED → SENT
+    # 2. 같은 상태에서는 우선순위 점수 높은 순
+    # 3. 같은 우선순위에서는 먼저 탐지된 사건 우선
+    # 4. 완전히 같으면 ID 오름차순
     # --------------------------------------------------------
     items = connection.execute(
         base
         + """
         ORDER BY
-            CASE
-                WHEN i.status = 'DETECTED'
-                THEN 0
-                ELSE 1
-            END,
-            CASE
-                WHEN i.status = 'DETECTED'
-                THEN i.detected_at
-                ELSE NULL
-            END DESC NULLS LAST,
+            CASE i.status
+                WHEN 'DETECTED' THEN 0
+                WHEN 'CONFIRMED' THEN 1
+                WHEN 'SENT' THEN 2
+                ELSE 3
+            END ASC,
             a.priority_score DESC NULLS LAST,
-            i.detected_at DESC,
-            i.id DESC
+            i.detected_at ASC,
+            i.id ASC
         LIMIT %s
         OFFSET %s
         """,
         [
             *params,
             page_size,
-            (
-                page - 1
-            )
-            * page_size,
+            (page - 1) * page_size,
         ],
     ).fetchall()
 
@@ -587,6 +580,95 @@ def update_status(
             *allowed_from,
         ),
     ).fetchone()
+
+
+# ------------------------------------------------------------
+# 전달된 모든 기관의 대응 완료 여부 확인
+#
+# 기관별 recommendation_status 변경은 기관/현장대응 영역에서 처리합니다.
+# 그 작업 직후 같은 DB 트랜잭션에서 이 함수를 호출하여,
+# 전달된 기관이 모두 COMPLETED라면 사건을 RESOLVED로 변경합니다.
+#
+# RECOMMENDED 상태는 실제 전달되지 않은 기관이므로
+# 사건 완료 여부 판단에 포함하지 않습니다.
+# ------------------------------------------------------------
+def resolve_if_all_deliveries_completed(
+    connection,
+    incident_id: int,
+):
+    # 동일 사건에 대한 동시 완료 처리를 직렬화합니다.
+    incident = connection.execute(
+        """
+        SELECT
+            id,
+            status
+        FROM incidents
+        WHERE id = %s
+        FOR UPDATE
+        """,
+        (
+            incident_id,
+        ),
+    ).fetchone()
+
+    if incident is None:
+        return None
+
+    # 이미 완료된 사건은 그대로 반환합니다.
+    if incident["status"] == "RESOLVED":
+        return incident
+
+    # 기관 전달이 이루어진 SENT 사건만
+    # 자동 완료 대상으로 봅니다.
+    if incident["status"] != "SENT":
+        return incident
+
+    delivery_state = connection.execute(
+        """
+        SELECT
+            COUNT(*) FILTER (
+                WHERE recommendation_status = 'DELIVERED'
+            ) AS delivered_count,
+
+            COUNT(*) FILTER (
+                WHERE recommendation_status = 'COMPLETED'
+            ) AS completed_count
+
+        FROM incident_agency_recommendations
+        WHERE incident_id = %s
+        """,
+        (
+            incident_id,
+        ),
+    ).fetchone()
+
+    # 실제 전달 후 완료된 기관이 하나 이상 있고,
+    # 아직 처리 중인 DELIVERED 기관이 하나도 없을 때만
+    # 사건 전체를 RESOLVED로 변경합니다.
+    if (
+        delivery_state["completed_count"] > 0
+        and delivery_state["delivered_count"] == 0
+    ):
+        changed = connection.execute(
+            """
+            UPDATE incidents
+            SET status = 'RESOLVED'
+            WHERE id = %s
+              AND status = 'SENT'
+            RETURNING
+                id,
+                status
+            """,
+            (
+                incident_id,
+            ),
+        ).fetchone()
+
+        if changed is not None:
+            return changed
+
+    return incident
+
 
 
 def find_detail(

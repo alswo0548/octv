@@ -29,10 +29,17 @@ class IncidentResponse(BaseModel):
     representative_image_updated_at: datetime | None = None
     detection_bbox_json: dict | list
 
+
 class IncidentDetailResponse(IncidentResponse):
     risk_breakdown_json: dict[str, Any] | None = None
     priority_breakdown_json: dict[str, Any] | None = None
     rule_version: str | None = None
+
+    # AI 분석 완료 후 추천 기관과 기관별 경로 후보를 함께 반환합니다.
+    # 분석 전이거나 추천 가능한 기관이 없으면 빈 리스트입니다.
+    recommendations: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
 
 
 # 현재 페이지 목록과 검색 조건에 맞는 전체 건수를 묶습니다.
