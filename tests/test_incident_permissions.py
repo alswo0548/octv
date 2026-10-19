@@ -241,22 +241,91 @@ class IncidentPermissionsTests(unittest.TestCase):
 
     def test_detail_allowed_for_own_agency(self):
         self.connection.execute.return_value.fetchone.return_value = {"id": 1}
-        with patch.object(incident_repository, "find_detail", return_value=self.incident()):
-            response = self.client.get("/api/incidents/31", headers=self.headers())
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["id"], 31)
-        self.assertEqual(response.json()["analysis_status"], "PENDING")
+
+        recommendations = {
+            "incident_id": 31,
+            "incident_status": "DETECTED",
+            "items": [],
+        }
+
+        with (
+            patch.object(
+                incident_repository,
+                "find_detail",
+                return_value=self.incident(),
+            ),
+            patch.object(
+                agency_repository,
+                "list_recommendations",
+                return_value=recommendations,
+            ),
+        ):
+            response = self.client.get(
+                "/api/incidents/31",
+                headers=self.headers(),
+            )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        self.assertEqual(
+            response.json()["id"],
+            31,
+        )
+        self.assertEqual(
+            response.json()["analysis_status"],
+            "PENDING",
+        )
 
     def test_admin_detail_and_missing_incident(self):
-        self.user.update(role="CONTROL_ADMIN", agency_id=None)
-        with patch.object(incident_repository, "find_detail", return_value=self.incident()) as detail:
+        self.user.update(
+            role="CONTROL_ADMIN",
+            agency_id=None,
+        )
+
+        recommendations = {
+            "incident_id": 31,
+            "incident_status": "DETECTED",
+            "items": [],
+        }
+
+        with (
+            patch.object(
+                incident_repository,
+                "find_detail",
+                return_value=self.incident(),
+            ) as detail,
+            patch.object(
+                agency_repository,
+                "list_recommendations",
+                return_value=recommendations,
+            ) as recommendation_query,
+        ):
             self.assertEqual(
-                self.client.get("/api/incidents/31", headers=self.headers()).status_code, 200
+                self.client.get(
+                    "/api/incidents/31",
+                    headers=self.headers(),
+                ).status_code,
+                200,
             )
+
             self.connection.execute.assert_not_called()
+
+            recommendation_query.assert_called_once_with(
+                self.connection,
+                31,
+                agency_id=None,
+            )
+
             detail.return_value = None
+
             self.assertEqual(
-                self.client.get("/api/incidents/999", headers=self.headers()).status_code, 404
+                self.client.get(
+                    "/api/incidents/999",
+                    headers=self.headers(),
+                ).status_code,
+                404,
             )
 
     def test_user_without_agency_cannot_read_detail(self):
