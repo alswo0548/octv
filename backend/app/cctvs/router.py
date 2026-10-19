@@ -7,7 +7,6 @@ from fastapi import (
 )
 
 from ..dependencies import (
-    get_current_user,
     require_control_admin,
 )
 from . import (
@@ -38,10 +37,13 @@ def list_cctvs(
             "지역 코드 필터"
         ),
     ),
-    user=Depends(
-        get_current_user
+    _admin=Depends(
+        require_control_admin
     ),
 ):
+    """
+    관제 관리자만 CCTV 목록을 조회할 수 있다.
+    """
 
     return service.list_cctvs(
         region_code=region_code,
@@ -62,10 +64,13 @@ def get_cctv_summary(
             "지역 코드 필터"
         ),
     ),
-    user=Depends(
-        get_current_user
+    _admin=Depends(
+        require_control_admin
     ),
 ):
+    """
+    관제 관리자만 CCTV 상태 요약을 조회할 수 있다.
+    """
 
     return service.get_cctv_summary(
         region_code=region_code,
@@ -81,13 +86,13 @@ def get_cctv_summary(
 )
 def prepare_stream(
     cctv_id: int,
-    user=Depends(
-        get_current_user
+    _admin=Depends(
+        require_control_admin
     ),
 ):
     """
-    현재 감시 중인 CCTV의
-    MediaMTX WebRTC 스트림을 준비한다.
+    관제 관리자만 현재 감시 중인 CCTV의
+    MediaMTX WebRTC 스트림을 준비할 수 있다.
 
     실제 UTIC 원본 Stream URL은
     클라이언트에 노출하지 않는다.
@@ -107,10 +112,13 @@ def prepare_stream(
 )
 def get_cctv(
     cctv_id: int,
-    user=Depends(
-        get_current_user
+    _admin=Depends(
+        require_control_admin
     ),
 ):
+    """
+    관제 관리자만 CCTV 상세 정보를 조회할 수 있다.
+    """
 
     return service.get_cctv(
         cctv_id
@@ -127,10 +135,13 @@ def get_cctv(
 def change_monitoring(
     cctv_id: int,
     body: schemas.MonitoringRequest,
-    user=Depends(
+    _admin=Depends(
         require_control_admin
     ),
 ):
+    """
+    관제 관리자만 CCTV 감시 상태를 변경할 수 있다.
+    """
 
     return service.change_monitoring(
         cctv_id,

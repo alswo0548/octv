@@ -9,7 +9,7 @@ from fastapi import (
 )
 
 from ..dependencies import (
-    require_control_admin,
+    get_current_user,
 )
 from . import schemas, service
 
@@ -33,19 +33,23 @@ def get_dashboard(
         default=1,
         ge=1,
     ),
-
     page_size: int = Query(
         default=5,
         ge=1,
         le=20,
     ),
-
-    _admin=Depends(
-        require_control_admin
+    user=Depends(
+        get_current_user
     ),
 ):
     """
     W02 통합관제 메인 데이터를 조회한다.
+
+    CONTROL_ADMIN:
+    - 전체 현황과 전체 P1/P2 사건
+
+    AGENCY_STAFF / RESPONDER:
+    - 소속 기관에 전달된 사건 범위만 조회
 
     같은 incidents.items 배열을
     긴급 사건 목록과 지도 마커에 함께 사용한다.
@@ -54,6 +58,7 @@ def get_dashboard(
     return service.get_dashboard(
         page=page,
         page_size=page_size,
+        user=user,
     )
 
 
@@ -65,28 +70,22 @@ def get_dashboard(
 )
 def get_dashboard_external_status(
     incident_id: int,
-    _admin=Depends(
-        require_control_admin
+    user=Depends(
+        get_current_user
     ),
 ):
     """
     W02에서 선택한 사건의 외부 상황을 조회한다.
 
-    현재:
-    - 기상특보
-    - 집중감시 CCTV 수
-
-    추후 MCP 연결:
-    - 강수량
-    - 수위
-    - 도로통제
-    - 마지막 수신시각
+    기관/현장 사용자는 소속 기관에 전달된 사건만
+    조회할 수 있으며, 접근 불가 사건은 404로 숨긴다.
     """
 
     try:
         return (
             service.get_external_status(
-                incident_id
+                incident_id,
+                user=user,
             )
         )
 

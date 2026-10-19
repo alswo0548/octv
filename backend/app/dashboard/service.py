@@ -8,6 +8,8 @@ from datetime import (
 )
 from zoneinfo import ZoneInfo
 
+from fastapi import HTTPException
+
 from ..db.session import get_connection
 from . import repository, schemas
 
@@ -27,15 +29,7 @@ def _today_utc_range() -> tuple[
     datetime,
     datetime,
 ]:
-    """
-    한국시간 기준 오늘의 시작과 끝을 구한 뒤
-    incidents DB 저장 기준인 UTC naive 값으로 변환한다.
-
-    예:
-        2026-10-19 00:00:00+09:00
-        ->
-        2026-10-18 15:00:00
-    """
+    """한국시간 오늘 범위를 UTC naive로 변환한다."""
 
     today_kst = datetime.now(
         KST
@@ -83,10 +77,7 @@ def _today_utc_range() -> tuple[
 def _utc_naive_to_kst(
     value: datetime,
 ) -> datetime:
-    """
-    DB의 UTC naive timestamp를
-    timezone-aware 한국시간으로 변환한다.
-    """
+    """DB의 UTC naive timestamp를 KST로 변환한다."""
 
     if value.tzinfo is None:
         value = value.replace(
@@ -101,14 +92,7 @@ def _utc_naive_to_kst(
 def _kst_naive_to_aware(
     value: datetime,
 ) -> datetime:
-    """
-    weather_alerts의 KST naive timestamp를
-    timezone-aware KST datetime으로 변환한다.
-
-    weather_alerts Scheduler는
-    발표시각을 한국시간 그대로
-    TIMESTAMP WITHOUT TIME ZONE에 저장한다.
-    """
+    """weather_alerts KST naive timestamp를 aware KST로 변환한다."""
 
     if value.tzinfo is None:
         return value.replace(
@@ -123,10 +107,7 @@ def _kst_naive_to_aware(
 def _unmapped_metric(
     unit: str,
 ) -> schemas.DashboardExternalMetric:
-    """
-    외부 API/MCP 연결 전 화면 계약을 유지하기 위한
-    기본 응답.
-    """
+    """외부 API/MCP 연결 전 기본 응답."""
 
     return schemas.DashboardExternalMetric(
         value=None,
@@ -136,17 +117,60 @@ def _unmapped_metric(
     )
 
 
+def _role_scope(
+    user: dict,
+) -> tuple[bool, int | None]:
+    """
+    Dashboard 조회 범위를 결정한다.
+
+    CONTROL_ADMIN:
+        전체 조회
+
+    AGENCY_STAFF / RESPONDER:
+        자신의 agency_id에 전달된 사건만 조회
+    """
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요합니다.",
+        )
+
+    if user["role"] == "CONTROL_ADMIN":
+        return (
+            False,
+            None,
+        )
+
+    return (
+        True,
+        user.get(
+            "agency_id"
+        ),
+    )
+
+
 def get_dashboard(
     page: int = 1,
     page_size: int = 5,
+    user: dict | None = None,
 ) -> schemas.DashboardResponse:
     """
     W02 통합관제 화면 데이터를 반환한다.
 
+    - CONTROL_ADMIN: 전체 현황
+    - AGENCY_STAFF / RESPONDER:
+      소속 기관에 전달된 사건 범위
     - 사건 목록과 지도는 동일한 incidents.items 사용
     - 오늘 등록 사건은 한국 날짜 기준
-    - 사건 탐지 시각은 API에서 한국시간(+09:00)으로 반환
+    - 사건 탐지 시각은 KST(+09:00)로 반환
     """
+
+    agency_scoped, agency_id = (
+        _role_scope(
+            user
+        )
+    )
 
     (
         today_start_utc,
@@ -163,12 +187,16 @@ def get_dashboard(
                 today_end_utc=(
                     today_end_utc
                 ),
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
             )
         )
 
         total = (
             repository.count_dashboard_incidents(
-                connection
+                connection,
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
             )
         )
 
@@ -177,6 +205,8 @@ def get_dashboard(
                 connection,
                 page=page,
                 page_size=page_size,
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
             )
         )
 
@@ -220,13 +250,9 @@ def get_dashboard(
         incidents=(
             schemas.DashboardIncidentPage(
                 items=incident_items,
-
                 total=total,
-
                 page=page,
-
                 page_size=page_size,
-
                 total_pages=(
                     total_pages
                 ),
@@ -237,29 +263,36 @@ def get_dashboard(
 
 def get_external_status(
     incident_id: int,
+    user: dict | None = None,
 ) -> schemas.DashboardExternalStatusResponse:
     """
-    선택한 사건 기준의 W02 외부 상황 정보를 반환한다.
+    선택한 사건 기준 W02 외부 상황 정보를 반환한다.
 
-    현재 단계:
-    - 사건 지역의 ACTIVE 기상특보: 실제 DB 조회
-    - 사건 지역 ALERT CCTV 수: 실제 DB 조회
-    - 강수량 / 수위 / 도로통제:
-      MCP 실행 설정과 API Key 연결 전까지 NO_MAPPING
+    CONTROL_ADMIN:
+    - 전체 사건 접근 가능
 
-    추후 MCP 연결 시:
-    - last_received_at = ContextSnapshot.captured_at
-    - rainfall_mm = measurements["rainfall_mm"]
-    - water_level_m = measurements["water_level_m"]
-    - road_control_count = 검증된 closures 기반 건수
-    로 교체한다.
+    AGENCY_STAFF / RESPONDER:
+    - 자기 기관에 DELIVERED / COMPLETED된 사건만 접근 가능
+
+    현재:
+    - 기상특보 실제 조회
+    - 집중감시 CCTV 수 실제 조회
+    - 강수량 / 수위 / 도로통제는 NO_MAPPING
     """
+
+    agency_scoped, agency_id = (
+        _role_scope(
+            user
+        )
+    )
 
     with get_connection() as connection:
         incident = (
             repository.get_external_status_incident(
                 connection,
                 incident_id,
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
             )
         )
 
@@ -295,25 +328,21 @@ def get_external_status(
                     "external_alert_id"
                 ]
             ),
-
             alert_type=(
                 row[
                     "alert_type"
                 ]
             ),
-
             alert_level=(
                 row[
                     "alert_level"
                 ]
             ),
-
             title=(
                 row[
                     "title"
                 ]
             ),
-
             issued_at=(
                 _kst_naive_to_aware(
                     row[
@@ -321,7 +350,6 @@ def get_external_status(
                     ]
                 )
             ),
-
             region_code=(
                 row[
                     "region_code"
@@ -339,61 +367,50 @@ def get_external_status(
                     "id"
                 ]
             ),
-
             incident_no=(
                 incident[
                     "incident_no"
                 ]
             ),
-
             cctv_id=(
                 incident[
                     "cctv_id"
                 ]
             ),
-
             cctv_name=(
                 incident[
                     "cctv_name"
                 ]
             ),
-
             region_code=(
                 incident[
                     "region_code"
                 ]
             ),
-
             region_name=(
                 incident[
                     "region_name"
                 ]
             ),
-
             last_received_at=None,
-
             weather_alerts=(
                 weather_alerts
             ),
-
             rainfall_mm=(
                 _unmapped_metric(
                     "mm"
                 )
             ),
-
             water_level_m=(
                 _unmapped_metric(
                     "m"
                 )
             ),
-
             road_control_count=(
                 _unmapped_metric(
                     "count"
                 )
             ),
-
             focused_monitoring_cctv_count=(
                 focused_count
             ),
