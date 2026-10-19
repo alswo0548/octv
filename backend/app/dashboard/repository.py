@@ -254,3 +254,200 @@ def list_dashboard_incidents(
 
         for row in rows
     ]
+
+
+def get_external_status_incident(
+    connection,
+    incident_id: int,
+) -> dict | None:
+    """
+    외부상황 패널의 기준이 될 사건을 조회한다.
+
+    Dashboard 목록에서 선택한 incident_id를 기준으로
+    CCTV와 지역 정보를 가져온다.
+    """
+
+    query = """
+        SELECT
+            i.id,
+            i.incident_no,
+            i.cctv_id,
+
+            c.name AS cctv_name,
+            c.region_code,
+            c.latitude,
+            c.longitude,
+
+            CONCAT_WS(
+                ' ',
+                r.sido_name,
+                r.sigungu_name
+            ) AS region_name
+
+        FROM incidents AS i
+
+        JOIN cctvs AS c
+          ON c.id = i.cctv_id
+
+        LEFT JOIN region AS r
+          ON r.region_code = c.region_code
+
+        WHERE i.id = %s;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                incident_id,
+            ),
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "id":
+            row["id"],
+
+        "incident_no":
+            row["incident_no"],
+
+        "cctv_id":
+            row["cctv_id"],
+
+        "cctv_name":
+            row["cctv_name"],
+
+        "region_code":
+            row["region_code"],
+
+        "region_name":
+            row["region_name"],
+
+        "latitude": (
+            float(
+                row["latitude"]
+            )
+            if row["latitude"] is not None
+            else None
+        ),
+
+        "longitude": (
+            float(
+                row["longitude"]
+            )
+            if row["longitude"] is not None
+            else None
+        ),
+    }
+
+
+def list_active_weather_alerts(
+    connection,
+    region_code: str | None,
+) -> list[dict]:
+    """
+    선택한 사건의 지역에 현재 활성화된
+    기상특보를 조회한다.
+
+    weather_alerts.issued_at은
+    현재 기상특보 Scheduler 정책상 KST naive이다.
+    """
+
+    if not region_code:
+        return []
+
+    query = """
+        SELECT
+            external_alert_id,
+            alert_type,
+            alert_level,
+            title,
+            issued_at,
+            region_code
+
+        FROM weather_alerts
+
+        WHERE region_code = %s
+          AND status = 'ACTIVE'
+
+        ORDER BY
+            CASE alert_level
+                WHEN '경보' THEN 1
+                WHEN '주의보' THEN 2
+                WHEN '예비특보' THEN 3
+                ELSE 4
+            END,
+            issued_at DESC,
+            external_alert_id;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                region_code,
+            ),
+        )
+        rows = cursor.fetchall()
+
+    return [
+        {
+            "external_alert_id":
+                row["external_alert_id"],
+
+            "alert_type":
+                row["alert_type"],
+
+            "alert_level":
+                row["alert_level"],
+
+            "title":
+                row["title"],
+
+            "issued_at":
+                row["issued_at"],
+
+            "region_code":
+                row["region_code"],
+        }
+
+        for row in rows
+    ]
+
+
+def count_focused_monitoring_cctvs(
+    connection,
+    region_code: str | None,
+) -> int:
+    """
+    선택한 사건 지역에서 현재 ALERT 모드로
+    집중감시 중인 CCTV 수를 반환한다.
+    """
+
+    if not region_code:
+        return 0
+
+    query = """
+        SELECT
+            COUNT(*)::int AS total
+
+        FROM cctvs
+
+        WHERE region_code = %s
+          AND is_monitored = TRUE
+          AND monitored_mode = 'ALERT';
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                region_code,
+            ),
+        )
+        row = cursor.fetchone()
+
+    return row["total"]

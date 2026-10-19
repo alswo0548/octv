@@ -17,6 +17,12 @@ KST = ZoneInfo(
 )
 
 
+class DashboardIncidentNotFoundError(
+    LookupError
+):
+    """Dashboard 외부상황 기준 사건을 찾지 못한 경우."""
+
+
 def _today_utc_range() -> tuple[
     datetime,
     datetime,
@@ -89,6 +95,44 @@ def _utc_naive_to_kst(
 
     return value.astimezone(
         KST
+    )
+
+
+def _kst_naive_to_aware(
+    value: datetime,
+) -> datetime:
+    """
+    weather_alerts의 KST naive timestamp를
+    timezone-aware KST datetime으로 변환한다.
+
+    weather_alerts Scheduler는
+    발표시각을 한국시간 그대로
+    TIMESTAMP WITHOUT TIME ZONE에 저장한다.
+    """
+
+    if value.tzinfo is None:
+        return value.replace(
+            tzinfo=KST
+        )
+
+    return value.astimezone(
+        KST
+    )
+
+
+def _unmapped_metric(
+    unit: str,
+) -> schemas.DashboardExternalMetric:
+    """
+    외부 API/MCP 연결 전 화면 계약을 유지하기 위한
+    기본 응답.
+    """
+
+    return schemas.DashboardExternalMetric(
+        value=None,
+        unit=unit,
+        observed_at=None,
+        status="NO_MAPPING",
     )
 
 
@@ -188,4 +232,170 @@ def get_dashboard(
                 ),
             )
         ),
+    )
+
+
+def get_external_status(
+    incident_id: int,
+) -> schemas.DashboardExternalStatusResponse:
+    """
+    선택한 사건 기준의 W02 외부 상황 정보를 반환한다.
+
+    현재 단계:
+    - 사건 지역의 ACTIVE 기상특보: 실제 DB 조회
+    - 사건 지역 ALERT CCTV 수: 실제 DB 조회
+    - 강수량 / 수위 / 도로통제:
+      MCP 실행 설정과 API Key 연결 전까지 NO_MAPPING
+
+    추후 MCP 연결 시:
+    - last_received_at = ContextSnapshot.captured_at
+    - rainfall_mm = measurements["rainfall_mm"]
+    - water_level_m = measurements["water_level_m"]
+    - road_control_count = 검증된 closures 기반 건수
+    로 교체한다.
+    """
+
+    with get_connection() as connection:
+        incident = (
+            repository.get_external_status_incident(
+                connection,
+                incident_id,
+            )
+        )
+
+        if incident is None:
+            raise (
+                DashboardIncidentNotFoundError(
+                    f"incident_id={incident_id}"
+                )
+            )
+
+        weather_rows = (
+            repository.list_active_weather_alerts(
+                connection,
+                incident[
+                    "region_code"
+                ],
+            )
+        )
+
+        focused_count = (
+            repository.count_focused_monitoring_cctvs(
+                connection,
+                incident[
+                    "region_code"
+                ],
+            )
+        )
+
+    weather_alerts = [
+        schemas.DashboardWeatherAlert(
+            external_alert_id=(
+                row[
+                    "external_alert_id"
+                ]
+            ),
+
+            alert_type=(
+                row[
+                    "alert_type"
+                ]
+            ),
+
+            alert_level=(
+                row[
+                    "alert_level"
+                ]
+            ),
+
+            title=(
+                row[
+                    "title"
+                ]
+            ),
+
+            issued_at=(
+                _kst_naive_to_aware(
+                    row[
+                        "issued_at"
+                    ]
+                )
+            ),
+
+            region_code=(
+                row[
+                    "region_code"
+                ]
+            ),
+        )
+
+        for row in weather_rows
+    ]
+
+    return (
+        schemas.DashboardExternalStatusResponse(
+            incident_id=(
+                incident[
+                    "id"
+                ]
+            ),
+
+            incident_no=(
+                incident[
+                    "incident_no"
+                ]
+            ),
+
+            cctv_id=(
+                incident[
+                    "cctv_id"
+                ]
+            ),
+
+            cctv_name=(
+                incident[
+                    "cctv_name"
+                ]
+            ),
+
+            region_code=(
+                incident[
+                    "region_code"
+                ]
+            ),
+
+            region_name=(
+                incident[
+                    "region_name"
+                ]
+            ),
+
+            last_received_at=None,
+
+            weather_alerts=(
+                weather_alerts
+            ),
+
+            rainfall_mm=(
+                _unmapped_metric(
+                    "mm"
+                )
+            ),
+
+            water_level_m=(
+                _unmapped_metric(
+                    "m"
+                )
+            ),
+
+            road_control_count=(
+                _unmapped_metric(
+                    "count"
+                )
+            ),
+
+            focused_monitoring_cctv_count=(
+                focused_count
+            ),
+        )
     )
