@@ -237,12 +237,12 @@ class BackendScaffoldTests(
             ],
         )
 
-    def test_unimplemented_routes_do_not_claim_state_change(
+    def test_support_requests_require_authentication(
         self,
     ):
         """
-        아직 미구현인 API가
-        구현 완료 상태를 반환하지 않는지 확인한다.
+        구현된 지원요청 API는
+        로그인하지 않은 요청을 거부해야 한다.
         """
 
         cases = [
@@ -281,7 +281,7 @@ class BackendScaffoldTests(
 
                 self.assertEqual(
                     status,
-                    501,
+                    401,
                 )
 
     def test_cctv_routes_require_authentication(
