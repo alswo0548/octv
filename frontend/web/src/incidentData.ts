@@ -8,7 +8,7 @@
  * 4. 사건 대표 이미지는 JWT 인증이 필요한 별도 JPEG API에서 Blob으로 조회합니다.
  *
  * 이 파일은 로그인·토큰 저장/삭제를 직접 구현하지 않습니다.
- * 실제 로그인/복원/로그아웃 호출 지점은 수연 담당 인증 코드와 연결해야 합니다.
+ * 로그인 화면이 세션을 연결하고, 로그아웃 시 전달받은 토큰 폐기 함수를 호출합니다.
  */
 import type { CurrentUserDto, IncidentDto, PageDto } from "@octv/shared";
 import { ApiError, type createApi } from "./api";

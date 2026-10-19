@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import type { IncidentDto, PageDto } from "@octv/shared";
 import { type ShowModal } from "../components/Primitives";
+import { LiveSupportRequestsPanel } from "../components/LiveSupportRequestsPanel";
 import {
   changeServerIncident,
   formatSeoulTime,
@@ -540,11 +541,14 @@ export function LiveIncidentsPage({
             >
               추천 기관 확인·전달
             </button>
-            <p className="subtle">
-              경로 지도·내비게이션은 후속-05, 현장 지원 요청은 후속-06에서
-              연결합니다.
-            </p>
           </section>
+          {/* 기존 세션과 실제 사건 ID를 재사용하고, 사건·세션 전환 시 이전 패널을 비웁니다. */}
+          <LiveSupportRequestsPanel
+            key={`${session.version}:${detail.id}`}
+            session={session}
+            incidentId={detail.id}
+            refreshKey={refreshKey}
+          />
         </>
       )}
     </>

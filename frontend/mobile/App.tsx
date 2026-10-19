@@ -3,6 +3,7 @@
  * 주요 기능: 종료 상태의 알림 터치, 계정 변경 시 상세 차단, 샘플 사건과 실제 사건의 분리.
  * 기존 인증 Backend를 모바일 화면에 연결하고 JWT 복원 후 connectNotificationSession을 재사용합니다.
  * onLogout에서는 기존 알림 기기 해제가 성공한 뒤 저장된 JWT만 삭제합니다.
+ * 실제 사건 상세·경로·지원요청은 조회된 사건과 원래 진입 목록을 함께 유지합니다.
  */
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import {
@@ -31,6 +32,8 @@ import type { Screen, Navigate } from "./src/navigation/types";
 import { AuthScreens } from "./src/screens/AuthScreens";
 import { LiveIncidentScreens } from "./src/screens/LiveIncidentScreens";
 import { DetailScreen } from "./src/screens/DetailScreen";
+import { LiveRoutesScreen } from "./src/screens/LiveRoutesScreen";
+import { LiveSupportRequestScreen } from "./src/screens/LiveSupportRequestScreen";
 import { RoutesScreen } from "./src/screens/RoutesScreen";
 import { RequestScreen } from "./src/screens/RequestScreen";
 import { NotificationScreen } from "./src/screens/NotificationScreen";
@@ -59,6 +62,8 @@ export function MobileApp({
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushInitialized, setPushInitialized] = useState(false);
   const navigationVersion = useRef(0);
+  // 메뉴 이동 뒤 끝난 이전 조회와 확인창 콜백을 구분합니다.
+  const navigationRequest = useRef(0);
   const detailOrigin = useRef<"notifications" | "incidents">("notifications");
   const [screen, setScreen] = useState<Screen>("login"),
     [id, setId] = useState("SEL-001"),
@@ -102,10 +107,16 @@ export function MobileApp({
     }
   }, [currentSession.status, currentSession.api, notification.status]);
 
-  // 계정이 달라지거나 인증이 풀리면 이전 사용자가 열어 둔 확인창도 닫습니다.
+  // 계정·사건·화면이 달라지거나 인증이 풀리면 이전 확인창도 닫습니다.
   useEffect(() => {
     setDialog(null);
-  }, [notification.user, notification.status]);
+  }, [
+    notification.user,
+    notification.status,
+    notification.incident?.id,
+    currentSession.api,
+    screen,
+  ]);
 
   // 리스너는 앱당 한 번 연결하고, 드라이버 준비 전에 앱이 닫히면 뒤늦게 등록하지 않습니다.
   useEffect(() => {
@@ -157,6 +168,8 @@ export function MobileApp({
     if (notification.status !== "ready" || !notification.incident) return;
     if (notification.openedNotificationId)
       detailOrigin.current = "notifications";
+    navigationRequest.current += 1;
+    setDialog(null);
     setNotificationDetail(true);
     setScreen("detail");
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -167,22 +180,62 @@ export function MobileApp({
   ]);
 
   const go: Navigate = (next, incident) => {
+    const session = mobileSession.getSnapshot();
     // 기존 로그인 화면을 거치지 않고 샘플 사건 화면으로 진입하지 않게 합니다.
     if (
-      currentSession.status !== "ready" &&
+      session.status !== "ready" &&
       !["login", "signup-basic", "signup-agency", "signup-complete"].includes(
         next,
       )
     ) {
+      navigationRequest.current += 1;
+      setDialog(null);
       setScreen("login");
       return;
     }
+    const opened = notificationController.getSnapshot();
+    const actualIncident =
+      notificationDetail &&
+      session.api === currentSession.api &&
+      opened.status === "ready" &&
+      opened.user?.id === session.user?.id
+        ? opened.incident
+        : null;
+    // 같은 실제 사건의 상세·경로·지원요청 이동에서는 사건과 원래 목록을 보존합니다.
+    if (
+      notificationDetail &&
+      ["detail", "routes", "request"].includes(next) &&
+      (!incident || incident === String(actualIncident?.id))
+    ) {
+      if (actualIncident || next === "detail") {
+        if (screen !== next) navigationRequest.current += 1;
+        setScreen(next);
+        scroll.current?.scrollTo({ y: 0, animated: false });
+      } else {
+        setDialog({
+          title: "사건 조회 안내",
+          body: "사건 정보를 다시 확인한 뒤 이용해주세요.",
+          cancel: false,
+        });
+      }
+      return;
+    }
+    const requestVersion = ++navigationRequest.current;
     // 실제 DB 번호는 항상 서버 상세 조회로 보내고, 알 수 없는 번호를 샘플 사건으로 대체하지 않습니다.
     if (incident && /^[1-9]\d*$/.test(incident)) {
       if (next === "detail") {
         detailOrigin.current = "incidents";
+        const ownerApi = session.api;
+        const openedVersion = opened.navigationVersion;
         void notificationController.openIncident(incident).then((opened) => {
-          if (!opened && mobileSession.getSnapshot().status === "ready") {
+          if (
+            !opened &&
+            requestVersion === navigationRequest.current &&
+            mobileSession.getSnapshot().status === "ready" &&
+            mobileSession.getSnapshot().api === ownerApi &&
+            notificationController.getSnapshot().navigationVersion ===
+              openedVersion
+          ) {
             setDialog({
               title: "사건 조회 안내",
               body: "사건 상세를 확인하지 못했습니다. 목록에서 다시 시도해주세요.",
@@ -198,7 +251,10 @@ export function MobileApp({
         });
       return;
     }
-    if (notificationDetail && ["live", "routes", "request"].includes(next)) {
+    if (
+      notificationDetail &&
+      ["detail", "live", "routes", "request"].includes(next)
+    ) {
       setDialog({
         title: "이용 안내",
         body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
@@ -207,13 +263,38 @@ export function MobileApp({
       return;
     }
     // 아직 상세가 열리기 전이라도 사용자가 다른 메뉴를 택하면 진행 중인 조회를 취소 처리합니다.
-    if (!(notificationDetail && next === "detail" && !incident)) {
-      setNotificationDetail(false);
-      notificationController.clearOpenedIncident();
-    }
+    setNotificationDetail(false);
+    notificationController.clearOpenedIncident();
     setScreen(next);
     if (incident) setId(incident);
     scroll.current?.scrollTo({ y: 0, animated: false });
+  };
+  // 화면을 떠난 뒤 도착한 내비 결과나 이전 사건의 확인창은 현재 화면에 표시하지 않습니다.
+  const incidentViewVersion = navigationRequest.current;
+  const showIncidentDialog = (value: DialogState) => {
+    const isCurrent = () => {
+      const session = mobileSession.getSnapshot();
+      const opened = notificationController.getSnapshot();
+      return (
+        incidentViewVersion === navigationRequest.current &&
+        session.status === "ready" &&
+        session.api === currentSession.api &&
+        opened.status === "ready" &&
+        opened.user?.id === session.user?.id &&
+        !!opened.incident &&
+        opened.incident.id === notification.incident?.id &&
+        opened.navigationVersion === notification.navigationVersion
+      );
+    };
+    if (!isCurrent()) return;
+    setDialog({
+      ...value,
+      onConfirm: value.onConfirm
+        ? () => {
+            if (isCurrent()) value.onConfirm?.();
+          }
+        : undefined,
+    });
   };
   const auth = [
       "login",
@@ -239,7 +320,7 @@ export function MobileApp({
   };
   function navigate(next: Screen) {
     if (screen === "request")
-      setDialog({
+      (notificationDetail ? showIncidentDialog : setDialog)({
         title: "작성 화면을 나갈까요?",
         body: "입력 내용은 저장되지 않습니다.",
         confirm: "이동",
@@ -342,13 +423,31 @@ export function MobileApp({
               <View style={s.panel}>
                 <T>저장된 로그인 상태를 확인하고 있습니다.</T>
               </View>
-            ) : notificationDetail && screen === "detail" ? (
-              notification.status === "ready" && notification.incident ? (
-                <DetailScreen
-                  actualIncident={notification.incident}
-                  go={go}
-                  backTo={detailOrigin.current}
-                />
+            ) : notificationDetail &&
+              ["detail", "routes", "request"].includes(screen) ? (
+              currentSession.status === "ready" &&
+              notification.status === "ready" &&
+              notification.user?.id === currentSession.user?.id &&
+              notification.incident ? (
+                screen === "routes" ? (
+                  <LiveRoutesScreen
+                    incident={notification.incident}
+                    go={go}
+                    show={showIncidentDialog}
+                  />
+                ) : screen === "request" ? (
+                  <LiveSupportRequestScreen
+                    incident={notification.incident}
+                    go={go}
+                    show={showIncidentDialog}
+                  />
+                ) : (
+                  <DetailScreen
+                    actualIncident={notification.incident}
+                    go={go}
+                    backTo={detailOrigin.current}
+                  />
+                )
               ) : (
                 <View style={s.panel}>
                   <T>

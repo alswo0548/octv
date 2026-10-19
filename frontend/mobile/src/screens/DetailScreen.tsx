@@ -106,6 +106,13 @@ function DeliveredIncidentDetail({
           value={`${(incident.confidence * 100).toFixed(1)}%`}
         />
       </Panel>
+      {/* 조회된 실제 사건 ID를 같은 사건의 경로·지원요청 화면으로 전달합니다. */}
+      <Button onPress={() => go("routes", String(incident.id))}>
+        경로 비교 상세
+      </Button>
+      <Button secondary onPress={() => go("request", String(incident.id))}>
+        추가 지원요청
+      </Button>
       <Button
         onPress={() => void notificationController.openIncident(incident.id)}
       >
