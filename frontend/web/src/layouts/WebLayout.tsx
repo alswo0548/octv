@@ -1,4 +1,4 @@
-import { mock } from "@octv/shared";
+/** 기존 화면 틀을 유지하고 운영 상태·시각을 확인되지 않은 정상 값으로 표시하지 않습니다. */
 import { type ReactNode } from "react";
 import { Background } from "../components/Background";
 import { Brand, type ShowModal } from "../components/Primitives";
@@ -23,7 +23,6 @@ export function WebLayout({
   show: ShowModal;
   onLogout?: () => void;
 }) {
-  const isLiveIncidentPage = page === "overview" || page === "incidents";
   return (
     <>
       <Background />
@@ -50,7 +49,7 @@ export function WebLayout({
         </nav>
         <div className="side-foot">
           <div className="signal">
-            <i /> {isLiveIncidentPage ? "서버 상태 미확인" : "시스템 정상"}
+            <i /> 서버 상태 미확인
           </div>
           <small>119 종합상황실</small>
           <div className="profile">
@@ -83,14 +82,9 @@ export function WebLayout({
             <h1>{title}</h1>
           </div>
           <div className="header-right">
-            <time>
-              {isLiveIncidentPage
-                ? "사건 시각 KST 기준"
-                : mock.uiSnapshot.header.date}
-              {!isLiveIncidentPage && <b>{mock.uiSnapshot.header.time}</b>}
-            </time>
+            <time>사건 시각 KST 기준</time>
             <span className="signal">
-              <i /> {isLiveIncidentPage ? "미확인" : "정상"}
+              <i /> 미확인
             </span>
             <span className="avatar">관</span>
           </div>
