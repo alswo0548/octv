@@ -15,12 +15,15 @@ export function WebLayout({
   title,
   children,
   show,
+  onLogout,
 }: {
   page: string;
   title: string;
   children: ReactNode;
   show: ShowModal;
+  onLogout?: () => void;
 }) {
+  const isLiveIncidentPage = page === "overview" || page === "incidents";
   return (
     <>
       <Background />
@@ -47,7 +50,7 @@ export function WebLayout({
         </nav>
         <div className="side-foot">
           <div className="signal">
-            <i /> 시스템 정상
+            <i /> {isLiveIncidentPage ? "서버 상태 미확인" : "시스템 정상"}
           </div>
           <small>119 종합상황실</small>
           <div className="profile">
@@ -63,7 +66,7 @@ export function WebLayout({
                 title: "로그아웃",
                 body: "로그인 화면으로 이동할까요?",
                 confirm: "로그아웃",
-                onConfirm: () => go("login"),
+                onConfirm: onLogout ?? (() => go("login")),
               })
             }
           >
@@ -81,10 +84,11 @@ export function WebLayout({
           </div>
           <div className="header-right">
             <time>
-              {mock.uiSnapshot.header.date} <b>{mock.uiSnapshot.header.time}</b>
+              {isLiveIncidentPage ? "사건 시각 KST 기준" : mock.uiSnapshot.header.date}
+              {!isLiveIncidentPage && <b>{mock.uiSnapshot.header.time}</b>}
             </time>
             <span className="signal">
-              <i /> 정상
+              <i /> {isLiveIncidentPage ? "미확인" : "정상"}
             </span>
             <span className="avatar">관</span>
           </div>
