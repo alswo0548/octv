@@ -1,4 +1,5 @@
 import fixtures from "./fixtures.json";
+export { hazardLabel, hazardLabels } from "./hazards";
 export { CCTV_SOURCE, cctvCaption } from "./attribution";
 /** UI snapshots only. Values are prepared, never calculated or persisted at runtime. */
 export const mock = fixtures;

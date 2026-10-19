@@ -2,11 +2,11 @@
  * 후속-04 모바일 실사건 목록: 기존 /api/incidents를 기관 JWT로 조회하여 보여줍니다.
  * 화면의 카드 배치·스타일을 재사용하며 샘플 사건을 실제 데이터로 대신 표시하지 않습니다.
  * 로그인·계정 변경 후 이전 서버 응답이 새 계정 화면에 섞이지 않도록 현재 API를 비교합니다.
- * 경로·지원 요청 화면 연결은 각각 후속-05·06에서 진행합니다.
+ * 경로·지원 요청 연결을 유지하며 재난 유형은 웹과 같은 표시 계약을 사용합니다.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import type { IncidentDto, PageDto } from "@octv/shared";
+import { hazardLabel, type IncidentDto, type PageDto } from "@octv/shared";
 import { ApiError } from "../api";
 import { mobileSession } from "../mobileSession";
 import type { Navigate } from "../navigation/types";
@@ -58,7 +58,7 @@ function LiveIncidentCard({
         <Text style={[s.muted, { color: "#b9d1df" }]}>● 전달받은 사건</Text>
       </View>
       <Text style={[s.h2, { marginTop: 15, marginBottom: 4 }]}>
-        {incident.hazard_type} · {incident.incident_no}
+        {hazardLabel(incident.hazard_type)} · {incident.incident_no}
       </Text>
       <T muted>{incident.cctv_name}</T>
       <View

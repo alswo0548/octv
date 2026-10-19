@@ -15,7 +15,7 @@ OCTV 재난별 후보 기관 추천 Rule
 [2. 재난 유형별 추천 기관]
 - 침수        : 주요 소방·도로관리 / 협조 지자체·경찰
 - 쓰러진 나무  : 주요 도로관리·지자체 / 협조 경찰·소방
-- 싱크홀      : 주요 도로관리·지자체 / 협조 경찰·소방
+- 심각 도로 파손 : 주요 도로관리·지자체 / 협조 경찰·소방
 - 도로 장애물  : 주요 도로관리 / 협조 경찰·지자체
 
 [3. 기관 추천 처리 순서]
@@ -54,7 +54,7 @@ AGENCY_ROLES = {
         'primary': ('ROAD_MANAGEMENT', 'LOCAL_GOVERNMENT'),
         'conditional': ('POLICE', 'FIRE'),
     },
-    'sinkhole': {
+    'severe_road_damage': {
         'primary': ('ROAD_MANAGEMENT', 'LOCAL_GOVERNMENT'),
         'conditional': ('POLICE', 'FIRE'),
     },
@@ -63,6 +63,9 @@ AGENCY_ROLES = {
         'conditional': ('POLICE', 'LOCAL_GOVERNMENT'),
     },
 }
+
+# 과거 저장 유형은 기존 기관 정책을 유지합니다. 신규 사건은 severe_road_damage를 사용합니다.
+AGENCY_ROLES['sinkhole'] = AGENCY_ROLES['severe_road_damage']
 
 # 하버사인 공식(지구가 둥글다는 점을 고려한 계산법)을 활용하여 사건위치와 기관위치 사이의 진선거리를 계산
 def haversine_m(a, b):

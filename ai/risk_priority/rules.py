@@ -5,7 +5,7 @@ OCTV 위험도 및 사건 간 우선순위 판단
 1. 재난 유형별 기본 점수에 검증된 외부 상황 가산점을 반영 (재난 60점·주변 30점·악화 10점)
 2. 동일한 위험도 점수로 HIGH/MEDIUM/LOW 및 P1/P2/P3를 동시에 결정
 3. 사건 간 점수 정렬: 높은 점수 → 먼저 탐지된 사건 → 사건 ID
-4. 악화점수: 침수·싱크홀은 강수, 나무·전봇대는 강수/풍속 중 최댓값, 도로 장애물은 각각 5점씩 합산
+4. 악화점수: 침수·심각 도로 파손은 강수, 나무·전봇대는 강수/풍속 중 최댓값, 도로 장애물은 각각 5점씩 합산
 
 OCTV 위험도 및 사건 간 우선순위 Rule
 
@@ -17,14 +17,14 @@ OCTV 위험도 및 사건 간 우선순위 Rule
 [2. 재난 유형별 기본 점수 및 심각성 가산]
 - 침수        : 기본 40점 + 차로 차단 5~10 + 수위 5~10 + 지하차도 5
 - 쓰러진 나무  : 기본 40점 + 차로 차단 5~10
-- 싱크홀      : 기본 45점 + 도로 통제 확인 5
+- 심각 도로 파손 : 기본 45점 + 도로 통제 확인 5
 - 도로 장애물  : 기본 30점 + 차로 차단 10~20
 ※ 심각성 가산점은 조건 충족 시에만 적용하며 최대 60점으로 제한
 
 [3. 재난별 악화 가능성 - 최대 10점]
 - 침수        : 강수량 0 / 5 / 10점
 - 쓰러진 나무  : 강수·풍속 점수 중 높은 값 (최대 10점)
-- 싱크홀      : 강수량 0 / 5 / 10점
+- 심각 도로 파손 : 강수량 0 / 5 / 10점
 - 도로 장애물  : 강수량 최대 5점 + 풍속 최대 5점
 
 ※ 현재 Rule상 최고점 : 침수 100점 / 나머지 재난 90점
@@ -66,10 +66,14 @@ RISK_POLICIES = {
     for hazard, base_score in {
         "flood": 40,
         "fallen_tree": 40,
-        "sinkhole": 45,
+        "severe_road_damage": 45,
         "road_obstacle": 30,
     }.items()
 }
+
+
+# 과거 저장 사건만 호환합니다. 새 탐지 클래스나 DB 값을 변환하지 않습니다.
+RISK_POLICIES["sinkhole"] = {**RISK_POLICIES["severe_road_damage"], "hazard_type": "sinkhole"}
 
 
 # 필수 외부 정보가 부족하거나 관측값이 잘못된 경우
@@ -196,8 +200,8 @@ def assess(context: ContextSnapshot, policy: dict) -> dict:
             else:
                 unknown.append("road_type")
 
-    if hazard == "sinkhole":
-        # 실제 도로 통제가 확인된 경우만 가산하며, 싱크홀 확대 추정은 하지 않습니다.
+    if hazard in {"severe_road_damage", "sinkhole"}:
+        # 실제 도로 통제가 확인된 경우만 가산하며, 파손 원인이나 함몰 확대를 추정하지 않습니다.
         closure = observation("closure_confirmed")
         if closure is not None:
             if closure in (
