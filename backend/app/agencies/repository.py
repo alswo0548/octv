@@ -45,9 +45,7 @@ def list_agencies(
         )
 
     sql += """
-        ORDER BY
-            name,
-            id
+        ORDER BY name, id
     """
 
     return connection.execute(
