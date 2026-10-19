@@ -175,4 +175,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://octv_test:local_ci_only@127.0.0.1:5432/octv_test
 
+      - run: python tests/run_dashboard_checks.py
+        env:
+          DATABASE_URL: postgresql://octv_test:local_ci_only@127.0.0.1:5432/octv_test
+
       - run: python tests/run_migration_checks.py
