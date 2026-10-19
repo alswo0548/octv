@@ -36,7 +36,9 @@ def get_analysis_input(incident_id):
 
 # 판단이 필요하면 Celery에 작업 요청
 def request_analysis(incident_id):
-    if get_analysis_input(incident_id) is None:
+    # 기존 조회 결과를 재사용해 분석 상태와 재난 유형을 함께 확인합니다.
+    incident = get_analysis_input(incident_id)
+    if incident is None:
         return {
             'incident_id': incident_id,
             'queued': False,
@@ -48,6 +50,22 @@ def request_analysis(incident_id):
             '판단 연결은 05번 완료 후 활성화합니다.'
         )
     try:
+        # 분석을 켠 경우에만 기존 판단 정책을 읽습니다. 새 유형이나 점수는 만들지 않습니다.
+        from ai.risk_priority.rules import RISK_POLICIES
+
+        # 사건화와 판단의 유형명이 다르면 임의 변환하지 않고 요청을 건너뜁니다.
+        if incident['hazard_type'] not in RISK_POLICIES:
+            log.warning(
+                'analysis_unsupported_hazard incident=%s hazard=%s',
+                incident_id,
+                incident['hazard_type'],
+            )
+            return {
+                'incident_id': incident_id,
+                'queued': False,
+                'reason': 'UNSUPPORTED_HAZARD_TYPE',
+            }
+
         from .workers import analyze_incident
 
         # .delay() 지금 즉시 AI 판단을 실행하는 게 아닌 Celery에 작업을 등록하라는 요청
@@ -72,6 +90,14 @@ def request_analysis(incident_id):
 # 사건 DB 저장 완료 후 AI 판단 작업을 요청합니다.
 # 판단 요청이 실패하더라도 기존 사건 저장 결과는 유지합니다.
 def after_incident_committed(incident_id):
+    # 자동 분석 OFF는 정상 설정. 반복 탐지마다 DB 조회나 실패 경고를 만들지 않습니다.
+    if os.environ.get('OCTV_DECISION_ENABLED', '0') != '1':
+        return {
+            'incident_id': incident_id,
+            'queued': False,
+            'reason': 'DISABLED',
+        }
+
     try:
         return request_analysis(incident_id)
     except Exception as exc:

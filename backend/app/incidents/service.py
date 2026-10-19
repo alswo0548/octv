@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 
+from ..analysis_requests import after_incident_committed
 from ..db.session import get_connection
 from . import repository
 
@@ -60,6 +61,9 @@ def register_detection(
                 data,
             )
         )
+
+    # 기존 사건을 DB 저장 후 마무리가 아닌 저장 후 자동 분석 연결할수있게 설정
+    after_incident_committed(incident["id"])
 
     return incident
 
