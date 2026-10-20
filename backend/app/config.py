@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import dotenv_values
 
@@ -10,6 +11,45 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # OCTV의 DB 세션 시간대
 DB_TIMEZONE = "Asia/Seoul"
+
+
+def cors_allowed_origins() -> list[str]:
+    """새 설정: 브라우저에서 여는 페이지의 Origin을 쉼표로 구분합니다."""
+    values = dotenv_values(ROOT / "backend" / ".env", interpolate=False)
+    raw = os.environ.get(
+        "OCTV_CORS_ALLOWED_ORIGINS", values.get("OCTV_CORS_ALLOWED_ORIGINS")
+    ) or ""
+    origins = []
+    for item in raw.split(","):
+        origin = item.strip()
+        if not origin:
+            continue
+        try:
+            parsed = urlsplit(origin)
+            valid = (
+                parsed.scheme in ("http", "https")
+                and bool(parsed.hostname)
+                and not parsed.username
+                and not parsed.password
+                and not parsed.path
+                and not parsed.query
+                and not parsed.fragment
+                and "*" not in origin
+                and not any(char.isspace() for char in origin)
+            )
+            # 잘못된 포트도 시작 시 확인합니다. 실제 Origin 값은 오류에 출력하지 않습니다.
+            port = parsed.port
+            valid = valid and (port is None or 1 <= port <= 65535)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError(
+                "OCTV_CORS_ALLOWED_ORIGINS에는 경로·끝 슬래시 없이 "
+                "http(s)://호스트[:포트]를 입력하세요. 와일드카드는 허용하지 않습니다."
+            )
+        if origin not in origins:
+            origins.append(origin)
+    return origins
 
 
 def database_connect_kwargs() -> dict:

@@ -399,7 +399,7 @@ class NodeTests(unittest.TestCase):
     def test_four_hazard_policies_keep_original_worsening_caps(self):
         cases = (
             ('flood', 100), ('fallen_tree', 90),
-            ('sinkhole', 90), ('road_obstacle', 90),
+            ('severe_road_damage', 90), ('road_obstacle', 90),
         )
         for hazard, expected in cases:
             with self.subTest(hazard=hazard):

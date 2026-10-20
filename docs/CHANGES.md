@@ -32,7 +32,7 @@ ERD의 DATETIME은 PostgreSQL TIMESTAMP WITHOUT TIME ZONE으로, AUTO_INCREMENT�
 - 새 ERD의 COMPLETED를 기관추천 ENUM에 반영했습니다. 기관별 완료 처리와 사건 RESOLVED 전환 로직은 후속 구현 대상입니다.
 - 기존 UI 목업의 동작은 그대로입니다. 화면상 동작을 실제 DB 처리로 설명하지 않습니다.
 - 아키텍처 그림에는 RDBMS MySQL 및 Redis/Celery/MediaMTX가 있으나 이번 명시 요청에 따라 PostgreSQL만 구성했습니다. 추가 서비스를 설치하지 않았습니다.
-- 서비스 Workflow의 사고/차량, 기존 화면의 도로 차단·통제, 학습 데이터의 싱크홀 분류는 이번에 합치거나 재정의하지 않았습니다.
+- 현재 서비스는 flood / fallen_tree / severe_road_damage / road_obstacle 네 유형을 사용합니다. 모델 내부 클래스와 ID는 가중치 적용 전에 별도로 확인합니다.
 - 최신 ERD의 is_monitored는 기본 감시 대상 여부이고 monitored_mode는 현재 감시 상태입니다. 기존 문서의 둘을 같은 ON/OFF로 다루던 설명은 수정했습니다. 특보 중 수동 OFF 허용·재활성화 제외 등 운영 정책은 별도 확인 사항이며 이번에 구현하지 않았습니다.
 
 ## 실행 가능 부분과 미구현 부분

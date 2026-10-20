@@ -64,9 +64,6 @@ AGENCY_ROLES = {
     },
 }
 
-# 과거 저장 유형은 기존 기관 정책을 유지합니다. 신규 사건은 severe_road_damage를 사용합니다.
-AGENCY_ROLES['sinkhole'] = AGENCY_ROLES['severe_road_damage']
-
 # 하버사인 공식(지구가 둥글다는 점을 고려한 계산법)을 활용하여 사건위치와 기관위치 사이의 진선거리를 계산
 def haversine_m(a, b):
     lat1, lon1, lat2, lon2 = map(radians, (*a, *b))

@@ -167,7 +167,7 @@ def fetch_rule_data(query: dict) -> dict:
         and isinstance(closures.get('value'), list)
     )
 
-    # 하나의 검증된 통제 수준으로 싱크홀의 통제 여부를 재사용합니다.
+    # 검증된 도로 통제 수준에서 위험도 판단에 사용할 통제 여부를 구합니다.
     if result['closure_confirmed']['status'] == 'NO_MAPPING':
         control = result['traffic_control']
         if control.get('status') == 'OK':
