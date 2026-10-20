@@ -18,10 +18,10 @@ DEFAULT_SETTINGS = {
     "alert_analysis_interval_sec": 3,
     "verify_analysis_interval_sec": 2,
 
-    "candidate_confidence_threshold": 0.70,
+    "candidate_confidence_threshold": 0.35,
     "candidate_min_detection_count": 3,
-    "temporal_validation_sec": 5,
-    "incident_confidence_threshold": 0.85,
+    "temporal_validation_sec": 15,
+    "incident_confidence_threshold": 0.35,
 
     "reconnect_interval_sec": 10,
     "max_reconnect_attempts": 3,

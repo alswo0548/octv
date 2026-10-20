@@ -243,6 +243,229 @@ def update_monitoring(
 
 
 # ============================================================
+# Incident VERIFY Runtime 상태 전환
+# ============================================================
+
+
+VERIFY_RESTORE_MODES = {
+    "BASE",
+    "ALERT",
+    "POST_ALERT",
+}
+
+
+def enter_verify_mode(
+    connection,
+    cctv_id: int,
+):
+    """
+    위험 후보가 발견된 CCTV를
+    일시적인 VERIFY 모드로 전환한다.
+
+    DB 구조를 변경하지 않는다.
+    기존 cctvs.monitored_mode만 사용한다.
+
+    정상 전환:
+
+        BASE       -> VERIFY
+        ALERT      -> VERIFY
+        POST_ALERT -> VERIFY
+
+    OFF CCTV는 VERIFY로 전환하지 않는다.
+
+    반환:
+        {
+            "id": int,
+            "changed": bool,
+            "previous_mode": str | None,
+            "monitored_mode": str,
+        }
+    """
+
+    select_query = """
+        SELECT
+            id,
+            is_monitored,
+            monitored_mode::text
+                AS monitored_mode
+        FROM cctvs
+        WHERE id = %s
+        FOR UPDATE;
+    """
+
+    with connection.cursor() as cursor:
+
+        cursor.execute(
+            select_query,
+            (
+                cctv_id,
+            ),
+        )
+
+        current = (
+            cursor.fetchone()
+        )
+
+        if current is None:
+
+            raise LookupError(
+                "CCTV를 찾을 수 없습니다. "
+                f"cctv_id={cctv_id}"
+            )
+
+        current_mode = str(
+            current[
+                "monitored_mode"
+            ]
+        )
+
+        is_monitored = bool(
+            current[
+                "is_monitored"
+            ]
+        )
+
+        if (
+            not is_monitored
+            or current_mode == "OFF"
+        ):
+
+            return {
+                "id":
+                    cctv_id,
+
+                "changed":
+                    False,
+
+                "previous_mode":
+                    current_mode,
+
+                "monitored_mode":
+                    current_mode,
+            }
+
+        if current_mode == "VERIFY":
+
+            return {
+                "id":
+                    cctv_id,
+
+                "changed":
+                    False,
+
+                "previous_mode":
+                    None,
+
+                "monitored_mode":
+                    "VERIFY",
+            }
+
+        if (
+            current_mode
+            not in VERIFY_RESTORE_MODES
+        ):
+
+            raise ValueError(
+                "VERIFY로 전환할 수 없는 "
+                "CCTV 감시 모드입니다. "
+                f"mode={current_mode}"
+            )
+
+        cursor.execute(
+            """
+            UPDATE cctvs
+            SET monitored_mode =
+                'VERIFY'
+                ::monitored_mode_enum
+            WHERE id = %s
+            RETURNING id;
+            """,
+            (
+                cctv_id,
+            ),
+        )
+
+    return {
+        "id":
+            cctv_id,
+
+        "changed":
+            True,
+
+        "previous_mode":
+            current_mode,
+
+        "monitored_mode":
+            "VERIFY",
+    }
+
+
+def restore_from_verify_mode(
+    connection,
+    cctv_id: int,
+    restore_mode: str,
+):
+    """
+    VERIFY가 끝난 CCTV를
+    검증 전 감시 모드로 복귀한다.
+
+    허용 복귀 모드:
+
+        BASE
+        ALERT
+        POST_ALERT
+
+    현재 DB 상태가 VERIFY일 때만 변경한다.
+
+    따라서 VERIFY 동안 다른 로직이
+    CCTV 상태를 이미 변경했다면
+    그 상태를 덮어쓰지 않는다.
+    """
+
+    target_mode = str(
+        restore_mode
+    ).upper()
+
+    if (
+        target_mode
+        not in VERIFY_RESTORE_MODES
+    ):
+
+        raise ValueError(
+            "VERIFY 복귀 모드가 "
+            "올바르지 않습니다. "
+            f"mode={restore_mode}"
+        )
+
+    query = """
+        UPDATE cctvs
+        SET monitored_mode =
+            %s::monitored_mode_enum
+        WHERE id = %s
+          AND is_monitored = TRUE
+          AND monitored_mode =
+              'VERIFY'
+              ::monitored_mode_enum
+        RETURNING
+            id,
+            monitored_mode::text
+                AS monitored_mode;
+    """
+
+    with connection.cursor() as cursor:
+
+        cursor.execute(
+            query,
+            (
+                target_mode,
+                cctv_id,
+            ),
+        )
+
+        return cursor.fetchone()
+
+
+# ============================================================
 # CCTV Runtime 조회
 # ============================================================
 
