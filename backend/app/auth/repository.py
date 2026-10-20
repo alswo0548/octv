@@ -95,3 +95,104 @@ def find_user_by_id(connection, user_id: int) -> dict | None:
             (user_id,),
         )
         return cursor.fetchone()
+
+
+# ============================================================
+# 회원가입용 지역 / 기관 조회
+# ============================================================
+
+def list_signup_sidos(
+    connection,
+) -> list[dict]:
+    """
+    회원가입 화면에서 사용할 시·도 목록을 조회한다.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                sido_name
+            FROM region
+            ORDER BY sido_name
+            """
+        )
+
+        return cursor.fetchall()
+
+
+def list_signup_sigungus(
+    connection,
+    sido_name: str,
+) -> list[dict]:
+    """
+    선택한 시·도에 속한 시·군·구 목록을 조회한다.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                region_code,
+                sigungu_name
+            FROM region
+            WHERE sido_name = %s
+            ORDER BY
+                sigungu_name,
+                region_code
+            """,
+            (
+                sido_name,
+            ),
+        )
+
+        return cursor.fetchall()
+
+
+def list_signup_agencies(
+    connection,
+    region_code: str,
+    agency_type: str | None = None,
+) -> list[dict]:
+    """
+    선택한 지역과 기관 유형에 맞는
+    소속기관 목록을 조회한다.
+    """
+
+    sql = """
+        SELECT
+            id,
+            name,
+            agency_type,
+            address,
+            region_code
+        FROM agencies
+        WHERE region_code = %s
+    """
+
+    params = [
+        region_code,
+    ]
+
+    if agency_type is not None:
+        sql += """
+            AND agency_type = %s
+        """
+
+        params.append(
+            agency_type
+        )
+
+    sql += """
+        ORDER BY
+            name,
+            id
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            params,
+        )
+
+        return cursor.fetchall()

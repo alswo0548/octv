@@ -193,3 +193,65 @@ def signup(payload: SignupRequest) -> UserResponse:     # payload : Pydantic 검
             status_code=status.HTTP_409_CONFLICT,
             detail="이미 사용 중인 이메일입니다.",
         )
+
+
+# ============================================================
+# 회원가입용 지역 / 기관 조회
+# ============================================================
+
+def list_signup_sidos() -> list[dict]:
+    """
+    회원가입 화면에서 사용할 시·도 목록을 반환한다.
+    """
+
+    with get_connection() as connection:
+        return repository.list_signup_sidos(
+            connection
+        )
+
+
+def list_signup_sigungus(
+    sido_name: str,
+) -> list[dict]:
+    """
+    선택한 시·도에 속한 시·군·구 목록을 반환한다.
+    """
+
+    sido_name = sido_name.strip()
+
+    if not sido_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="시·도를 선택해 주세요.",
+        )
+
+    with get_connection() as connection:
+        return repository.list_signup_sigungus(
+            connection,
+            sido_name,
+        )
+
+
+def list_signup_agencies(
+    region_code: str,
+    agency_type: str | None = None,
+) -> list[dict]:
+    """
+    선택한 지역과 기관 유형에 맞는
+    소속기관 목록을 반환한다.
+    """
+
+    region_code = region_code.strip()
+
+    if not region_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="지역을 선택해 주세요.",
+        )
+
+    with get_connection() as connection:
+        return repository.list_signup_agencies(
+            connection,
+            region_code,
+            agency_type,
+        )
