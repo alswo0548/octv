@@ -121,9 +121,18 @@ class CctvStreamResponse(BaseModel):
     """
 
     cctv_id: int
-
     path: str
-
     playback_url: str
-
     whep_url: str
+
+
+class CctvReconnectResponse(BaseModel):
+    """
+    관리자 수동 CCTV 재연결 요청 접수 응답.
+
+    ACCEPTED는 실제 재연결 완료가 아니라
+    Runtime에 전달할 요청이 접수되었다는 의미다.
+    """
+
+    cctv_id: int
+    status: Literal["ACCEPTED"] = "ACCEPTED"

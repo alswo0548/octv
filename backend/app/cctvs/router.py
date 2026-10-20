@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     Query,
+    status,
 )
 
 from ..dependencies import (
@@ -101,6 +102,37 @@ def prepare_stream(
     return service.prepare_stream(
         cctv_id
     )
+
+
+
+@router.post(
+    "/{cctv_id}/reconnect",
+    response_model=(
+        schemas.CctvReconnectResponse
+    ),
+    status_code=(
+        status.HTTP_202_ACCEPTED
+    ),
+    summary="CCTV 수동 재연결 요청",
+)
+def request_reconnect(
+    cctv_id: int,
+    _admin=Depends(
+        require_control_admin
+    ),
+):
+    """
+    관제 관리자가 특정 CCTV의
+    수동 재연결을 요청한다.
+
+    실제 재연결은 독립 실행 중인
+    CCTV Runtime에서 수행한다.
+    """
+
+    return service.request_reconnect(
+        cctv_id
+    )
+
 
 
 @router.get(
