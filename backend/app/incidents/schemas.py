@@ -10,6 +10,8 @@ class IncidentResponse(BaseModel):
     incident_no: str
     cctv_id: int
     cctv_name: str
+    provider: str | None = None
+    address: str | None = None
     hazard_type: str
     status: Literal["DETECTED", "CONFIRMED", "SENT", "RESOLVED", "FALSE_POSITIVE"]
     confidence: float = Field(ge=0, le=1)

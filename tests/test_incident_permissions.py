@@ -76,6 +76,8 @@ class IncidentPermissionsTests(unittest.TestCase):
             "incident_no": "OCTV-test",
             "cctv_id": 1,
             "cctv_name": "테스트 CCTV",
+            "provider": "UTIC",
+            "address": "서울특별시 강남구 테헤란로 629",
             "hazard_type": "FLOOD",
             "status": "DETECTED",
             "confidence": Decimal("0.9"),
@@ -457,6 +459,16 @@ class IncidentPermissionsTests(unittest.TestCase):
             "PENDING",
         )
 
+        self.assertEqual(
+            response.json()["provider"],
+            "UTIC",
+        )
+
+        self.assertEqual(
+            response.json()["address"],
+            "서울특별시 강남구 테헤란로 629",
+        )
+
     def test_admin_detail_and_missing_incident(self):
         self.user.update(
             role="CONTROL_ADMIN",
@@ -530,8 +542,8 @@ class IncidentPermissionsTests(unittest.TestCase):
         for call in (count, page):
             self.assertIn("ar.agency_id = %s", call.args[0])
             self.assertIn("'DELIVERED', 'COMPLETED'", call.args[0])
-        self.assertEqual(count.args[1], ["%OCTV%", "%OCTV%", 7])
-        self.assertEqual(page.args[1], ["%OCTV%", "%OCTV%", 7, 5, 40])
+        self.assertEqual(count.args[1], ["%OCTV%", "%OCTV%", "%OCTV%", 7])
+        self.assertEqual(page.args[1], ["%OCTV%", "%OCTV%", "%OCTV%", 7, 5, 40])
 
     def test_active_scope_and_existing_search_parameters(self):
         active, params = incident_repository.agency_filter({
@@ -546,7 +558,8 @@ class IncidentPermissionsTests(unittest.TestCase):
             "region_code": "11000", "cctv_id": 1, "start": start, "end": end,
             "q": "road", "confirmed_only": True, "active_only": True,
         })
-        self.assertEqual(values, ["SENT", "FLOOD", "P1", "11000", 1, start, end, "%road%", "%road%"])
+        self.assertEqual(values, ["SENT", "FLOOD", "P1", "11000", 1, start, end, "%road%", "%road%", "%road%"])
+        self.assertIn("c.address ILIKE %s", where)
         self.assertIn("i.detected_at >= %s", where)
         self.assertIn("i.detected_at < %s", where)
 
