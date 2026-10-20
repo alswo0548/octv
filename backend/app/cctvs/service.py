@@ -296,13 +296,19 @@ def change_monitoring(
     """
     관리자 CCTV 감시 ON/OFF.
 
+    OFF:
+        BASE / POST_ALERT
+        -> false + OFF
+
+        ALERT / VERIFY
+        -> 409 Conflict
+
     ON:
-        false + OFF
+        OFF
         -> true + BASE
 
-    OFF:
-        BASE / ALERT / VERIFY / POST_ALERT
-        -> false + OFF
+        이미 감시 중인 CCTV
+        -> 현재 monitored_mode 유지
 
     POST_ALERT 상태에서 관리자가
     감시 종료 버튼을 누르는 경우도
@@ -314,11 +320,41 @@ def change_monitoring(
 
     with get_connection() as connection:
 
-        row = repository.update_monitoring(
-            connection,
-            cctv_id=cctv_id,
-            enabled=body.enabled,
-        )
+        try:
+            row = (
+                repository.update_monitoring(
+                    connection,
+                    cctv_id=cctv_id,
+                    enabled=body.enabled,
+                )
+            )
+
+        except (
+            repository
+            .MonitoringChangeBlockedError
+        ) as exc:
+
+            if (
+                exc.monitored_mode
+                == "ALERT"
+            ):
+
+                detail = (
+                    "기상특보 감시 중인 CCTV는 "
+                    "수동으로 감시를 종료할 수 없습니다."
+                )
+
+            else:
+
+                detail = (
+                    "위험상황 검증 중인 CCTV는 "
+                    "수동으로 감시를 종료할 수 없습니다."
+                )
+
+            raise HTTPException(
+                status_code=409,
+                detail=detail,
+            ) from exc
 
         if row is None:
 

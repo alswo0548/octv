@@ -11,7 +11,11 @@ from fastapi.testclient import TestClient
 from backend.app import dependencies
 from backend.app.settings import router as settings_router, service as settings_service, schemas as settings_schemas
 from backend.app.stats import router as stats_router, service as stats_service, schemas as stats_schemas
-from backend.app.cctvs import router as cctv_router, service as cctv_service
+from backend.app.cctvs import (
+    repository as cctv_repository,
+    router as cctv_router,
+    service as cctv_service,
+)
 
 SECRET = "operations-unit-test-only-secret-32-characters"
 VALUES = dict(base_analysis_interval_sec=10, alert_analysis_interval_sec=5, verify_analysis_interval_sec=1,
@@ -161,6 +165,93 @@ class OperationsApiTests(unittest.TestCase):
             self.assertEqual(self.client.post("/api/cctvs/1/stream", headers=self.headers()).status_code, 200)
             prepare.side_effect = requests.ConnectionError("TEST_ONLY")
             self.assertEqual(self.client.post("/api/cctvs/1/stream", headers=self.headers()).status_code, 502)
+
+
+    def test_alert_and_verify_monitoring_off_are_409(
+        self,
+    ):
+        """
+        시스템이 강제로 유지해야 하는 감시 상태에서는
+        관리자가 수동으로 CCTV 감시를 종료할 수 없다.
+
+        ALERT  + OFF -> 409
+        VERIFY + OFF -> 409
+        """
+
+        cases = (
+            (
+                "ALERT",
+                "기상특보 감시 중인 CCTV는 "
+                "수동으로 감시를 종료할 수 없습니다.",
+            ),
+            (
+                "VERIFY",
+                "위험상황 검증 중인 CCTV는 "
+                "수동으로 감시를 종료할 수 없습니다.",
+            ),
+        )
+
+        for (
+            mode,
+            expected_detail,
+        ) in cases:
+
+            with self.subTest(
+                mode=mode
+            ):
+
+                error = (
+                    cctv_repository
+                    .MonitoringChangeBlockedError(
+                        mode
+                    )
+                )
+
+                with (
+                    patch.object(
+                        cctv_repository,
+                        "update_monitoring",
+                        side_effect=error,
+                    ) as update_monitoring,
+                    patch(
+                        "backend.app.cctvs."
+                        "streaming.remove_cctv_stream"
+                    ) as remove_stream,
+                ):
+
+                    response = (
+                        self.client.patch(
+                            "/api/cctvs/1/monitoring",
+                            headers=self.headers(),
+                            json={
+                                "enabled": False,
+                            },
+                        )
+                    )
+
+                self.assertEqual(
+                    response.status_code,
+                    409,
+                    response.text,
+                )
+
+                self.assertEqual(
+                    response.json(),
+                    {
+                        "detail":
+                            expected_detail,
+                    },
+                )
+
+                update_monitoring.assert_called_once_with(
+                    self.conn,
+                    cctv_id=1,
+                    enabled=False,
+                )
+
+                # OFF 자체가 실패했으므로
+                # MediaMTX stream도 제거하면 안 된다.
+                remove_stream.assert_not_called()
 
     def test_cctv_last_frame_utc_is_explicit(self):
         from backend.app.cctvs.schemas import CctvResponse

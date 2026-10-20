@@ -182,34 +182,166 @@ def get_cctv_summary(
         return cursor.fetchone()
 
 
+class MonitoringChangeBlockedError(
+    RuntimeError
+):
+    """
+    현재 CCTV 감시 상태 때문에
+    관리자 수동 ON/OFF 변경을 허용할 수 없는 경우.
+    """
+
+    def __init__(
+        self,
+        monitored_mode: str,
+    ) -> None:
+
+        self.monitored_mode = (
+            str(
+                monitored_mode
+            ).upper()
+        )
+
+        super().__init__(
+            "현재 감시 상태에서는 "
+            "관리자 수동 감시 변경을 "
+            "허용할 수 없습니다. "
+            f"mode={self.monitored_mode}"
+        )
+
+
 def update_monitoring(
     connection,
     cctv_id: int,
     enabled: bool,
 ):
     """
-    관리자가 CCTV 감시 ON/OFF를 변경한다.
+    관리자 CCTV 감시 ON/OFF 변경.
 
-    enabled = True
-        -> is_monitored = TRUE
-        -> monitored_mode = BASE
+    ON:
+        OFF
+        -> BASE
 
-    enabled = False
-        -> is_monitored = FALSE
-        -> monitored_mode = OFF
+        이미 감시 중인
+        BASE / ALERT / VERIFY / POST_ALERT
+        -> 현재 mode 유지
 
-    true + OFF 조합은 생성하지 않는다.
+    OFF:
+        BASE / POST_ALERT
+        -> OFF
 
-    Weather Alert Scheduler가 만드는
-    ALERT / POST_ALERT 상태와 별개로,
-    이 함수는 관리자 수동 감시 ON/OFF에 사용한다.
+        ALERT / VERIFY
+        -> 관리자 수동 종료 차단
+
+        OFF
+        -> OFF 유지
+
+    SELECT ... FOR UPDATE로 현재 CCTV 행을 잠근 뒤
+    상태를 판단하므로 상태 확인과 UPDATE 사이의
+    경쟁 조건을 방지한다.
     """
 
-    target_mode = (
-        "BASE"
-        if enabled
-        else "OFF"
+    # ========================================================
+    # 현재 감시 상태 Lock
+    # ========================================================
+
+    with connection.cursor() as cursor:
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                is_monitored,
+                monitored_mode::text
+                    AS monitored_mode
+            FROM cctvs
+            WHERE id = %s
+            FOR UPDATE;
+            """,
+            (
+                cctv_id,
+            ),
+        )
+
+        current = (
+            cursor.fetchone()
+        )
+
+    if current is None:
+        return None
+
+    current_mode = str(
+        current[
+            "monitored_mode"
+        ]
+    ).upper()
+
+    is_monitored = bool(
+        current[
+            "is_monitored"
+        ]
     )
+
+    # ========================================================
+    # 관리자 ON
+    # ========================================================
+
+    if enabled:
+
+        # 이미 정상적으로 감시 중이라면
+        # ALERT / VERIFY / POST_ALERT 같은
+        # 시스템 상태를 BASE로 덮어쓰지 않는다.
+        if (
+            is_monitored
+            and current_mode != "OFF"
+        ):
+
+            return get_cctv(
+                connection,
+                cctv_id,
+            )
+
+        target_enabled = True
+        target_mode = "BASE"
+
+    # ========================================================
+    # 관리자 OFF
+    # ========================================================
+
+    else:
+
+        # 기상특보 감시 중이거나
+        # 위험 후보 집중 검증 중에는
+        # 관리자가 감시를 끌 수 없다.
+        if current_mode in {
+            "ALERT",
+            "VERIFY",
+        }:
+
+            raise (
+                MonitoringChangeBlockedError(
+                    current_mode
+                )
+            )
+
+        # 이미 OFF이면 idempotent.
+        if (
+            not is_monitored
+            and current_mode == "OFF"
+        ):
+
+            return get_cctv(
+                connection,
+                cctv_id,
+            )
+
+        # BASE / POST_ALERT
+        # -> OFF
+        target_enabled = False
+        target_mode = "OFF"
+
+    # ========================================================
+    # 상태 변경
+    # ========================================================
 
     query = """
         UPDATE cctvs
@@ -222,10 +354,11 @@ def update_monitoring(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
-                enabled,
+                target_enabled,
                 target_mode,
                 cctv_id,
             ),
