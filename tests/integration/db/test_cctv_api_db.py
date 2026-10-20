@@ -566,8 +566,210 @@ def main() -> None:
             label="OFF 재요청",
         )
 
+
         # ====================================================
         # TEST 8
+        #
+        # ALERT 상태에서 관리자 OFF 차단
+        #
+        # true + ALERT
+        #     ->
+        # MonitoringChangeBlockedError
+        #
+        # 상태는 ALERT 그대로 유지
+        # ====================================================
+
+        _set_state(
+            connection,
+            cctv_id,
+            is_monitored=True,
+            mode="ALERT",
+        )
+
+        try:
+
+            repository.update_monitoring(
+                connection,
+                cctv_id=cctv_id,
+                enabled=False,
+            )
+
+        except (
+            repository
+            .MonitoringChangeBlockedError
+        ) as exc:
+
+            if (
+                exc.monitored_mode
+                != "ALERT"
+            ):
+                raise AssertionError(
+                    "ALERT 차단 예외의 "
+                    "monitored_mode가 잘못되었습니다. "
+                    f"actual={exc.monitored_mode}"
+                )
+
+        else:
+
+            raise AssertionError(
+                "ALERT 상태 CCTV를 "
+                "관리자가 OFF할 수 있으면 안 됩니다."
+            )
+
+        after_alert_block = (
+            repository.get_cctv(
+                connection,
+                cctv_id,
+            )
+        )
+
+        _assert_state(
+            after_alert_block,
+            expected_is_monitored=True,
+            expected_mode="ALERT",
+            label=(
+                "ALERT 관리자 OFF 차단 후 "
+                "상태 유지"
+            ),
+        )
+
+        print(
+            "[PASS] ALERT -> 관리자 OFF 차단"
+        )
+
+        # ====================================================
+        # TEST 9
+        #
+        # VERIFY 상태에서 관리자 OFF 차단
+        #
+        # true + VERIFY
+        #     ->
+        # MonitoringChangeBlockedError
+        #
+        # 상태는 VERIFY 그대로 유지
+        # ====================================================
+
+        _set_state(
+            connection,
+            cctv_id,
+            is_monitored=True,
+            mode="VERIFY",
+        )
+
+        try:
+
+            repository.update_monitoring(
+                connection,
+                cctv_id=cctv_id,
+                enabled=False,
+            )
+
+        except (
+            repository
+            .MonitoringChangeBlockedError
+        ) as exc:
+
+            if (
+                exc.monitored_mode
+                != "VERIFY"
+            ):
+                raise AssertionError(
+                    "VERIFY 차단 예외의 "
+                    "monitored_mode가 잘못되었습니다. "
+                    f"actual={exc.monitored_mode}"
+                )
+
+        else:
+
+            raise AssertionError(
+                "VERIFY 상태 CCTV를 "
+                "관리자가 OFF할 수 있으면 안 됩니다."
+            )
+
+        after_verify_block = (
+            repository.get_cctv(
+                connection,
+                cctv_id,
+            )
+        )
+
+        _assert_state(
+            after_verify_block,
+            expected_is_monitored=True,
+            expected_mode="VERIFY",
+            label=(
+                "VERIFY 관리자 OFF 차단 후 "
+                "상태 유지"
+            ),
+        )
+
+        print(
+            "[PASS] VERIFY -> 관리자 OFF 차단"
+        )
+
+        # ====================================================
+        # TEST 10
+        #
+        # 이미 감시 중인 CCTV에 ON 요청을 보내도
+        # 시스템 monitored_mode를 BASE로 덮어쓰지 않는다.
+        #
+        # ALERT + ON
+        #     -> ALERT 유지
+        #
+        # VERIFY + ON
+        #     -> VERIFY 유지
+        #
+        # POST_ALERT + ON
+        #     -> POST_ALERT 유지
+        # ====================================================
+
+        for mode in (
+            "ALERT",
+            "VERIFY",
+            "POST_ALERT",
+        ):
+
+            _set_state(
+                connection,
+                cctv_id,
+                is_monitored=True,
+                mode=mode,
+            )
+
+            result = (
+                repository.update_monitoring(
+                    connection,
+                    cctv_id=cctv_id,
+                    enabled=True,
+                )
+            )
+
+            if result is None:
+                raise AssertionError(
+                    "관리자 ON 상태 유지 결과가 "
+                    "없습니다. "
+                    f"mode={mode}"
+                )
+
+            _assert_state(
+                result,
+                expected_is_monitored=True,
+                expected_mode=mode,
+                label=(
+                    f"{mode} + ON "
+                    "상태 보존"
+                ),
+            )
+
+        print(
+            "[PASS] "
+            "ALERT / VERIFY / POST_ALERT "
+            "+ ON -> 현재 mode 유지"
+        )
+
+
+        # ====================================================
+        # TEST 9
         # 존재하지 않는 CCTV
         # ====================================================
 
@@ -606,7 +808,7 @@ def main() -> None:
         )
 
         # ====================================================
-        # TEST 9
+        # TEST 10
         # DB row -> Pydantic Response 변환
         # ====================================================
 
@@ -636,7 +838,7 @@ def main() -> None:
         )
 
         # ====================================================
-        # TEST 10
+        # TEST 11
         # Service 404
         #
         # 이 호출은 별도 connection의 읽기 조회만 수행한다.
@@ -667,7 +869,7 @@ def main() -> None:
         )
 
         # ====================================================
-        # TEST 11
+        # TEST 12
         # Router 등록
         # ====================================================
 
