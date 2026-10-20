@@ -31,8 +31,8 @@ class OperationsApiTests(unittest.TestCase):
         self.row = {**VALUES, "id": 1, "updated_by": None, "updated_at": datetime(2026, 10, 19, 15, 0)}
         self.read = self.stack.enter_context(patch("backend.app.settings.repository.get_monitoring_settings", side_effect=lambda *a, **k: dict(self.row)))
         def save(conn, sid, values, uid):
-            self.row.update({k: v for k, v in values.items() if k not in settings_service.DISCONNECTED_FIELDS}, updated_by=uid, updated_at=datetime(2026, 10, 19, 16, 0))
-            return {"id": sid}
+            self.row.update(values, updated_by=uid, updated_at=datetime(2026, 10, 19, 16, 0,),)
+            return {"id": sid,}
         self.save = self.stack.enter_context(patch("backend.app.settings.repository.save_monitoring_settings", side_effect=save))
         self.aggregate = self.stack.enter_context(patch("backend.app.stats.repository.aggregate_incidents", return_value={
             "total_incident_count": 0, "confirmed_incident_count": 0, "average_confidence": None,
@@ -80,15 +80,29 @@ class OperationsApiTests(unittest.TestCase):
         self.assertEqual(self.read.call_args_list[0].kwargs, {"for_update": True})
         again = self.client.get("/api/settings/monitoring", headers=self.headers()).json()
         self.assertEqual(again["base_analysis_interval_sec"], 12)
-        self.assertEqual(again["application"]["temporal_validation_sec"]["mode"], "NOT_CONNECTED")
+        self.assertEqual(again["application"]["temporal_validation_sec"]["mode"], "RESTART_REQUIRED")
         self.assertEqual(again["application"]["reconnect_interval_sec"]["mode"], "RESTART_REQUIRED")
 
-    def test_disconnected_fields_cannot_be_changed(self):
-        for name in settings_service.DISCONNECTED_FIELDS:
-            value = float(VALUES[name]) + (0.01 if "threshold" in name else 1)
-            if "threshold" not in name: value = int(value)
-            with self.subTest(name=name): self.assertEqual(self.client.put("/api/settings/monitoring", headers=self.headers(), json=self.body(**{name: value})).status_code, 409)
-        self.save.assert_not_called()
+    def test_incident_fields_are_saved_and_require_restart(self):
+        for name in (settings_service.INCIDENT_RESTART_FIELDS):
+            if "threshold" in name:
+                value = (float(VALUES[name]) + 0.01)
+            else:
+                value = (int(VALUES[name]) + 1)
+
+            with self.subTest(name=name):
+                response = (self.client.put("/api/settings/monitoring", headers=self.headers(), json=self.body(**{name: value,}),))
+                self.assertEqual(response.status_code, 200, response.text,)
+                actual_value = (response.json()[name])
+                if "threshold" in name:
+                    self.assertEqual(Decimal(str(actual_value)), Decimal(str(value)))
+
+                else:
+                    self.assertEqual(actual_value, value)
+
+                self.assertEqual(response.json()["application"][name]["mode"], "RESTART_REQUIRED",)
+
+        self.assertEqual(self.save.call_count, len(settings_service.INCIDENT_RESTART_FIELDS))
 
     def test_invalid_settings_are_422_without_storage(self):
         for value in (0, -1, 1.5, True, "5", 2147483648):

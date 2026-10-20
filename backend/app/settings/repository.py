@@ -1,15 +1,26 @@
-"""최신 monitoring_settings 행과 개인 알림 설정을 조회·갱신합니다. 트랜잭션은 Service가 관리합니다."""
+"""
+monitoring_settings와
+개인 알림 설정 Repository.
+
+트랜잭션은 Service에서 관리합니다.
+"""
 
 
-def get_monitoring_settings(connection, *, for_update=False):
+# ============================================================
+# Monitoring Settings
+# ============================================================
+
+
+def get_monitoring_settings(
+    connection,
+    *,
+    for_update: bool = False,
+):
     """
     현재 OCTV 감시·분석 설정을 조회한다.
 
-    monitoring_settings에 데이터가 없으면
-    None을 반환한다.
-
-    현재 테이블에는 active/version 컬럼이 없으므로,
-    여러 행이 존재할 경우 가장 최근 id의 설정을 사용한다.
+    monitoring_settings에 행이 여러 개라면
+    가장 최근 id를 현재 설정으로 사용한다.
     """
 
     query = """
@@ -31,14 +42,22 @@ def get_monitoring_settings(connection, *, for_update=False):
         ORDER BY id DESC
         LIMIT 1
     """
+
     if for_update:
-        query += " FOR UPDATE"
+
+        query += (
+            " FOR UPDATE"
+        )
 
     with connection.cursor() as cursor:
-        cursor.execute(query)
-        row = cursor.fetchone()
 
-    return row
+        cursor.execute(
+            query
+        )
+
+        return (
+            cursor.fetchone()
+        )
 
 
 def save_monitoring_settings(
@@ -48,26 +67,76 @@ def save_monitoring_settings(
     updated_by: int,
 ):
     """
-    monitoring_settings를 수정한다.
+    기존 monitoring_settings 행을 수정한다.
 
-    허용된 필드만 수정하고 UTC 수정 시각을 기록한다.
+    DB 구조는 변경하지 않는다.
+
+    W06에서 관리하는 기존 10개 설정 컬럼을
+    모두 저장한다.
     """
 
-    # 허용 필드만 갱신하고 updated_by·updated_at도 명시적으로 갱신.
     fields = (
-        "base_analysis_interval_sec", "alert_analysis_interval_sec",
-        "verify_analysis_interval_sec", "reconnect_interval_sec",
-        "max_reconnect_attempts", "quality_threshold",
+        "base_analysis_interval_sec",
+        "alert_analysis_interval_sec",
+        "verify_analysis_interval_sec",
+
+        "candidate_confidence_threshold",
+        "candidate_min_detection_count",
+        "temporal_validation_sec",
+        "incident_confidence_threshold",
+
+        "reconnect_interval_sec",
+        "max_reconnect_attempts",
+
+        "quality_threshold",
     )
-    assignments = ", ".join(f"{name} = %s" for name in fields)
-    with connection.cursor() as cursor:
-        cursor.execute(
-            f"UPDATE monitoring_settings SET {assignments}, updated_by = %s, "
-            "updated_at = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') "
-            "WHERE id = %s RETURNING id",
-            tuple(values[name] for name in fields) + (updated_by, settings_id),
+
+    assignments = ", ".join(
+        f"{name} = %s"
+        for name in fields
+    )
+
+    params = (
+        tuple(
+            values[
+                name
+            ]
+            for name in fields
         )
-        return cursor.fetchone()
+        + (
+            updated_by,
+            settings_id,
+        )
+    )
+
+    query = f"""
+        UPDATE monitoring_settings
+        SET
+            {assignments},
+            updated_by = %s,
+            updated_at = (
+                CURRENT_TIMESTAMP
+                AT TIME ZONE 'UTC'
+            )
+        WHERE id = %s
+        RETURNING id;
+    """
+
+    with connection.cursor() as cursor:
+
+        cursor.execute(
+            query,
+            params,
+        )
+
+        return (
+            cursor.fetchone()
+        )
+
+
+# ============================================================
+# Personal Push Settings
+# ============================================================
 
 
 def set_notification_enabled(
@@ -76,10 +145,7 @@ def set_notification_enabled(
     enabled: bool,
 ):
     """
-    로그인한 사용자 본인의
-    Push 알림 ON/OFF 설정을 변경한다.
-
-    비활성 사용자의 설정은 변경하지 않는다.
+    활성 사용자의 개인 Push 수신 여부를 변경한다.
     """
 
     query = """
@@ -91,6 +157,7 @@ def set_notification_enabled(
     """
 
     with connection.cursor() as cursor:
+
         cursor.execute(
             query,
             (
@@ -99,6 +166,6 @@ def set_notification_enabled(
             ),
         )
 
-        row = cursor.fetchone()
-
-    return row
+        return (
+            cursor.fetchone()
+        )
