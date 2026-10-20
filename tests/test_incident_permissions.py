@@ -148,6 +148,185 @@ class IncidentPermissionsTests(unittest.TestCase):
             self.client.get("/api/incidents", headers=self.headers()).status_code, 401
         )
 
+    def test_signup_sidos(self):
+        with patch.object(
+            auth_repository,
+            "list_signup_sidos",
+            return_value=[
+                {
+                    "sido_name":
+                        "경기도"
+                },
+                {
+                    "sido_name":
+                        "서울특별시"
+                },
+            ],
+        ) as query:
+
+            response = self.client.get(
+                "/api/auth/signup/sidos"
+            )
+
+            self.assertEqual(
+                response.status_code,
+                200,
+            )
+
+            self.assertEqual(
+                response.json(),
+                [
+                    {
+                        "sido_name":
+                            "경기도"
+                    },
+                    {
+                        "sido_name":
+                            "서울특별시"
+                    },
+                ],
+            )
+
+            query.assert_called_once_with(
+                self.connection
+            )
+
+
+    def test_signup_sigungus(self):
+        with patch.object(
+            auth_repository,
+            "list_signup_sigungus",
+            return_value=[
+                {
+                    "region_code":
+                        "11680",
+                    "sigungu_name":
+                        "강남구",
+                },
+            ],
+        ) as query:
+
+            response = self.client.get(
+                "/api/auth/signup/sigungus",
+                params={
+                    "sido_name":
+                        "서울특별시"
+                },
+            )
+
+            self.assertEqual(
+                response.status_code,
+                200,
+            )
+
+            self.assertEqual(
+                response.json(),
+                [
+                    {
+                        "region_code":
+                            "11680",
+                        "sigungu_name":
+                            "강남구",
+                    },
+                ],
+            )
+
+            query.assert_called_once_with(
+                self.connection,
+                "서울특별시",
+            )
+
+        response = self.client.get(
+            "/api/auth/signup/sigungus",
+            params={
+                "sido_name": ""
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+
+
+    def test_signup_agencies(self):
+        with patch.object(
+            auth_repository,
+            "list_signup_agencies",
+            return_value=[
+                {
+                    "id": 4,
+                    "name":
+                        "강남소방서",
+                    "agency_type":
+                        "FIRE",
+                    "address":
+                        "서울특별시 강남구 테헤란로 629 (삼성동)",
+                    "region_code":
+                        "11680",
+                },
+            ],
+        ) as query:
+
+            response = self.client.get(
+                "/api/auth/signup/agencies",
+                params={
+                    "region_code":
+                        "11680",
+                    "agency_type":
+                        "FIRE",
+                },
+            )
+
+            self.assertEqual(
+                response.status_code,
+                200,
+            )
+
+            body = response.json()
+
+            self.assertEqual(
+                body[0]["name"],
+                "강남소방서",
+            )
+
+            self.assertEqual(
+                body[0]["agency_type"],
+                "FIRE",
+            )
+
+            self.assertEqual(
+                body[0]["region_code"],
+                "11680",
+            )
+
+            self.assertIsNotNone(
+                body[0]["address"]
+            )
+
+            query.assert_called_once_with(
+                self.connection,
+                "11680",
+                "FIRE",
+            )
+
+        response = self.client.get(
+            "/api/auth/signup/agencies",
+            params={
+                "region_code":
+                    "11680",
+                "agency_type":
+                    "INVALID",
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            422,
+        )
+
+
+
     def test_existing_signup_rules_and_password_hash(self):
         body = {
             "email": "NEW@EXAMPLE.COM", "password": TEST_PASSWORD,
