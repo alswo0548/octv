@@ -115,7 +115,7 @@ def fetch_station_thresholds(query: dict) -> dict:
     }
 
 # 선택한 관측소의 확인된 주의·경계·위험 수위 기준으로 수위 위험 단계 생성
-# 이 값은 CCTV 도로의 실제 침수 깊이나 싱크홀 지하수위를 뜻하지 않습니다.
+# 이 값은 하천 관측소 기준이며 CCTV 도로의 실제 침수 깊이를 뜻하지 않습니다.
 def classify_risk_level(query: dict, water: dict) -> dict:
     result = {
         'value': None,

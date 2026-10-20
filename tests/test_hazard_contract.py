@@ -20,9 +20,8 @@ EXPECTED = {0: "flood", 1: "fallen_tree", 2: "severe_road_damage", 3: "road_obst
 class HazardContractTests(unittest.TestCase):
     def test_active_classes_match_existing_incidentization(self):
         self.assertEqual(ALLOWED_HAZARD_TYPES, frozenset(EXPECTED.values()))
-        for hazard in EXPECTED.values():
-            self.assertIn(hazard, RISK_POLICIES); self.assertIn(hazard, AGENCY_ROLES)
-        self.assertNotIn("sinkhole", ALLOWED_HAZARD_TYPES)
+        self.assertEqual(set(RISK_POLICIES), set(EXPECTED.values()))
+        self.assertEqual(set(AGENCY_ROLES), set(EXPECTED.values()))
         self.assertNotIn("road_damage", ALLOWED_HAZARD_TYPES)
 
     def test_four_classes_cross_real_temporal_storage_queue_and_graph_boundaries(self):
@@ -51,14 +50,32 @@ class HazardContractTests(unittest.TestCase):
                 self.assertGreater(snapshots[0]["assessment"]["risk_score"],0)
                 self.assertTrue(snapshots[0]["recommendations"])
 
-    def test_road_damage_reuses_existing_scores_and_legacy_read_policy(self):
+    def test_road_damage_keeps_scores_and_agency_roles(self):
         new = assess(sample_context(), RISK_POLICIES["severe_road_damage"])
-        legacy = assess(sample_context(), RISK_POLICIES["sinkhole"])
-        self.assertEqual(new, legacy)
         self.assertEqual(new["risk_score"], 90)
         self.assertEqual(new["risk_breakdown"]["base_score"],45)
         self.assertEqual(new["risk_breakdown"]["components"]["closure_confirmed"]["points"],5)
-        self.assertEqual(AGENCY_ROLES["severe_road_damage"], AGENCY_ROLES["sinkhole"])
+        self.assertEqual(AGENCY_ROLES["severe_road_damage"], {
+            "primary": ("ROAD_MANAGEMENT", "LOCAL_GOVERNMENT"),
+            "conditional": ("POLICE", "FIRE"),
+        })
+
+    def test_unsupported_type_is_not_queued_or_analyzed(self):
+        from backend.app.analysis_requests import request_analysis
+        incident = {**sample_incident(), "hazard_type": "unsupported_type"}
+        with patch.dict(os.environ, {"OCTV_DECISION_ENABLED": "1"}), patch(
+            "backend.app.analysis_requests.get_analysis_input", return_value=incident
+        ), patch("backend.app.analysis_requests.acquire_analysis_lock") as lock:
+            result = request_analysis(incident["id"])
+        self.assertEqual(result["reason"], "UNSUPPORTED_HAZARD_TYPE")
+        lock.assert_not_called()
+        config = sample_config()
+        config["load_incident"] = lambda _: incident
+        saver = Mock()
+        config["save_analysis"] = saver
+        with self.assertRaises(ValueError):
+            run_pipeline(incident["id"], config)
+        saver.assert_not_called()
 
     def test_unconfirmed_road_damage_context_does_not_invent_bonus(self):
         from dataclasses import replace

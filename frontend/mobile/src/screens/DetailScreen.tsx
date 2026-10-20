@@ -5,7 +5,12 @@
  */
 import { useSyncExternalStore } from "react";
 import { View, Text, Pressable, Image } from "react-native";
-import { mock, type Incident, type IncidentDto } from "@octv/shared";
+import {
+  hazardLabel,
+  mock,
+  type Incident,
+  type IncidentDto,
+} from "@octv/shared";
 import { Badge, T, Button, Panel, Pair } from "../components/UI";
 import { Camera } from "../components/Camera";
 import { s, color } from "../styles/theme";
@@ -15,15 +20,6 @@ import {
   notificationController,
   parseNotificationTime,
 } from "../notifications";
-
-const hazardNames: Record<string, string> = {
-  flood: "침수",
-  fallen_tree: "쓰러진 나무·전봇대",
-  structural_damage: "시설물 파손",
-  road_obstacle: "도로 장애물",
-  severe_road_damage: "심각한 도로 파손",
-  sinkhole: "sinkhole · 과거 유형",
-};
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
 function incidentTime(value: string) {
@@ -55,9 +51,7 @@ function DeliveredIncidentDetail({
     <>
       <Badge priority={incident.priority ?? "평가 대기"} />
       <Text style={[s.title, { marginTop: 13 }]}>
-        {hazardNames[incident.hazard_type.toLowerCase()] ??
-          incident.hazard_type}{" "}
-        · {incident.incident_no}
+        {hazardLabel(incident.hazard_type)} · {incident.incident_no}
       </Text>
       <T muted>{incident.cctv_name}</T>
       <View style={[s.info, { marginVertical: 18 }]}>

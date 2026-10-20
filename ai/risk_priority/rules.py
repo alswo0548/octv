@@ -5,7 +5,7 @@ OCTV 위험도 및 사건 간 우선순위 판단
 1. 재난 유형별 기본 점수에 검증된 외부 상황 가산점을 반영 (재난 60점·주변 30점·악화 10점)
 2. 동일한 위험도 점수로 HIGH/MEDIUM/LOW 및 P1/P2/P3를 동시에 결정
 3. 사건 간 점수 정렬: 높은 점수 → 먼저 탐지된 사건 → 사건 ID
-4. 악화점수: 침수·심각 도로 파손은 강수, 나무·전봇대는 강수/풍속 중 최댓값, 도로 장애물은 각각 5점씩 합산
+4. 악화점수: 침수·심각 도로 파손은 강수, 쓰러진 나무는 강수/풍속 중 최댓값, 도로 장애물은 각각 5점씩 합산
 
 OCTV 위험도 및 사건 간 우선순위 Rule
 
@@ -70,10 +70,6 @@ RISK_POLICIES = {
         "road_obstacle": 30,
     }.items()
 }
-
-
-# 과거 저장 사건만 호환합니다. 새 탐지 클래스나 DB 값을 변환하지 않습니다.
-RISK_POLICIES["sinkhole"] = {**RISK_POLICIES["severe_road_damage"], "hazard_type": "sinkhole"}
 
 
 # 필수 외부 정보가 부족하거나 관측값이 잘못된 경우
@@ -200,7 +196,7 @@ def assess(context: ContextSnapshot, policy: dict) -> dict:
             else:
                 unknown.append("road_type")
 
-    if hazard in {"severe_road_damage", "sinkhole"}:
+    if hazard == "severe_road_damage":
         # 실제 도로 통제가 확인된 경우만 가산하며, 파손 원인이나 함몰 확대를 추정하지 않습니다.
         closure = observation("closure_confirmed")
         if closure is not None:
@@ -284,7 +280,7 @@ def assess(context: ContextSnapshot, policy: dict) -> dict:
         )
         weather_scores.append(("rainfall_mm", rainfall, points))
 
-    # 풍속은 나무·전봇대와 도로 장애물에만 적용합니다.
+    # 풍속은 쓰러진 나무와 도로 장애물에만 적용합니다.
     if hazard in {"fallen_tree", "road_obstacle"}:
         wind = observation("wind_speed_mps", numeric=True)
         if wind is not None:
@@ -295,7 +291,7 @@ def assess(context: ContextSnapshot, policy: dict) -> dict:
             )
             weather_scores.append(("wind_speed_mps", wind, points))
 
-    # 나무·전봇대는 높은 점수 하나만 사용하고, 동점이면 풍속을 대표 근거로 선택합니다.
+    # 쓰러진 나무는 높은 점수 하나만 사용하고, 동점이면 풍속을 대표 근거로 선택합니다.
     selected_weather = None
     if hazard == "fallen_tree" and weather_scores:
         selected_weather = max(

@@ -1,7 +1,9 @@
 """실행: python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000"""
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from .config import cors_allowed_origins
 from .errors import FeatureNotImplemented
 from .auth.router import router as auth_router
 from .cctvs.router import router as cctvs_router
@@ -15,6 +17,16 @@ from .stats.router import router as stats_router
 from .dashboard.router import router as dashboard_router
 
 app = FastAPI(title="OCTV 개발용 API 골격", version="0.1.0")
+
+# backend/.env를 직접 읽으므로 다른 모듈의 load_dotenv 실행 순서에 의존하지 않습니다.
+# 현재 인증은 Authorization: Bearer 방식이며 쿠키 인증을 추가하지 않습니다.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_allowed_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
 
 
 @app.exception_handler(FeatureNotImplemented)
