@@ -80,16 +80,221 @@ class OperationsDatabaseTests(unittest.TestCase):
     def test_region_parameter_does_not_change_sql_scope(self):
         self.assertEqual(self.query(region_code="' OR 1=1 --")["total_incident_count"], 0)
 
-    def test_settings_save_requery_and_only_connected_columns_change(self):
-        uid = self.sql("INSERT INTO users(email,password_hash,name,role) VALUES(%s,'TEST','TEST','CONTROL_ADMIN') RETURNING id", (self.prefix+'@example.invalid',)).fetchone()["id"]
-        sid = self.sql("INSERT INTO monitoring_settings(base_analysis_interval_sec,alert_analysis_interval_sec,verify_analysis_interval_sec,candidate_confidence_threshold,candidate_min_detection_count,temporal_validation_sec,incident_confidence_threshold,reconnect_interval_sec,max_reconnect_attempts,quality_threshold) VALUES(10,5,1,0.35,3,5,0.7,3,5,0.6) RETURNING id").fetchone()["id"]
-        values = dict(base_analysis_interval_sec=12,alert_analysis_interval_sec=4,verify_analysis_interval_sec=2,reconnect_interval_sec=8,max_reconnect_attempts=7,quality_threshold=Decimal("0.65"),candidate_confidence_threshold=Decimal("0.99"))
-        settings.save_monitoring_settings(self.connection,sid,values,uid)
-        row = self.sql("SELECT * FROM monitoring_settings WHERE id=%s",(sid,)).fetchone()
-        self.assertEqual(row["base_analysis_interval_sec"],12)
-        self.assertEqual(row["updated_by"],uid)
-        self.assertEqual(Decimal(str(row["candidate_confidence_threshold"])),Decimal("0.35"))
-        delta = self.sql("SELECT ABS(EXTRACT(EPOCH FROM (updated_at - (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')))) AS seconds FROM monitoring_settings WHERE id=%s",(sid,)).fetchone()["seconds"]
-        self.assertLess(float(delta),1)
+    def test_settings_save_requery_and_all_runtime_columns_change(self):
+        uid = self.sql(
+            """
+            INSERT INTO users(
+                email,
+                password_hash,
+                name,
+                role
+            )
+            VALUES(
+                %s,
+                'TEST',
+                'TEST',
+                'CONTROL_ADMIN'
+            )
+            RETURNING id
+            """,
+            (
+                self.prefix
+                + "@example.invalid",
+            ),
+        ).fetchone()["id"]
+
+        sid = self.sql(
+            """
+            INSERT INTO monitoring_settings(
+                base_analysis_interval_sec,
+                alert_analysis_interval_sec,
+                verify_analysis_interval_sec,
+                candidate_confidence_threshold,
+                candidate_min_detection_count,
+                temporal_validation_sec,
+                incident_confidence_threshold,
+                reconnect_interval_sec,
+                max_reconnect_attempts,
+                quality_threshold
+            )
+            VALUES(
+                10,
+                5,
+                1,
+                0.35,
+                3,
+                5,
+                0.70,
+                3,
+                5,
+                0.60
+            )
+            RETURNING id
+            """
+        ).fetchone()["id"]
+
+        values = dict(
+            base_analysis_interval_sec=12,
+            alert_analysis_interval_sec=4,
+            verify_analysis_interval_sec=2,
+
+            candidate_confidence_threshold=Decimal(
+                "0.40"
+            ),
+            candidate_min_detection_count=4,
+            temporal_validation_sec=15,
+            incident_confidence_threshold=Decimal(
+                "0.45"
+            ),
+
+            reconnect_interval_sec=8,
+            max_reconnect_attempts=7,
+
+            quality_threshold=Decimal(
+                "0.65"
+            ),
+        )
+
+        settings.save_monitoring_settings(
+            self.connection,
+            sid,
+            values,
+            uid,
+        )
+
+        row = self.sql(
+            """
+            SELECT *
+            FROM monitoring_settings
+            WHERE id = %s
+            """,
+            (
+                sid,
+            ),
+        ).fetchone()
+
+        self.assertEqual(
+            row[
+                "base_analysis_interval_sec"
+            ],
+            12,
+        )
+
+        self.assertEqual(
+            row[
+                "alert_analysis_interval_sec"
+            ],
+            4,
+        )
+
+        self.assertEqual(
+            row[
+                "verify_analysis_interval_sec"
+            ],
+            2,
+        )
+
+        self.assertEqual(
+            Decimal(
+                str(
+                    row[
+                        "candidate_confidence_threshold"
+                    ]
+                )
+            ),
+            Decimal(
+                "0.40"
+            ),
+        )
+
+        self.assertEqual(
+            row[
+                "candidate_min_detection_count"
+            ],
+            4,
+        )
+
+        self.assertEqual(
+            row[
+                "temporal_validation_sec"
+            ],
+            15,
+        )
+
+        self.assertEqual(
+            Decimal(
+                str(
+                    row[
+                        "incident_confidence_threshold"
+                    ]
+                )
+            ),
+            Decimal(
+                "0.45"
+            ),
+        )
+
+        self.assertEqual(
+            row[
+                "reconnect_interval_sec"
+            ],
+            8,
+        )
+
+        self.assertEqual(
+            row[
+                "max_reconnect_attempts"
+            ],
+            7,
+        )
+
+        self.assertEqual(
+            Decimal(
+                str(
+                    row[
+                        "quality_threshold"
+                    ]
+                )
+            ),
+            Decimal(
+                "0.65"
+            ),
+        )
+
+        self.assertEqual(
+            row[
+                "updated_by"
+            ],
+            uid,
+        )
+
+        delta = self.sql(
+            """
+            SELECT
+                ABS(
+                    EXTRACT(
+                        EPOCH FROM (
+                            updated_at
+                            - (
+                                CURRENT_TIMESTAMP
+                                AT TIME ZONE 'UTC'
+                            )
+                        )
+                    )
+                ) AS seconds
+            FROM monitoring_settings
+            WHERE id = %s
+            """,
+            (
+                sid,
+            ),
+        ).fetchone()["seconds"]
+
+        self.assertLess(
+            float(
+                delta
+            ),
+            1,
+        )
 
 if __name__ == '__main__': unittest.main()
