@@ -55,7 +55,8 @@ class OperationsApiTests(unittest.TestCase):
 
     def test_anonymous_settings_stats_and_cctv_requests_are_401(self):
         for path, method, body in (("/api/settings/monitoring", "GET", None), ("/api/settings/monitoring", "PUT", self.body()),
-                ("/api/stats", "GET", None), ("/api/cctvs", "GET", None), ("/api/cctvs/1/stream", "POST", None), ("/api/cctvs/1/monitoring", "PATCH", {"enabled": True})):
+            ("/api/stats", "GET",  None), ("/api/cctvs", "GET", None), ("/api/cctvs/1/stream", "POST", None), ("/api/cctvs/1/reconnect", "POST", None),
+            ("/api/cctvs/1/monitoring", "PATCH", {"enabled": True})):
             with self.subTest(path=path, method=method):
                 self.assertEqual(self.client.request(method, path, json=body).status_code, 401)
         self.read.assert_not_called(); self.save.assert_not_called(); self.aggregate.assert_not_called()
@@ -67,6 +68,7 @@ class OperationsApiTests(unittest.TestCase):
                 with self.subTest(role=role, path=path): self.assertEqual(self.client.get(path, headers=self.headers()).status_code, 403)
             self.assertEqual(self.client.put("/api/settings/monitoring", headers=self.headers(), json=self.body()).status_code, 403)
             self.assertEqual(self.client.post("/api/cctvs/1/stream", headers=self.headers()).status_code, 403)
+            self.assertEqual(self.client.post("/api/cctvs/1/reconnect", headers=self.headers()).status_code, 403)
             self.assertEqual(self.client.patch("/api/cctvs/1/monitoring", headers=self.headers(), json={"enabled": False}).status_code, 403)
         self.save.assert_not_called()
 
@@ -166,6 +168,187 @@ class OperationsApiTests(unittest.TestCase):
             prepare.side_effect = requests.ConnectionError("TEST_ONLY")
             self.assertEqual(self.client.post("/api/cctvs/1/stream", headers=self.headers()).status_code, 502)
 
+
+    def test_reconnect_missing_cctv_is_404(self):
+        with (
+            patch(
+                "backend.app.cctvs."
+                "repository.get_cctv",
+                return_value=None,
+            ) as get_cctv,
+            patch(
+                "backend.app.cctvs."
+                "reconnect_signal."
+                "publish_reconnect_request"
+            ) as publish,
+        ):
+
+            response = (
+                self.client.post(
+                    "/api/cctvs/1/reconnect",
+                    headers=self.headers(),
+                )
+            )
+
+        self.assertEqual(
+            response.status_code,
+            404,
+            response.text,
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "detail":
+                    "CCTV를 찾을 수 없습니다.",
+            },
+        )
+
+        get_cctv.assert_called_once_with(
+            self.conn,
+            1,
+        )
+
+        publish.assert_not_called()
+
+    def test_unmonitored_reconnect_is_409(
+        self,
+    ):
+        with (
+            patch(
+                "backend.app.cctvs."
+                "repository.get_cctv",
+                return_value={
+                    "id": 1,
+                    "is_monitored": False,
+                    "provider": "UTIC",
+                },
+            ),
+            patch(
+                "backend.app.cctvs."
+                "reconnect_signal."
+                "publish_reconnect_request"
+            ) as publish,
+        ):
+
+            response = (
+                self.client.post(
+                    "/api/cctvs/1/reconnect",
+                    headers=self.headers(),
+                )
+            )
+
+        self.assertEqual(
+            response.status_code,
+            409,
+            response.text,
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "detail":
+                    "현재 감시 중인 CCTV가 "
+                    "아니므로 재연결할 수 없습니다.",
+            },
+        )
+
+        publish.assert_not_called()
+
+    def test_unsupported_provider_reconnect_is_409(
+        self,
+    ):
+        with (
+            patch(
+                "backend.app.cctvs."
+                "repository.get_cctv",
+                return_value={
+                    "id": 1,
+                    "is_monitored": True,
+                    "provider": "OTHER",
+                },
+            ),
+            patch(
+                "backend.app.cctvs."
+                "reconnect_signal."
+                "publish_reconnect_request"
+            ) as publish,
+        ):
+
+            response = (
+                self.client.post(
+                    "/api/cctvs/1/reconnect",
+                    headers=self.headers(),
+                )
+            )
+
+        self.assertEqual(
+            response.status_code,
+            409,
+            response.text,
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "detail":
+                    "현재 수동 재연결을 지원하지 "
+                    "않는 CCTV입니다.",
+            },
+        )
+
+        publish.assert_not_called()
+
+    def test_manual_reconnect_is_accepted(
+        self,
+    ):
+        with (
+            patch(
+                "backend.app.cctvs."
+                "repository.get_cctv",
+                return_value={
+                    "id": 1,
+                    "is_monitored": True,
+                    "provider": "UTIC",
+                },
+            ) as get_cctv,
+            patch(
+                "backend.app.cctvs."
+                "reconnect_signal."
+                "publish_reconnect_request"
+            ) as publish,
+        ):
+
+            response = (
+                self.client.post(
+                    "/api/cctvs/1/reconnect",
+                    headers=self.headers(),
+                )
+            )
+
+        self.assertEqual(
+            response.status_code,
+            202,
+            response.text,
+        )
+
+        self.assertEqual(
+            response.json(),
+            {
+                "cctv_id": 1,
+                "status": "ACCEPTED",
+            },
+        )
+
+        get_cctv.assert_called_once_with(
+            self.conn,
+            1,
+        )
+
+        publish.assert_called_once_with(
+            self.conn,
+            1,
+        )
 
     def test_alert_and_verify_monitoring_off_are_409(
         self,

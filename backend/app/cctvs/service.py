@@ -21,6 +21,7 @@ from fastapi import HTTPException
 
 from ..db.session import get_connection
 from . import (
+    reconnect_signal,
     repository,
     schemas,
     streaming,
@@ -286,6 +287,74 @@ def prepare_stream(
 
     return schemas.CctvStreamResponse(
         **result
+    )
+
+
+def request_reconnect(
+    cctv_id: int,
+) -> schemas.CctvReconnectResponse:
+    """
+    관리자가 특정 CCTV의 수동 재연결을 요청한다.
+
+    실제 영상 연결을 FastAPI 프로세스에서
+    직접 다시 여는 것이 아니다.
+
+    PostgreSQL NOTIFY를 통해
+    24시간 실행 중인 CCTV Runtime에
+    재연결 요청만 전달한다.
+
+    실제 connection_status 변경은
+    CaptureWorker가 수행한다.
+    """
+
+    with get_connection() as connection:
+
+        row = repository.get_cctv(
+            connection,
+            cctv_id,
+        )
+
+        if row is None:
+
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "CCTV를 찾을 수 없습니다."
+                ),
+            )
+
+        if not bool(
+            row["is_monitored"]
+        ):
+
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "현재 감시 중인 CCTV가 "
+                    "아니므로 재연결할 수 없습니다."
+                ),
+            )
+
+        if str(
+            row["provider"]
+        ).upper() != "UTIC":
+
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "현재 수동 재연결을 지원하지 "
+                    "않는 CCTV입니다."
+                ),
+            )
+
+        reconnect_signal.publish_reconnect_request(
+            connection,
+            cctv_id,
+        )
+
+    return schemas.CctvReconnectResponse(
+        cctv_id=cctv_id,
+        status="ACCEPTED",
     )
 
 

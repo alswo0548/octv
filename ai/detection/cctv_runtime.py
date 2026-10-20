@@ -29,6 +29,9 @@ from ai.detection.frame_sampler import (
 from ai.detection.health_monitor import (
     CctvHealthMonitor,
 )
+from ai.detection.reconnect_listener import (
+    CctvReconnectListener,
+)
 from ai.detection.quality import (
     check_quality,
 )
@@ -373,6 +376,21 @@ class CctvDetectionRuntime:
         )
 
         # -------------------------------------------------
+        # Manual Reconnect Listener
+        # -------------------------------------------------
+
+        self._reconnect_listener = (
+            CctvReconnectListener(
+                stop_event=(
+                    self._stop_event
+                ),
+                reconnect_requester=(
+                    self._request_reconnect
+                ),
+            )
+        )
+
+        # -------------------------------------------------
         # Thread 객체
         # -------------------------------------------------
 
@@ -381,6 +399,10 @@ class CctvDetectionRuntime:
         self._sampling_thread: Thread | None = None
 
         self._health_thread: Thread | None = None
+
+        self._reconnect_listener_thread: (
+            Thread | None
+        ) = None
 
     # =====================================================
     # 환경설정
@@ -1113,6 +1135,23 @@ class CctvDetectionRuntime:
 
         self._health_thread.start()
 
+    def _start_reconnect_listener_thread(
+        self,
+    ) -> None:
+
+        self._reconnect_listener_thread = (
+            Thread(
+                target=(
+                    self._reconnect_listener.run
+                ),
+                name=(
+                    "octv-reconnect-listener"
+                ),
+            )
+        )
+
+        self._reconnect_listener_thread.start()
+
     # =====================================================
     # Capture Worker Sync
     # =====================================================
@@ -1243,13 +1282,19 @@ class CctvDetectionRuntime:
             )
 
             # ---------------------------------------------
-            # 6. Health Monitor
+            # 6. Manual Reconnect Listener
+            # ---------------------------------------------
+
+            self._start_reconnect_listener_thread()
+
+            # ---------------------------------------------
+            # 7. Health Monitor
             # ---------------------------------------------
 
             self._start_health_thread()
 
             # ---------------------------------------------
-            # 7. Runtime Main Loop
+            # 8. Runtime Main Loop
             #
             # is_monitored 대상이 추가/삭제되면
             # Manager가 Worker를 시작/종료한다.
@@ -1350,6 +1395,11 @@ class CctvDetectionRuntime:
         self._join_thread(
             self._health_thread,
             "Health Monitor",
+        )
+
+        self._join_thread(
+            self._reconnect_listener_thread,
+            "Reconnect Listener",
         )
 
         self._join_thread(
