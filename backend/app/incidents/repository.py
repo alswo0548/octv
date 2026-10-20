@@ -334,18 +334,23 @@ def incident_where(
                 i.incident_no ILIKE %s
                 OR
                 c.name ILIKE %s
+                OR
+                c.address ILIKE %s
             )
             """
         )
 
+        search = (
+            "%"
+            + filters["q"]
+            + "%"
+        )
+
         params.extend(
             [
-                "%"
-                + filters["q"]
-                + "%",
-                "%"
-                + filters["q"]
-                + "%",
+                search,
+                search,
+                search,
             ]
         )
 
