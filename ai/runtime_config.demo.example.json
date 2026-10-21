@@ -1,0 +1,64 @@
+{
+  "_설정_안내": {
+    "설정_목적": "시연 CCTV E910012의 기상 요청 예시. 실제 DB CCTV ID와 좌표를 확인한 뒤 개인 실행 JSON에 필요한 cctvs 항목만 합친다.",
+    "설정_기준": "2026-10-15 개발용 초기값. 실제 API 테스트 결과에 따라 변경 가능",
+    "수정_방법": "필요한 숫자만 변경한 후 관련 실행 프로세스를 재시작",
+    "기관_기본_반경": "max_distance_m: 기관 탐색 기본 반경. 단위 m, 현재 50000 = 50km",
+    "기관_확대_반경": "fallback_max_distance_m: 기본 반경 내 후보가 부족하면 탐색 범위를 확대. 현재 100000 = 100km",
+    "기관_추천_개수": "limit: 최대 4개. 기존 추천 정책이므로 임의 변경 금지",
+    "경로_시간_기준": "duration_scale_sec: 이동시간 점수 계산 기준. 1800초 = 30분. 최대 이동시간 제한이 아님",
+    "경로_거리_기준": "distance_scale_m: 이동거리 점수 계산 기준. 20000m = 20km. 최대 이동거리 제한이 아님",
+    "경로_점수_정책": "이동시간 70점, 이동거리 30점. 기존 확정 정책이므로 변경하지 않음",
+    "CCTV_매핑": "cctvs: DB CCTV ID를 문자열 키로 사용. 3번(E910012)의 초단기실황 요청 설정 추가. 수위·교통은 제공 서비스와 매핑을 확인한 뒤 추가.",
+    "주의사항": "실제 운영 전 기관 위치 및 경로 API 결과로 초기값 검증 필요. 인증키는 JSON에 직접 저장하지 않음",
+    "CCTV_3_기상_격자": "DB 위도 37.1824818, 경도 127.0958378을 기상청 5km LCC 격자로 변환: nx=62, ny=118.",
+    "CCTV_3_기상_시각": "현재 KST 시각에서 publication_delay_min(초기값 10분)을 빼고 정시 자료를 요청. 실제 제공 지연은 최종 API 응답 확인 시 점검.",
+    "CCTV_3_기상_유효기간": "max_age_sec=7200은 2시간 유효기간을 선택한 초기 설정이며 제공기관 보장값이 아님.",
+    "CCTV_3_기상_검증상태": "JSON 구성과 좌표 변환 확인 완료. 실제 API 권한·응답은 최종 미리보기에서 확인 예정.",
+    "실행_파일": "backend/.env의 OCTV_RUNTIME_CONFIG가 가리키는 파일에 적용. 이 예시 파일을 추가하는 것만으로 실행 설정이 바뀌지 않는다.",
+    "외부_API_제공처": "수위: 한강홍수통제소(HRFCO). 교통: ITS 국가교통정보센터. 발급처 확인과 실제 조회·관측소/도로 매핑 완료는 별개다.",
+    "수위_교통_상태": "관측소·동일 관측소 공식 기준 수위와 도로 구간·방향 매핑이 미확정이므로 NO_MAPPING 유지. 미조회 값을 0이나 정상으로 채우지 않는다."
+  },
+  "context_transport": "mcp",
+  "agency_policy": {
+    "version": "OCTV_AGENCY_RULE_20261014",
+    "max_distance_m": 50000,
+    "fallback_max_distance_m": 100000,
+    "limit": 4,
+    "min_score": 0
+  },
+  "route_policy": {
+    "version": "OCTV_ROUTE_RULE_20261014",
+    "duration_scale_sec": 1800,
+    "distance_scale_m": 20000,
+    "time_points": 70,
+    "distance_points": 30
+  },
+  "cctvs": {
+    "3": {
+      "weather": {
+        "mapped": true,
+        "required_env": [
+          "WEATHER_API_KEY"
+        ],
+        "publication_delay_min": 10,
+        "max_age_sec": 7200,
+        "url": "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst",
+        "params": {
+          "serviceKey": "${WEATHER_API_KEY}",
+          "pageNo": 1,
+          "numOfRows": 100,
+          "dataType": "JSON",
+          "base_date": "${KMA_BASE_DATE}",
+          "base_time": "${KMA_BASE_TIME}",
+          "nx": 62,
+          "ny": 118
+        }
+      },
+      "water_level": {
+        "mapped": false
+      },
+      "traffic": {}
+    }
+  }
+}
