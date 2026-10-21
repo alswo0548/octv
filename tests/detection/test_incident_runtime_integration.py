@@ -1028,6 +1028,90 @@ class IncidentRuntimeIntegrationTests(
             "Runtime poll 기본값 = 1초"
         )
 
+    # ========================================================
+    # TEST 5
+    #
+    # Runtime 정상 종료 중 VERIFY
+    # → 원래 감시 모드 복귀
+    # ========================================================
+
+    def test_stop_restores_verify_mode(
+        self,
+    ) -> None:
+
+        context = (
+            self.make_runtime(
+                initial_mode="ALERT"
+            )
+        )
+
+        runtime = (
+            context[
+                "runtime"
+            ]
+        )
+
+        state = (
+            context[
+                "state"
+            ]
+        )
+
+        # Runtime이 ALERT → VERIFY 전환했던 상황을 재현.
+        state[
+            "mode"
+        ] = "VERIFY"
+
+        runtime._verify_restore_mode_by_cctv[
+            1
+        ] = "ALERT"
+
+        with (
+            patch(
+                "ai.detection.incident_runtime.get_connection",
+                new=fake_get_connection,
+            ),
+            patch.object(
+                cctv_repository,
+                "restore_from_verify_mode",
+                side_effect=(
+                    context[
+                        "restore_from_verify_mode"
+                    ]
+                ),
+            ),
+            patch.object(
+                CctvDetectionRuntime,
+                "stop",
+                return_value=None,
+            ) as base_stop,
+        ):
+
+            runtime.stop()
+
+        base_stop.assert_called_once_with()
+
+        self.assertEqual(
+            state[
+                "mode"
+            ],
+            "ALERT",
+        )
+
+        self.assertEqual(
+            runtime
+            ._verify_restore_mode_by_cctv,
+            {},
+        )
+
+        print()
+        print(
+            "[PASS] "
+            "Runtime 정상 종료 "
+            "→ VERIFY "
+            "→ ALERT 복귀"
+        )
+
 
 if __name__ == "__main__":
 
