@@ -453,61 +453,108 @@ def _set_alert_mode(
     region_codes: set[str],
 ) -> int:
     """
-    감시 강화 대상 특보가 있는
-    지역의 CCTV를 ALERT로 변경한다.
+    MVP에서는 감시 강화 대상 특보 지역 전체에서
+    CCTV 1대만 ALERT로 활성화한다.
 
-    false + OFF
-        -> true + ALERT
+    이미 해당 특보 지역에서 ALERT 중인 CCTV가 있으면
+    가장 작은 id의 CCTV 1대를 그대로 유지한다.
 
-    true + BASE
-        -> true + ALERT
-
-    true + POST_ALERT
-        -> true + ALERT
+    ALERT CCTV가 없으면:
+    1. OFF CCTV 우선
+    2. 없으면 BASE / POST_ALERT CCTV
+    순서로 1대를 선택한다.
 
     VERIFY는 변경하지 않는다.
     """
+
     if not region_codes:
         return 0
 
     query = """
+        WITH existing_alert AS (
+            SELECT id
+            FROM cctvs
+            WHERE region_code =
+                  ANY(
+                      %s::varchar[]
+                  )
+              AND provider = 'UTIC'
+              AND is_monitored = TRUE
+              AND monitored_mode =
+                  'ALERT'
+                  ::monitored_mode_enum
+            ORDER BY id
+            LIMIT 1
+        ),
+
+        candidate AS (
+            SELECT id
+            FROM cctvs
+            WHERE region_code =
+                  ANY(
+                      %s::varchar[]
+                  )
+              AND provider = 'UTIC'
+              AND external_cctv_id IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM existing_alert
+              )
+              AND (
+                  (
+                      is_monitored = FALSE
+                      AND monitored_mode =
+                          'OFF'
+                          ::monitored_mode_enum
+                  )
+                  OR
+                  (
+                      is_monitored = TRUE
+                      AND monitored_mode IN (
+                          'BASE'
+                          ::monitored_mode_enum,
+                          'POST_ALERT'
+                          ::monitored_mode_enum
+                      )
+                  )
+              )
+            ORDER BY
+                CASE
+                    WHEN (
+                        is_monitored = FALSE
+                        AND monitored_mode =
+                            'OFF'
+                            ::monitored_mode_enum
+                    )
+                    THEN 0
+                    ELSE 1
+                END,
+                id
+            LIMIT 1
+        )
+
         UPDATE cctvs
         SET
             is_monitored = TRUE,
             monitored_mode =
                 'ALERT'
                 ::monitored_mode_enum
-        WHERE region_code =
-              ANY(
-                  %s::varchar[]
-              )
-          AND (
-              (
-                  is_monitored = FALSE
-                  AND monitored_mode =
-                      'OFF'
-                      ::monitored_mode_enum
-              )
-              OR
-              (
-                  is_monitored = TRUE
-                  AND monitored_mode IN (
-                      'BASE'
-                      ::monitored_mode_enum,
-                      'POST_ALERT'
-                      ::monitored_mode_enum
-                  )
-              )
-          );
+        WHERE id = (
+            SELECT id
+            FROM candidate
+        );
     """
+
+    sorted_region_codes = sorted(
+        region_codes
+    )
 
     with connection.cursor() as cursor:
         cursor.execute(
             query,
             (
-                sorted(
-                    region_codes
-                ),
+                sorted_region_codes,
+                sorted_region_codes,
             ),
         )
 
