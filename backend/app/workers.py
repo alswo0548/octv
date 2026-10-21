@@ -18,18 +18,13 @@ workers.py는 Celery Task 실행 및 재시도를 담당합니다.
 
 import logging
 import os
-from pathlib import Path
 
 from celery import Celery
-from dotenv import load_dotenv
 
+from .config import load_environment
 
-# 프로젝트 루트: C:\KDT2604\octv
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-# Celery Worker는 FastAPI와 별도 프로세스로 실행되므로
-# 프로젝트 루트의 .env를 명시적으로 로드합니다.
-load_dotenv(PROJECT_ROOT / ".env")
+# 독립 Worker·Beat도 Celery 설정 전에 API와 같은 실행 설정을 읽습니다.
+load_environment()
 
 
 from .analysis_lock import (

@@ -13,6 +13,19 @@ ROOT = Path(__file__).resolve().parents[2]
 DB_TIMEZONE = "Asia/Seoul"
 
 
+def load_environment() -> None:
+    """API·Worker·Beat가 같은 설정을 읽고, 이미 지정된 환경변수는 유지합니다."""
+    values = {}
+    for path in (ROOT / ".env", ROOT / "backend" / ".env"):
+        values.update({
+            key: value
+            for key, value in dotenv_values(path, interpolate=False).items()
+            if value is not None
+        })
+    for key, value in values.items():
+        os.environ.setdefault(key, value)
+
+
 def cors_allowed_origins() -> list[str]:
     """새 설정: 브라우저에서 여는 페이지의 Origin을 쉼표로 구분합니다."""
     values = dotenv_values(ROOT / "backend" / ".env", interpolate=False)

@@ -3,7 +3,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from .config import cors_allowed_origins
+from .config import cors_allowed_origins, load_environment
+
+# 다른 API 모듈을 가져오기 전에 공통 실행 설정을 읽습니다.
+load_environment()
+
 from .errors import FeatureNotImplemented
 from .auth.router import router as auth_router
 from .cctvs.router import router as cctvs_router
