@@ -1,7 +1,8 @@
 """CCTV 한 대의 기상·수위 후보·교통 응답을 각각 한 번만 조회합니다.
 
 DB는 읽기 전용이며 사건·설정·추천·알림을 생성하거나 변경하지 않습니다.
-요청 URL/인증값/원문 오류는 출력하지 않고 공개 필드만 결과로 남깁니다.
+업무 코드·메시지는 인증값을 가린 뒤 표시하며, 공개 필드만 결과로 남깁니다.
+요청 URL·전체 응답·예외 원문은 출력하지 않습니다.
 """
 
 import argparse
@@ -12,7 +13,7 @@ from math import isfinite
 import os
 from pathlib import Path
 import sys
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, unquote, unquote_plus
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -24,6 +25,14 @@ TRAFFIC_FIELDS = {'eventid', 'eventtype', 'eventdetailtype', 'linkid', 'roadname
                   'startdate', 'enddate', 'createddate', 'speed', 'traveltime', 'roadrank'}
 
 
+def secret_variants(values):
+    decoded = {v for raw in values for v in (raw, raw.strip()) if v}
+    for _ in range(2):
+        decoded.update(v for raw in tuple(decoded) for text in (unquote(raw), unquote_plus(raw))
+                       for v in (text, text.strip()) if v)
+    return tuple({v for text in decoded for v in (text, quote(text, safe=''), quote_plus(text))})
+
+
 def safe(value):
     """허용 필드에도 인증값이나 URL이 반사되어 있으면 통째로 가립니다."""
     if isinstance(value, dict):
@@ -31,7 +40,8 @@ def safe(value):
     if isinstance(value, (list, tuple)):
         return [safe(v) for v in value]
     if isinstance(value, str):
-        if '://' in value or any(secret in value for secret in SECRETS):
+        decoded = (value, unquote(value), unquote_plus(value))
+        if any('://' in text or any(secret in text for secret in SECRETS) for text in decoded):
             return '[REDACTED]'
         return value[:180]
     return None if isinstance(value, float) and not isfinite(value) else value
@@ -43,6 +53,19 @@ def structure(value, depth=0):
     if isinstance(value, list):
         return {'list_count': len(value), 'item_type': type(value[0]).__name__ if value else None}
     return type(value).__name__
+
+
+def api_status(payload):
+    """허용된 업무 코드·메시지만 보존하며 성공 여부는 추정하지 않습니다."""
+    if not isinstance(payload, dict):
+        return {}
+    response = payload.get('response')
+    response = response if isinstance(response, dict) else {}
+    scopes = (('', payload, ('code', 'message')),
+              ('header.', payload.get('header'), ('resultCode', 'resultMsg')),
+              ('response.header.', response.get('header'), ('resultCode', 'resultMsg')))
+    return {prefix + key: node[key] for prefix, node, keys in scopes if isinstance(node, dict)
+            for key in keys if key in node and (node[key] is None or isinstance(node[key], (str, int, float, bool)))}
 
 
 def records(value, fields):
@@ -73,6 +96,7 @@ def request_once(url, params=None, headers=None):
         try:
             payload = response.json()
             result['structure'] = structure(payload)
+            result['api_status'] = api_status(payload)
         except ValueError:
             return {**result, 'json_status': 'NON_JSON'}, None
         if not 200 <= response.status_code < 300:
@@ -127,19 +151,19 @@ def main():
     logging.disable(logging.CRITICAL)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cctv-id', type=int, required=True)
+    parser.add_argument('--skip-weather', action='store_true', help='이미 확인한 기상 API 조회를 건너뜁니다.')
     args = parser.parse_args()
     from backend.app.config import load_environment
     load_environment()
     sensitive = [v for k, v in os.environ.items() if v and (
         k.endswith('_KEY') or any(word in k for word in ('PASSWORD', 'SECRET', 'TOKEN')) or k == 'DATABASE_URL')]
-    SECRETS = tuple({text for raw in sensitive for v in (raw, raw.strip()) if v
-                     for text in (v, quote(v, safe=''), quote_plus(v))})
+    SECRETS = secret_variants(sensitive)
     output = {'mode': 'READ_ONLY_DIAGNOSTIC', 'note': '후보 조회이며 자동 매핑·위험 판단·통제 없음 판정은 수행하지 않습니다.'}
     cctv = None
     try:
         cctv = read_cctv(args.cctv_id)
         output['cctv'] = cctv
-        output['weather'] = check_weather(cctv)
+        output['weather'] = {'status': 'SKIPPED_BY_OPTION'} if args.skip_weather else check_weather(cctv)
     except Exception as exc:
         output['weather' if cctv else 'cctv'] = {'status': 'ERROR', 'error_type': type(exc).__name__}
 
