@@ -70,17 +70,23 @@ def make_frame(
 def make_detection(
     hazard_type: str,
     confidence: float,
+    bbox: tuple[
+        float,
+        float,
+        float,
+        float,
+    ] = (
+        10.0,
+        10.0,
+        80.0,
+        80.0,
+    ),
 ) -> Detection:
 
     return Detection(
         hazard_type=hazard_type,
         confidence=confidence,
-        bbox=(
-            10.0,
-            10.0,
-            80.0,
-            80.0,
-        ),
+        bbox=bbox,
         model_version=(
             "test-model-v1"
         ),
@@ -211,6 +217,71 @@ def test_verify_success() -> None:
         "0s / 4s / 8s 탐지 "
         "→ 8초에 즉시 검증 성공"
     )
+
+
+# =========================================================
+# 서로 다른 위치의 같은 hazard는
+# 동일 Temporal hit로 누적하면 안 됨
+# =========================================================
+
+
+def test_different_bboxes_do_not_accumulate_hits() -> None:
+
+    verifier = TemporalIncidentVerifier(
+        config=make_config()
+    )
+
+    detections = [
+        make_detection(
+            "road_obstacle",
+            0.80,
+            bbox=(
+                10.0,
+                10.0,
+                25.0,
+                25.0,
+            ),
+        ),
+        make_detection(
+            "road_obstacle",
+            0.80,
+            bbox=(
+                40.0,
+                40.0,
+                55.0,
+                55.0,
+            ),
+        ),
+        make_detection(
+            "road_obstacle",
+            0.80,
+            bbox=(
+                70.0,
+                70.0,
+                90.0,
+                90.0,
+            ),
+        ),
+    ]
+
+    for seconds, detection in zip(
+        (0, 2, 4),
+        detections,
+    ):
+        result = verifier.observe(
+            frame=make_frame(seconds),
+            detections_by_hazard={
+                "road_obstacle": detection,
+            },
+        )
+
+        if result:
+            raise AssertionError(
+                "서로 다른 위치의 road_obstacle이 "
+                "동일 Temporal Track으로 누적되어 "
+                "Incident Candidate가 생성되었습니다."
+            )
+
 
 
 # =========================================================

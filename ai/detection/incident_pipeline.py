@@ -80,6 +80,8 @@ class IncidentPipelineConfig:
     temporal_validation_sec: float = 15.0
     incident_confidence_threshold: float = 0.35
 
+    temporal_min_iou: float = 0.20
+
     track_ttl_sec: float = 60.0
 
     jpeg_quality: int = 90
@@ -123,6 +125,11 @@ class IncidentPipelineConfig:
             raise ValueError(
                 "temporal_validation_sec은 "
                 "0보다 커야 합니다."
+            )
+
+        if not 0.0 <= self.temporal_min_iou <= 1.0:
+            raise ValueError(
+                "temporal_min_iou는 0~1이어야 합니다."
             )
 
         if self.track_ttl_sec <= 0:
@@ -176,6 +183,9 @@ class IncidentPipelineConfig:
                     "incident_confidence_threshold"
                 ]
             ),
+            temporal_min_iou=(
+                fallback.temporal_min_iou
+            ),
             track_ttl_sec=(
                 fallback.track_ttl_sec
             ),
@@ -225,6 +235,12 @@ class IncidentPipelineConfig:
                 os.getenv(
                     "OCTV_INCIDENT_CONFIDENCE_THRESHOLD",
                     str(candidate_threshold),
+                )
+            ),
+            temporal_min_iou=float(
+                os.getenv(
+                    "OCTV_TEMPORAL_MIN_IOU",
+                    "0.20",
                 )
             ),
             track_ttl_sec=float(
@@ -438,6 +454,8 @@ class _TemporalTrack:
 
     hit_count: int = 1
 
+    last_bbox: tuple[float, float, float, float] | None = None
+
     verified: bool = False
 
 
@@ -584,6 +602,7 @@ class TemporalIncidentVerifier:
                         frame.captured_at
                     ),
                     hit_count=1,
+                    last_bbox=detection.bbox,
                     verified=False,
                 )
 
@@ -721,11 +740,47 @@ class TemporalIncidentVerifier:
 
                 elif detection is not None:
 
-                    track.last_positive_at = (
-                        frame.captured_at
+                    bbox_iou = self._bbox_iou(
+                        track.last_bbox,
+                        detection.bbox,
                     )
 
-                    track.hit_count += 1
+                    if (
+                        bbox_iou
+                        < self._config.temporal_min_iou
+                    ):
+                        print(
+                            "[TEMPORAL] "
+                            f"CCTV {cctv_id} "
+                            f"/ hazard={hazard_type} "
+                            "/ bbox 불일치 → VERIFY 재시작 "
+                            f"/ iou={bbox_iou:.3f} "
+                            f"/ required="
+                            f"{self._config.temporal_min_iou:.3f}"
+                        )
+
+                        track.first_positive_at = (
+                            frame.captured_at
+                        )
+                        track.last_positive_at = (
+                            frame.captured_at
+                        )
+                        track.last_sample_at = (
+                            frame.captured_at
+                        )
+                        track.hit_count = 1
+                        track.last_bbox = (
+                            detection.bbox
+                        )
+
+                    else:
+                        track.last_positive_at = (
+                            frame.captured_at
+                        )
+                        track.last_bbox = (
+                            detection.bbox
+                        )
+                        track.hit_count += 1
 
             # =================================================
             # 현재 Frame 미탐
@@ -911,6 +966,79 @@ class TemporalIncidentVerifier:
             f"cctv:{cctv_id}:"
             f"hazard:{hazard_type}"
         )
+
+
+    @staticmethod
+    def _bbox_iou(
+        first_bbox: tuple[
+            float,
+            float,
+            float,
+            float,
+        ] | None,
+        second_bbox: tuple[
+            float,
+            float,
+            float,
+            float,
+        ],
+    ) -> float:
+
+        if first_bbox is None:
+            return 0.0
+
+        ax1, ay1, ax2, ay2 = first_bbox
+        bx1, by1, bx2, by2 = second_bbox
+
+        inter_x1 = max(ax1, bx1)
+        inter_y1 = max(ay1, by1)
+        inter_x2 = min(ax2, bx2)
+        inter_y2 = min(ay2, by2)
+
+        inter_width = max(
+            0.0,
+            inter_x2 - inter_x1,
+        )
+        inter_height = max(
+            0.0,
+            inter_y2 - inter_y1,
+        )
+
+        intersection = (
+            inter_width
+            * inter_height
+        )
+
+        first_area = max(
+            0.0,
+            ax2 - ax1,
+        ) * max(
+            0.0,
+            ay2 - ay1,
+        )
+
+        second_area = max(
+            0.0,
+            bx2 - bx1,
+        ) * max(
+            0.0,
+            by2 - by1,
+        )
+
+        union = (
+            first_area
+            + second_area
+            - intersection
+        )
+
+        if union <= 0.0:
+            return 0.0
+
+        return (
+            intersection
+            / union
+        )
+
 
     @staticmethod
     def _duration_sec(
