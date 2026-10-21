@@ -43,6 +43,8 @@ if str(ROOT) not in sys.path:
 
 
 from backend.app.dashboard import (  # noqa: E402
+    router as dashboard_router,
+    schemas,
     service,
 )
 from backend.app.db.session import (  # noqa: E402
@@ -255,6 +257,269 @@ def _insert_test_weather_alert(
     )
 
     return external_alert_id
+
+
+def _check_overview_external_status():
+    """
+    사건을 선택하지 않은 W02 전체 외부상황을 검증한다.
+
+    - 활성 기상특보 조회
+    - ALERT 모드 CCTV 수 조회
+    - 도로통제는 아직 NO_MAPPING
+    - 강수량 / 수위는 전체 응답에 포함하지 않음
+    """
+
+    token = uuid4().hex[:8]
+
+    external_cctv_id = (
+        f"DASH-OVERVIEW-CCTV-{token}"
+    )
+
+    try:
+        with get_connection() as connection:
+
+            region_code = (
+                _insert_test_region(
+                    connection,
+                    token,
+                )
+            )
+
+            _insert_test_cctv(
+                connection,
+                external_cctv_id=(
+                    external_cctv_id
+                ),
+                region_code=(
+                    region_code
+                ),
+            )
+
+            alert_id = (
+                _insert_test_weather_alert(
+                    connection,
+                    token=token,
+                    region_code=(
+                        region_code
+                    ),
+                )
+            )
+
+            @contextmanager
+            def same_connection():
+                yield connection
+
+            with patch.object(
+                service,
+                "get_connection",
+                same_connection,
+            ):
+                result = (
+                    service.get_overview_external_status(
+                        user=ADMIN_USER,
+                    )
+                )
+
+            # ---------------------------------------------
+            # 응답 Schema
+            # ---------------------------------------------
+
+            assert isinstance(
+                result,
+                schemas.DashboardOverviewExternalStatusResponse,
+            )
+
+            # 전체상황에는 강수량 / 수위가 없어야 한다.
+            assert not hasattr(
+                result,
+                "rainfall_mm",
+            )
+
+            assert not hasattr(
+                result,
+                "water_level_m",
+            )
+
+            # ---------------------------------------------
+            # 기상특보
+            # ---------------------------------------------
+
+            matched_alerts = [
+                alert
+                for alert in result.weather_alerts
+                if (
+                    alert.external_alert_id
+                    == alert_id
+                )
+            ]
+
+            assert (
+                len(
+                    matched_alerts
+                )
+                == 1
+            )
+
+            alert = matched_alerts[0]
+
+            assert (
+                alert.alert_type
+                == "호우"
+            )
+
+            assert (
+                alert.alert_level
+                == "주의보"
+            )
+
+            assert (
+                alert.region_code
+                == region_code
+            )
+
+            assert (
+                alert.issued_at.utcoffset()
+                == KST.utcoffset(
+                    alert.issued_at
+                )
+            )
+
+            # ---------------------------------------------
+            # 집중감시 CCTV
+            # ---------------------------------------------
+
+            assert (
+                result.focused_monitoring_cctv_count
+                >= 1
+            )
+
+            # ---------------------------------------------
+            # 아직 외부 연동 전인 도로통제
+            # ---------------------------------------------
+
+            assert (
+                result.road_control_count.value
+                is None
+            )
+
+            assert (
+                result.road_control_count.status
+                == "NO_MAPPING"
+            )
+
+            assert (
+                result.road_control_count.unit
+                == "count"
+            )
+
+            assert (
+                result.last_received_at
+                is None
+            )
+
+            print(
+                "PASS dashboard overview external "
+                "status weather/CCTV/contract"
+            )
+
+            raise (
+                _RollbackExternalStatusCheck
+            )
+
+    except _RollbackExternalStatusCheck:
+        pass
+
+    # -----------------------------------------------------
+    # rollback 확인
+    # -----------------------------------------------------
+
+    with get_connection() as connection:
+        cctv_remaining = (
+            connection.execute(
+                """
+                SELECT COUNT(*)::int AS n
+                FROM cctvs
+                WHERE external_cctv_id = %s;
+                """,
+                (
+                    external_cctv_id,
+                ),
+            )
+            .fetchone()["n"]
+        )
+
+        region_remaining = (
+            connection.execute(
+                """
+                SELECT COUNT(*)::int AS n
+                FROM region
+                WHERE region_code = %s;
+                """,
+                (
+                    f"DASH-REG-{token}",
+                ),
+            )
+            .fetchone()["n"]
+        )
+
+    assert (
+        cctv_remaining
+        == 0
+    )
+
+    assert (
+        region_remaining
+        == 0
+    )
+
+    print(
+        "PASS dashboard overview external "
+        "status rollback"
+    )
+
+
+def _check_overview_router_contract():
+    """
+    W02 사건 미선택 외부상황 API가
+    올바른 path와 response model로 등록됐는지 확인한다.
+    """
+
+    matched_routes = [
+        route
+        for route in dashboard_router.router.routes
+        if (
+            getattr(
+                route,
+                "path",
+                None,
+            )
+            == "/dashboard/external-status"
+        )
+    ]
+
+    assert (
+        len(
+            matched_routes
+        )
+        == 1
+    )
+
+    route = matched_routes[0]
+
+    assert (
+        "GET"
+        in route.methods
+    )
+
+    assert (
+        route.response_model
+        is schemas.DashboardOverviewExternalStatusResponse
+    )
+
+    print(
+        "PASS dashboard overview external "
+        "status router contract"
+    )
 
 
 def _check_external_status():
@@ -529,6 +794,8 @@ def _check_external_status():
 
 
 def main():
+    _check_overview_router_contract()
+    _check_overview_external_status()
     _check_external_status()
 
     print(

@@ -261,6 +261,111 @@ def get_dashboard(
     )
 
 
+def get_overview_external_status(
+    user: dict | None = None,
+) -> schemas.DashboardOverviewExternalStatusResponse:
+    """
+    W02에서 사건을 선택하지 않았을 때
+    표시할 전체 외부 상황을 반환한다.
+
+    CONTROL_ADMIN:
+    - 현재 감시 범위의 활성 기상특보
+    - 전체 ALERT 모드 집중감시 CCTV 수
+
+    AGENCY_STAFF / RESPONDER:
+    - 자기 기관에 전달된 진행 사건 범위의
+      활성 기상특보 / 집중감시 CCTV 수
+
+    전체 화면에서는 지역마다 값이 다른
+    강수량 / 수위를 표시하지 않는다.
+
+    도로통제는 외부 연동 전까지
+    NO_MAPPING으로 반환한다.
+    """
+
+    agency_scoped, agency_id = (
+        _role_scope(
+            user
+        )
+    )
+
+    with get_connection() as connection:
+        weather_rows = (
+            repository.list_overview_weather_alerts(
+                connection,
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
+            )
+        )
+
+        focused_count = (
+            repository.count_overview_focused_monitoring_cctvs(
+                connection,
+                agency_id=agency_id,
+                agency_scoped=agency_scoped,
+            )
+        )
+
+    weather_alerts = [
+        schemas.DashboardWeatherAlert(
+            external_alert_id=(
+                row[
+                    "external_alert_id"
+                ]
+            ),
+            alert_type=(
+                row[
+                    "alert_type"
+                ]
+            ),
+            alert_level=(
+                row[
+                    "alert_level"
+                ]
+            ),
+            title=(
+                row[
+                    "title"
+                ]
+            ),
+            issued_at=(
+                _kst_naive_to_aware(
+                    row[
+                        "issued_at"
+                    ]
+                )
+            ),
+            region_code=(
+                row[
+                    "region_code"
+                ]
+            ),
+        )
+
+        for row in weather_rows
+    ]
+
+    return (
+        schemas.DashboardOverviewExternalStatusResponse(
+            last_received_at=None,
+
+            weather_alerts=(
+                weather_alerts
+            ),
+
+            road_control_count=(
+                _unmapped_metric(
+                    "count"
+                )
+            ),
+
+            focused_monitoring_cctv_count=(
+                focused_count
+            ),
+        )
+    )
+
+
 def get_external_status(
     incident_id: int,
     user: dict | None = None,

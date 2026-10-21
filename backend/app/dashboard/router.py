@@ -63,6 +63,36 @@ def get_dashboard(
 
 
 @router.get(
+    "/external-status",
+    response_model=(
+        schemas.DashboardOverviewExternalStatusResponse
+    ),
+)
+def get_dashboard_overview_external_status(
+    user=Depends(
+        get_current_user
+    ),
+):
+    """
+    W02에서 아무 사건도 선택하지 않았을 때
+    표시할 전체 외부 상황을 조회한다.
+
+    - 활성 기상특보
+    - 도로통제
+    - 집중감시 CCTV 수
+
+    강수량 / 수위는 지역마다 값이 다르므로
+    전체 상황에서는 반환하지 않는다.
+    """
+
+    return (
+        service.get_overview_external_status(
+            user=user,
+        )
+    )
+
+
+@router.get(
     "/incidents/{incident_id}/external-status",
     response_model=(
         schemas.DashboardExternalStatusResponse
