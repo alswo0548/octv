@@ -531,6 +531,208 @@ def get_external_status_incident(
     }
 
 
+def list_overview_weather_alerts(
+    connection,
+    *,
+    agency_id: int | None = None,
+    agency_scoped: bool = False,
+) -> list[dict]:
+    """
+    W02에서 사건을 선택하지 않았을 때 표시할
+    현재 관제 범위의 활성 기상특보를 조회한다.
+
+    CONTROL_ADMIN:
+    - 현재 감시 중인 CCTV 지역의 활성 특보
+
+    AGENCY_STAFF / RESPONDER:
+    - 자기 기관에 전달된 진행 사건과 연결된
+      감시 CCTV 지역의 활성 특보
+    """
+
+    if (
+        agency_scoped
+        and agency_id is None
+    ):
+        return []
+
+    scope_sql = """
+        EXISTS (
+            SELECT 1
+            FROM cctvs AS c
+            WHERE c.region_code = wa.region_code
+              AND c.is_monitored = TRUE
+        )
+    """
+
+    params = []
+
+    if agency_scoped:
+        scope_sql = """
+            EXISTS (
+                SELECT 1
+                FROM incidents AS i
+
+                JOIN cctvs AS c
+                  ON c.id = i.cctv_id
+
+                JOIN incident_agency_recommendations AS ar
+                  ON ar.incident_id = i.id
+
+                WHERE c.region_code = wa.region_code
+                  AND c.is_monitored = TRUE
+                  AND i.status IN (
+                      'DETECTED',
+                      'CONFIRMED',
+                      'SENT'
+                  )
+                  AND ar.agency_id = %s
+                  AND ar.recommendation_status
+                      IN ('DELIVERED', 'COMPLETED')
+            )
+        """
+
+        params.append(
+            agency_id
+        )
+
+    query = (
+        """
+        SELECT
+            wa.external_alert_id,
+            wa.alert_type,
+            wa.alert_level,
+            wa.title,
+            wa.issued_at,
+            wa.region_code
+
+        FROM weather_alerts AS wa
+
+        WHERE wa.status = 'ACTIVE'
+          AND (
+        """
+        + scope_sql
+        + """
+          )
+
+        ORDER BY
+            CASE wa.alert_level
+                WHEN '경보' THEN 1
+                WHEN '주의보' THEN 2
+                WHEN '예비특보' THEN 3
+                ELSE 4
+            END,
+            wa.issued_at DESC,
+            wa.external_alert_id,
+            wa.region_code;
+        """
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            params,
+        )
+
+        rows = cursor.fetchall()
+
+    return [
+        {
+            "external_alert_id":
+                row["external_alert_id"],
+
+            "alert_type":
+                row["alert_type"],
+
+            "alert_level":
+                row["alert_level"],
+
+            "title":
+                row["title"],
+
+            "issued_at":
+                row["issued_at"],
+
+            "region_code":
+                row["region_code"],
+        }
+
+        for row in rows
+    ]
+
+
+def count_overview_focused_monitoring_cctvs(
+    connection,
+    *,
+    agency_id: int | None = None,
+    agency_scoped: bool = False,
+) -> int:
+    """
+    W02 전체 상황에 표시할
+    현재 ALERT 모드 집중감시 CCTV 수를 반환한다.
+    """
+
+    if (
+        agency_scoped
+        and agency_id is None
+    ):
+        return 0
+
+    scope_sql = "TRUE"
+    params = []
+
+    if agency_scoped:
+        scope_sql = """
+            EXISTS (
+                SELECT 1
+                FROM incidents AS i
+
+                JOIN incident_agency_recommendations AS ar
+                  ON ar.incident_id = i.id
+
+                WHERE i.cctv_id = c.id
+                  AND i.status IN (
+                      'DETECTED',
+                      'CONFIRMED',
+                      'SENT'
+                  )
+                  AND ar.agency_id = %s
+                  AND ar.recommendation_status
+                      IN ('DELIVERED', 'COMPLETED')
+            )
+        """
+
+        params.append(
+            agency_id
+        )
+
+    query = (
+        """
+        SELECT
+            COUNT(*)::int AS total
+
+        FROM cctvs AS c
+
+        WHERE c.is_monitored = TRUE
+          AND c.monitored_mode = 'ALERT'
+          AND (
+        """
+        + scope_sql
+        + """
+          );
+        """
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            params,
+        )
+
+        row = cursor.fetchone()
+
+    return row["total"]
+
+
 def list_active_weather_alerts(
     connection,
     region_code: str | None,
