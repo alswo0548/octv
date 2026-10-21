@@ -6,13 +6,13 @@
    -> true + BASE 유지
 
 2. BASE + 대설주의보
-   -> true + ALERT
+   -> 집중감시 슬롯 1대만 ALERT
 
 3. 대설 + 강풍 동시 ACTIVE
-   -> true + ALERT 유지
+   -> ALERT 1대 유지
 
 4. 대설만 종료, 강풍 유지
-   -> true + ALERT 유지
+   -> ALERT 1대 유지
 
 5. 모든 감시대상 특보 종료
    -> true + POST_ALERT
@@ -21,13 +21,18 @@
    -> true + POST_ALERT 유지
 
 7. false + OFF + 대설주의보
-   -> true + ALERT
+   -> OFF CCTV 우선 ALERT
 
 8. 위 대설 종료
    -> true + POST_ALERT
 
 9. true + VERIFY + 대설주의보
-   -> true + VERIFY 유지
+   -> VERIFY가 집중감시 슬롯을 유지
+   -> 추가 ALERT 생성 금지
+
+테스트용 weather_region_code가 여러 OCTV region_code에
+매핑될 수 있으므로, 해당 특보 코드의 전체 매핑 범위를
+하나의 테스트 scope로 격리한다.
 
 모든 변경은 마지막에 ROLLBACK한다.
 """
@@ -108,36 +113,91 @@ def _set_state(
         )
 
 
-def _select_test_target(
+def _select_test_scope(
     connection,
 ) -> dict:
     """
-    현재 감시 중이며 BASE 상태이고,
-    weather_region_code가 존재하는
-    CCTV 한 개를 테스트 대상으로 선택한다.
+    하나의 기상특보 코드가 매핑되는 전체 OCTV 지역을
+    테스트 scope로 선택한다.
+
+    VERIFY 상태에서 다른 CCTV가 추가 ALERT로
+    올라가지 않는 것까지 검사해야 하므로,
+    scope 안에 UTIC CCTV가 최소 2대 존재하는
+    weather_region_code를 선택한다.
+
+    scope 안에서 가장 작은 CCTV id를
+    기준 테스트 CCTV로 사용한다.
     """
 
     with connection.cursor() as cursor:
         cursor.execute(
             """
+            WITH weather_scopes AS (
+                SELECT
+                    w.weather_code,
+                    array_agg(
+                        DISTINCT r.region_code
+                        ORDER BY r.region_code
+                    ) AS region_codes
+                FROM region AS r
+                CROSS JOIN LATERAL
+                    unnest(
+                        r.weather_region_code
+                    )
+                    AS w(weather_code)
+                WHERE r.weather_region_code
+                      IS NOT NULL
+                  AND cardinality(
+                      r.weather_region_code
+                  ) > 0
+                GROUP BY
+                    w.weather_code
+            ),
+
+            scopes_with_cctv AS (
+                SELECT
+                    ws.weather_code,
+                    ws.region_codes,
+                    COUNT(c.id)
+                        AS cctv_count,
+                    MIN(c.id)
+                        AS cctv_id
+                FROM weather_scopes AS ws
+                JOIN cctvs AS c
+                  ON c.region_code =
+                     ANY(
+                         ws.region_codes
+                     )
+                 AND c.provider = 'UTIC'
+                 AND c.external_cctv_id
+                     IS NOT NULL
+                GROUP BY
+                    ws.weather_code,
+                    ws.region_codes
+                HAVING COUNT(c.id) >= 2
+            )
+
             SELECT
+                s.weather_code,
+                s.region_codes,
+                s.cctv_count,
                 c.id AS cctv_id,
                 c.name AS cctv_name,
                 c.region_code,
                 r.sido_name,
-                r.sigungu_name,
-                r.weather_region_code
-            FROM cctvs AS c
+                r.sigungu_name
+            FROM scopes_with_cctv AS s
+            JOIN cctvs AS c
+              ON c.id = s.cctv_id
             JOIN region AS r
-              ON r.region_code = c.region_code
-            WHERE c.is_monitored = TRUE
-              AND c.monitored_mode =
-                  'BASE'::monitored_mode_enum
-              AND r.weather_region_code IS NOT NULL
-              AND cardinality(
-                  r.weather_region_code
-              ) > 0
-            ORDER BY c.id
+              ON r.region_code =
+                 c.region_code
+            ORDER BY
+                cardinality(
+                    s.region_codes
+                ),
+                s.weather_code,
+                c.id
             LIMIT 1;
             """
         )
@@ -146,10 +206,157 @@ def _select_test_target(
 
     if row is None:
         raise RuntimeError(
-            "테스트 가능한 BASE 감시 CCTV가 없습니다."
+            "Weather Scheduler 통합 테스트에 사용할 "
+            "UTIC CCTV 2대 이상 특보 범위를 "
+            "찾을 수 없습니다."
         )
 
     return row
+
+
+def _prepare_scope_as_base(
+    connection,
+    region_codes: list[str],
+) -> None:
+    """
+    테스트 대상 weather_region_code에 매핑되는
+    전체 UTIC CCTV를 true + BASE로 통일한다.
+
+    이렇게 해야 실제 DB의 현재 ALERT / VERIFY / OFF 상태가
+    테스트 결과에 영향을 주지 않는다.
+
+    마지막에 transaction 전체를 rollback하므로
+    실제 운영 상태는 변경되지 않는다.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE cctvs
+            SET
+                is_monitored = TRUE,
+                monitored_mode =
+                    'BASE'
+                    ::monitored_mode_enum
+            WHERE region_code =
+                  ANY(
+                      %s::varchar[]
+                  )
+              AND provider = 'UTIC'
+              AND external_cctv_id
+                  IS NOT NULL;
+            """,
+            (
+                region_codes,
+            ),
+        )
+
+
+def _list_focus_cctvs(
+    connection,
+    region_codes: list[str],
+) -> list[dict]:
+    """
+    테스트 scope에서 현재 집중감시 슬롯에 해당하는
+    ALERT / VERIFY CCTV를 조회한다.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                name,
+                region_code,
+                is_monitored,
+                monitored_mode::text
+                    AS monitored_mode
+            FROM cctvs
+            WHERE region_code =
+                  ANY(
+                      %s::varchar[]
+                  )
+              AND provider = 'UTIC'
+              AND external_cctv_id
+                  IS NOT NULL
+              AND is_monitored = TRUE
+              AND monitored_mode IN (
+                  'ALERT'
+                  ::monitored_mode_enum,
+                  'VERIFY'
+                  ::monitored_mode_enum
+              )
+            ORDER BY id;
+            """,
+            (
+                region_codes,
+            ),
+        )
+
+        return cursor.fetchall()
+
+
+def _assert_single_focus(
+    connection,
+    region_codes: list[str],
+    *,
+    expected_cctv_id: int,
+    expected_mode: str,
+    label: str,
+) -> None:
+    """
+    테스트 scope 안의 ALERT / VERIFY 집중감시 슬롯이
+    정확히 1대인지 확인한다.
+    """
+
+    rows = _list_focus_cctvs(
+        connection,
+        region_codes,
+    )
+
+    if len(rows) != 1:
+        raise AssertionError(
+            f"{label}: "
+            "집중감시 CCTV는 정확히 1대여야 합니다. "
+            f"actual={len(rows)}, "
+            f"rows={rows}"
+        )
+
+    row = rows[0]
+
+    actual_cctv_id = int(
+        row["id"]
+    )
+
+    actual_mode = str(
+        row["monitored_mode"]
+    )
+
+    if (
+        actual_cctv_id
+        != expected_cctv_id
+    ):
+        raise AssertionError(
+            f"{label}: "
+            "예상 CCTV가 집중감시 슬롯을 "
+            "사용하지 않고 있습니다. "
+            f"expected={expected_cctv_id}, "
+            f"actual={actual_cctv_id}"
+        )
+
+    if actual_mode != expected_mode:
+        raise AssertionError(
+            f"{label}: "
+            "집중감시 모드가 다릅니다. "
+            f"expected={expected_mode}, "
+            f"actual={actual_mode}"
+        )
+
+    print(
+        f"[PASS] {label} "
+        f"-> CCTV {actual_cctv_id} "
+        f"/ mode={actual_mode}"
+    )
 
 
 def _warning(
@@ -277,10 +484,10 @@ def main() -> None:
 
     try:
         # ====================================================
-        # 테스트 대상 선택
+        # 테스트 scope 선택
         # ====================================================
 
-        target = _select_test_target(
+        target = _select_test_scope(
             connection
         )
 
@@ -290,9 +497,17 @@ def main() -> None:
 
         weather_region_code = str(
             target[
-                "weather_region_code"
-            ][0]
+                "weather_code"
+            ]
         )
+
+        region_codes = [
+            str(region_code)
+            for region_code
+            in target[
+                "region_codes"
+            ]
+        ]
 
         print(
             "test CCTV:",
@@ -302,7 +517,7 @@ def main() -> None:
         )
 
         print(
-            "region:",
+            "target region:",
             target["region_code"],
             "/",
             target["sido_name"],
@@ -312,6 +527,18 @@ def main() -> None:
         print(
             "weather code:",
             weather_region_code,
+        )
+
+        print(
+            "weather scope regions:",
+            len(region_codes),
+            "/",
+            region_codes,
+        )
+
+        print(
+            "scope UTIC CCTV count:",
+            target["cctv_count"],
         )
 
         # ====================================================
@@ -327,6 +554,16 @@ def main() -> None:
                 DELETE FROM weather_alerts;
                 """
             )
+
+        # ====================================================
+        # 운영 DB의 현재 CCTV 상태와 관계없이
+        # 테스트 scope를 BASE 상태로 격리한다.
+        # ====================================================
+
+        _prepare_scope_as_base(
+            connection,
+            region_codes,
+        )
 
         _assert_state(
             connection,
@@ -404,9 +641,27 @@ def main() -> None:
             label="폭염경보는 BASE 유지",
         )
 
+        if _list_focus_cctvs(
+            connection,
+            region_codes,
+        ):
+            raise AssertionError(
+                "폭염경보만 존재할 때 "
+                "ALERT / VERIFY CCTV가 "
+                "생기면 안 됩니다."
+            )
+
+        print(
+            "[PASS] 폭염경보 "
+            "집중감시 슬롯 미사용"
+        )
+
         # ====================================================
         # TEST 2
         # true + BASE -> true + ALERT
+        #
+        # scope 전체가 BASE이고,
+        # 가장 작은 id인 cctv_id가 선택된다.
         # ====================================================
 
         result = synchronize_weather_alerts(
@@ -428,6 +683,20 @@ def main() -> None:
                 "생성되지 않았습니다."
             )
 
+        if (
+            result[
+                "cctv_to_alert_count"
+            ]
+            != 1
+        ):
+            raise AssertionError(
+                "대설주의보 최초 발생 시 "
+                "ALERT CCTV는 1대만 "
+                "생성되어야 합니다. "
+                f"actual="
+                f"{result['cctv_to_alert_count']}"
+            )
+
         _assert_state(
             connection,
             cctv_id,
@@ -439,12 +708,25 @@ def main() -> None:
             ),
         )
 
+        _assert_single_focus(
+            connection,
+            region_codes,
+            expected_cctv_id=(
+                cctv_id
+            ),
+            expected_mode="ALERT",
+            label=(
+                "대설주의보 단일 "
+                "ALERT 슬롯"
+            ),
+        )
+
         # ====================================================
         # TEST 3
         # 대설 + 강풍 동시 ACTIVE
         # ====================================================
 
-        synchronize_weather_alerts(
+        result = synchronize_weather_alerts(
             connection,
             [
                 heat,
@@ -452,6 +734,17 @@ def main() -> None:
                 wind,
             ],
         )
+
+        if (
+            result[
+                "cctv_to_alert_count"
+            ]
+            != 0
+        ):
+            raise AssertionError(
+                "이미 ALERT 슬롯이 있는데 "
+                "추가 ALERT가 생성되었습니다."
+            )
 
         _assert_state(
             connection,
@@ -464,18 +757,42 @@ def main() -> None:
             ),
         )
 
+        _assert_single_focus(
+            connection,
+            region_codes,
+            expected_cctv_id=(
+                cctv_id
+            ),
+            expected_mode="ALERT",
+            label=(
+                "대설+강풍 "
+                "단일 집중감시 슬롯"
+            ),
+        )
+
         # ====================================================
         # TEST 4
         # 대설 종료 + 강풍 유지
         # ====================================================
 
-        synchronize_weather_alerts(
+        result = synchronize_weather_alerts(
             connection,
             [
                 heat,
                 wind,
             ],
         )
+
+        if (
+            result[
+                "cctv_to_alert_count"
+            ]
+            != 0
+        ):
+            raise AssertionError(
+                "강풍 특보가 계속 ACTIVE인데 "
+                "새 ALERT CCTV가 생성되었습니다."
+            )
 
         _assert_state(
             connection,
@@ -485,6 +802,19 @@ def main() -> None:
             label=(
                 "대설 종료 + 강풍 유지 "
                 "-> ALERT 유지"
+            ),
+        )
+
+        _assert_single_focus(
+            connection,
+            region_codes,
+            expected_cctv_id=(
+                cctv_id
+            ),
+            expected_mode="ALERT",
+            label=(
+                "강풍 유지 중 "
+                "단일 ALERT 슬롯"
             ),
         )
 
@@ -540,9 +870,10 @@ def main() -> None:
         #
         # false + OFF
         #
-        # 여기에 대설주의보가 발생하면:
+        # 다른 scope CCTV들은 BASE.
         #
-        # true + ALERT
+        # 특보 발생 시 OFF 우선 정책 때문에
+        # cctv_id가 다시 ALERT가 되어야 한다.
         # ====================================================
 
         _set_state(
@@ -560,13 +891,26 @@ def main() -> None:
             label="기상특보 전 OFF 상태",
         )
 
-        synchronize_weather_alerts(
+        result = synchronize_weather_alerts(
             connection,
             [
                 heat,
                 snow,
             ],
         )
+
+        if (
+            result[
+                "cctv_to_alert_count"
+            ]
+            != 1
+        ):
+            raise AssertionError(
+                "OFF CCTV 우선 선택에서 "
+                "ALERT 1대가 생성되어야 합니다. "
+                f"actual="
+                f"{result['cctv_to_alert_count']}"
+            )
 
         _assert_state(
             connection,
@@ -576,6 +920,19 @@ def main() -> None:
             label=(
                 "OFF + 대설주의보 "
                 "-> ALERT"
+            ),
+        )
+
+        _assert_single_focus(
+            connection,
+            region_codes,
+            expected_cctv_id=(
+                cctv_id
+            ),
+            expected_mode="ALERT",
+            label=(
+                "OFF 우선 선택 후 "
+                "단일 ALERT 슬롯"
             ),
         )
 
@@ -609,7 +966,16 @@ def main() -> None:
 
         # ====================================================
         # TEST 9
-        # VERIFY는 Scheduler가 변경하지 않는다.
+        #
+        # Incident Runtime이:
+        #
+        # ALERT -> VERIFY
+        #
+        # 로 일시 전환한 상황을 재현한다.
+        #
+        # Scheduler는 VERIFY를 기존 집중감시 슬롯으로
+        # 인식해야 하므로 다른 BASE CCTV를
+        # 새 ALERT로 추가하면 안 된다.
         # ====================================================
 
         _set_state(
@@ -619,7 +985,7 @@ def main() -> None:
             mode="VERIFY",
         )
 
-        synchronize_weather_alerts(
+        result = synchronize_weather_alerts(
             connection,
             [
                 heat,
@@ -627,12 +993,39 @@ def main() -> None:
             ],
         )
 
+        if (
+            result[
+                "cctv_to_alert_count"
+            ]
+            != 0
+        ):
+            raise AssertionError(
+                "VERIFY CCTV가 이미 집중감시 슬롯을 "
+                "사용 중인데 추가 ALERT가 "
+                "생성되었습니다. "
+                f"actual="
+                f"{result['cctv_to_alert_count']}"
+            )
+
         _assert_state(
             connection,
             cctv_id,
             expected_is_monitored=True,
             expected_mode="VERIFY",
             label="VERIFY 상태 보호",
+        )
+
+        _assert_single_focus(
+            connection,
+            region_codes,
+            expected_cctv_id=(
+                cctv_id
+            ),
+            expected_mode="VERIFY",
+            label=(
+                "VERIFY 중 추가 ALERT "
+                "생성 금지"
+            ),
         )
 
         # ====================================================
@@ -645,7 +1038,8 @@ def main() -> None:
                 SELECT
                     alert_type,
                     alert_level,
-                    status::text AS status
+                    status::text
+                        AS status
                 FROM weather_alerts
                 WHERE region_code = %s
                 ORDER BY issued_at;
