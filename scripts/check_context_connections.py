@@ -22,7 +22,8 @@ SECRETS = ()
 WATER_FIELDS = {'wlobscd', 'obsnm', 'wlobsnm', 'lat', 'lon', 'wrnwl', 'almwl', 'srswl'}
 TRAFFIC_FIELDS = {'eventid', 'eventtype', 'eventdetailtype', 'linkid', 'roadname',
                   'roaddrctype', 'lanesblocktype', 'lanesblocked', 'coordx', 'coordy',
-                  'startdate', 'enddate', 'createddate', 'speed', 'traveltime', 'roadrank'}
+                  'startdate', 'enddate', 'createddate', 'speed', 'traveltime', 'roadrank',
+                  'drctype', 'routeno', 'roadno', 'linkno', 'startnodeid', 'endnodeid'}
 
 
 def secret_variants(values):
@@ -152,6 +153,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cctv-id', type=int, required=True)
     parser.add_argument('--skip-weather', action='store_true', help='이미 확인한 기상 API 조회를 건너뜁니다.')
+    parser.add_argument('--skip-events', action='store_true', help='이미 확인한 교통 돌발정보 조회를 건너뜁니다.')
     args = parser.parse_args()
     from backend.app.config import load_environment
     load_environment()
@@ -177,6 +179,9 @@ def main():
     # 두 ITS 서비스는 각각 한 번만 호출합니다. 빈 결과를 정상 통제 상태로 바꾸지 않습니다.
     key = os.getenv('TRAFFIC_API_KEY', '').strip()
     for name, endpoint in (('traffic_events', 'eventInfo'), ('traffic_links', 'trafficInfo')):
+        if endpoint == 'eventInfo' and args.skip_events:
+            output[name] = {'status': 'SKIPPED_BY_OPTION', 'mapping_verified': False}
+            continue
         if not cctv or not key:
             output[name] = {'status': 'MISSING_CCTV_OR_KEY', 'mapping_verified': False}
             continue
@@ -185,6 +190,9 @@ def main():
                   'maxX': lon + 0.02, 'minY': lat - 0.02, 'maxY': lat + 0.02}
         if endpoint == 'eventInfo':
             params['eventType'] = 'all'
+        else:
+            # 소통정보의 공식 방향 조건을 명시합니다. 양방향 후보 조회이며 실제 방향 매핑은 별도입니다.
+            params['drcType'] = 'all'
         result, payload = request_once(f'https://openapi.its.go.kr:9443/{endpoint}', params)
         rows = list(records(payload, TRAFFIC_FIELDS))
         output[name] = {**result, 'mapping_verified': False, 'record_count': len(rows), 'records': rows[:8]}
