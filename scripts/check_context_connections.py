@@ -192,6 +192,7 @@ def main():
             params['eventType'] = 'all'
         else:
             # 소통정보의 공식 방향 조건을 명시합니다. 양방향 후보 조회이며 실제 방향 매핑은 별도입니다.
+            params['type'] = 'all'
             params['drcType'] = 'all'
         result, payload = request_once(f'https://openapi.its.go.kr:9443/{endpoint}', params)
         rows = list(records(payload, TRAFFIC_FIELDS))
