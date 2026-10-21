@@ -54,6 +54,108 @@ def list_agencies(
     ).fetchall()
 
 
+
+# ------------------------------------------------------------
+# A02 모바일 홈
+# ------------------------------------------------------------
+
+def get_agency_home_info(
+    connection,
+    agency_id: int,
+):
+    """
+    로그인 사용자의 소속기관과
+    기관 지역 코드를 조회한다.
+    """
+
+    return connection.execute(
+        """
+        SELECT
+            id AS agency_id,
+            name AS agency_name,
+            region_code
+        FROM agencies
+        WHERE id = %s
+        """,
+        (
+            agency_id,
+        ),
+    ).fetchone()
+
+
+def list_agency_active_weather_alerts(
+    connection,
+    region_code: str,
+):
+    """
+    기관 행정구역의 현재 ACTIVE 기상특보를 조회한다.
+
+    weather_alerts.region_code에는
+    기상청 코드가 아니라 OCTV 내부 region_code가 저장된다.
+    """
+
+    return (
+        connection.execute(
+            """
+            SELECT
+                external_alert_id,
+                alert_type,
+                alert_level,
+                title,
+                issued_at,
+                region_code
+
+            FROM weather_alerts
+
+            WHERE status = 'ACTIVE'
+              AND region_code = %s
+
+            ORDER BY
+                CASE alert_level
+                    WHEN '경보' THEN 1
+                    WHEN '주의보' THEN 2
+                    WHEN '예비특보' THEN 3
+                    ELSE 4
+                END,
+                issued_at DESC,
+                external_alert_id
+            """,
+            (
+                region_code,
+            ),
+        )
+        .fetchall()
+    )
+
+
+def count_agency_focused_monitoring_cctvs(
+    connection,
+    region_code: str,
+) -> int:
+    """
+    기관 행정구역에서 현재 ALERT 모드로
+    집중감시 중인 CCTV 수를 반환한다.
+    """
+
+    row = connection.execute(
+        """
+        SELECT
+            COUNT(*)::int AS total
+
+        FROM cctvs
+
+        WHERE region_code = %s
+          AND is_monitored = TRUE
+          AND monitored_mode = 'ALERT'
+        """,
+        (
+            region_code,
+        ),
+    ).fetchone()
+
+    return row["total"]
+
+
 # ------------------------------------------------------------
 # 사건별 추천 기관 / 경로 후보 조회
 # ------------------------------------------------------------

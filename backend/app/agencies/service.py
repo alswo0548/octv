@@ -5,6 +5,7 @@
 
 import logging
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 
@@ -25,6 +26,30 @@ log = logging.getLogger(
 )
 
 
+KST = ZoneInfo(
+    "Asia/Seoul"
+)
+
+
+def _kst_naive_to_aware(
+    value,
+):
+    """
+    weather_alerts의 KST naive 시각을
+    API 응답용 timezone-aware 값으로 변환한다.
+    """
+
+    if value is None:
+        return None
+
+    if value.tzinfo is not None:
+        return value
+
+    return value.replace(
+        tzinfo=KST
+    )
+
+
 # ------------------------------------------------------------
 # 회원가입용 기관 목록
 # ------------------------------------------------------------
@@ -34,6 +59,150 @@ def list_agencies():
         return repository.list_agencies(
             connection
         )
+
+
+
+# ------------------------------------------------------------
+# A02 모바일 홈 상단
+# ------------------------------------------------------------
+
+def get_agency_home_status(
+    user: dict[str, Any],
+) -> schemas.AgencyHomeStatusResponse:
+    """
+    로그인한 기관 사용자 기준으로
+    A02 상단의 기관·특보·집중감시 정보를 반환한다.
+    """
+
+    if (
+        user.get("is_active")
+        is not True
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "활성 사용자만 "
+                "접근할 수 있습니다."
+            ),
+        )
+
+    if user.get("role") not in (
+        "AGENCY_STAFF",
+        "RESPONDER",
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "기관 담당자 또는 "
+                "현장대응자만 접근할 수 있습니다."
+            ),
+        )
+
+    agency_id = user.get(
+        "agency_id"
+    )
+
+    if agency_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "소속 기관 정보가 필요합니다."
+            ),
+        )
+
+    with get_connection() as connection:
+
+        agency = (
+            repository.get_agency_home_info(
+                connection,
+                int(agency_id),
+            )
+        )
+
+        if agency is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "소속 기관 정보를 "
+                    "찾을 수 없습니다."
+                ),
+            )
+
+        region_code = agency[
+            "region_code"
+        ]
+
+        if not region_code:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "소속 기관의 지역 정보가 "
+                    "설정되지 않았습니다."
+                ),
+            )
+
+        weather_rows = (
+            repository
+            .list_agency_active_weather_alerts(
+                connection,
+                region_code,
+            )
+        )
+
+        focused_count = (
+            repository
+            .count_agency_focused_monitoring_cctvs(
+                connection,
+                region_code,
+            )
+        )
+
+    weather_alerts = [
+        schemas.AgencyHomeWeatherAlert(
+            external_alert_id=(
+                row["external_alert_id"]
+            ),
+            alert_type=(
+                row["alert_type"]
+            ),
+            alert_level=(
+                row["alert_level"]
+            ),
+            title=(
+                row["title"]
+            ),
+            issued_at=(
+                _kst_naive_to_aware(
+                    row["issued_at"]
+                )
+            ),
+            region_code=(
+                row["region_code"]
+            ),
+        )
+        for row in weather_rows
+    ]
+
+    return (
+        schemas.AgencyHomeStatusResponse(
+            agency_id=(
+                agency["agency_id"]
+            ),
+            agency_name=(
+                agency["agency_name"]
+            ),
+            region_code=(
+                region_code
+            ),
+            weather_alerts=(
+                weather_alerts
+            ),
+            focused_monitoring_cctv_count=(
+                focused_count
+            ),
+        )
+    )
+
 
 
 # ------------------------------------------------------------

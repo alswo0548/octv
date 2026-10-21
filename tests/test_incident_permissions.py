@@ -401,6 +401,43 @@ class IncidentPermissionsTests(unittest.TestCase):
             self.client.get("/api/incidents", headers=headers)
             self.assertNotIn("agency_id", query.call_args.args[1])
 
+
+    def test_a02_home_status_uses_authenticated_agency(self):
+        issued_at = datetime(2026, 10, 21, 14, 0)
+        with (patch.object(agency_repository, "get_agency_home_info",
+                return_value={"agency_id": 7, "agency_name": "강남소방서", "region_code": "11680"}) as agency_info,
+            patch.object(agency_repository, "list_agency_active_weather_alerts",
+                return_value=[{"external_alert_id": "TEST-WEATHER-1", "alert_type": "호우", "alert_level": "주의보",
+                        "title": "서울특별시 호우주의보", "issued_at": issued_at, "region_code": "11680"}]) as weather_alerts,
+            patch.object(agency_repository, "count_agency_focused_monitoring_cctvs", return_value=3) as focused_cctvs):
+            response = self.client.get("/api/agencies/me/home-status", headers=self.headers())
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["agency_id"], 7)
+        self.assertEqual(body["agency_name"], "강남소방서")
+        self.assertEqual(body["region_code"], "11680")
+        self.assertEqual(body["focused_monitoring_cctv_count"], 3)
+        self.assertEqual(len(body["weather_alerts"]), 1)
+        alert = body["weather_alerts"][0]
+        self.assertEqual(alert["alert_type"], "호우")
+        self.assertEqual(alert["alert_level"], "주의보")
+        self.assertEqual(alert["region_code"], "11680")
+
+        # DB의 KST naive 시각이 API에서는 timezone-aware KST로 반환되는지 확인.
+        self.assertEqual(alert["issued_at"], "2026-10-21T14:00:00+09:00")
+        agency_info.assert_called_once_with(self.connection, 7)
+        weather_alerts.assert_called_once_with(self.connection, "11680")
+        focused_cctvs.assert_called_once_with(self.connection, "11680")
+
+
+    def test_a02_home_status_rejects_control_admin(self):
+        self.user["role"] = "CONTROL_ADMIN"
+        with patch.object(agency_repository, "get_agency_home_info") as agency_info:
+            response = self.client.get("/api/agencies/me/home-status", headers=self.headers())
+        self.assertEqual(response.status_code, 403)
+        agency_info.assert_not_called()
+
+
     def test_service_does_not_trust_supplied_agency_filter(self):
         filters = {"agency_id": 999, "agency_active_only": True}
         with patch.object(incident_repository, "list_incidents", return_value={

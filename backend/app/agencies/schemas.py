@@ -7,6 +7,7 @@
 
 from typing import Annotated, Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from datetime import datetime
 
 
 # 회원가입에 사용할 기관 정보의 응답 형식
@@ -14,6 +15,32 @@ class AgencyResponse(BaseModel):
     id: int
     name: str
     agency_type: str
+
+
+class AgencyHomeWeatherAlert(
+    BaseModel
+):
+    external_alert_id: str
+    alert_type: str
+    alert_level: str
+    title: str
+    issued_at: datetime
+    region_code: str
+
+
+class AgencyHomeStatusResponse(
+    BaseModel
+):
+    """
+    A02 모바일 홈 상단에 필요한
+    소속기관·기상특보·집중감시 정보.
+    """
+
+    agency_id: int
+    agency_name: str
+    region_code: str
+    weather_alerts: list[AgencyHomeWeatherAlert] = Field(default_factory=list)
+    focused_monitoring_cctv_count: int = Field(ge=0)
 
 
 # PostgreSQL BIGINT 범위의 양수 정수만 ID로 받으며 문자·소수·불리언은 자동 변환하지 않습니다.
