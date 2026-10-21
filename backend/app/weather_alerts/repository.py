@@ -454,24 +454,29 @@ def _set_alert_mode(
 ) -> int:
     """
     MVP에서는 감시 강화 대상 특보 지역 전체에서
-    CCTV 1대만 ALERT로 활성화한다.
+    집중감시 슬롯을 1대만 사용한다.
 
-    이미 해당 특보 지역에서 ALERT 중인 CCTV가 있으면
-    가장 작은 id의 CCTV 1대를 그대로 유지한다.
+    이미 해당 특보 지역에서 ALERT 또는 VERIFY 중인
+    CCTV가 있으면 새 ALERT CCTV를 추가하지 않는다.
 
-    ALERT CCTV가 없으면:
+    VERIFY는 Incident Runtime이 ALERT에서
+    일시적으로 전환할 수 있는 상태이므로,
+    Scheduler 입장에서는 기존 집중감시 슬롯이
+    계속 사용 중인 것으로 취급한다.
+
+    ALERT / VERIFY CCTV가 없으면:
     1. OFF CCTV 우선
     2. 없으면 BASE / POST_ALERT CCTV
     순서로 1대를 선택한다.
 
-    VERIFY는 변경하지 않는다.
+    Scheduler는 VERIFY 자체를 변경하지 않는다.
     """
 
     if not region_codes:
         return 0
 
     query = """
-        WITH existing_alert AS (
+        WITH existing_focus_slot AS (
             SELECT id
             FROM cctvs
             WHERE region_code =
@@ -480,10 +485,21 @@ def _set_alert_mode(
                   )
               AND provider = 'UTIC'
               AND is_monitored = TRUE
-              AND monitored_mode =
+              AND monitored_mode IN (
                   'ALERT'
+                  ::monitored_mode_enum,
+                  'VERIFY'
                   ::monitored_mode_enum
-            ORDER BY id
+              )
+            ORDER BY
+                CASE
+                    WHEN monitored_mode =
+                        'ALERT'
+                        ::monitored_mode_enum
+                    THEN 0
+                    ELSE 1
+                END,
+                id
             LIMIT 1
         ),
 
@@ -498,7 +514,7 @@ def _set_alert_mode(
               AND external_cctv_id IS NOT NULL
               AND NOT EXISTS (
                   SELECT 1
-                  FROM existing_alert
+                  FROM existing_focus_slot
               )
               AND (
                   (
@@ -642,6 +658,11 @@ def synchronize_weather_alerts(
         true + POST_ALERT
             -> 대상 특보 재발생
             -> true + ALERT
+
+        true + ALERT
+            -> Incident 후보 검증
+            -> true + VERIFY
+            -> 집중감시 슬롯 유지
 
         true + ALERT
             -> 해당 지역 대상 특보 모두 종료
