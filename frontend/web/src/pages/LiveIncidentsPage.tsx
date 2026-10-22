@@ -38,24 +38,32 @@ type Props = {
 };
 
 type Period = "all" | "today" | "week";
+
 const PAGE_SIZE = 5;
 
 // 브라우저 위치와 관계없이 서울 날짜의 00:00(KST)을 ISO(UTC)로 전송합니다.
 function periodStart(period: Period): string | undefined {
   if (period === "all") return undefined;
+
   const koreaDate = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
+
   const parts = Object.fromEntries(
     koreaDate.map((part) => [part.type, part.value]),
   );
+
   const start = new Date(
     `${parts.year}-${parts.month}-${parts.day}T00:00:00+09:00`,
   );
-  if (period === "week") start.setUTCDate(start.getUTCDate() - 6);
+
+  if (period === "week") {
+    start.setUTCDate(start.getUTCDate() - 6);
+  }
+
   return start.toISOString();
 }
 
@@ -72,38 +80,58 @@ function JsonDetails({ title, data }: { title: string; data: unknown }) {
 function RepresentativeImage({
   session,
   incident,
+  isAdmin,
 }: {
   session: WebIncidentSession;
   incident: IncidentDetailDto;
+  isAdmin: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+
   useEffect(() => {
     setUrl(null);
     setUnavailable(false);
-    if (!incident.representative_image_updated_at) return;
+
+    if (!incident.representative_image_updated_at) {
+      return;
+    }
+
     const controller = new AbortController();
     let resource: string | null = null;
+
     void loadIncidentImageUrl(session.version, incident.id, controller.signal)
       .then((next) => {
         resource = next;
-        if (!controller.signal.aborted) setUrl(next);
-        else URL.revokeObjectURL(next);
+
+        if (!controller.signal.aborted) {
+          setUrl(next);
+        } else {
+          URL.revokeObjectURL(next);
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setUnavailable(true);
+        if (!controller.signal.aborted) {
+          setUnavailable(true);
+        }
       });
+
     return () => {
       controller.abort();
-      if (resource) URL.revokeObjectURL(resource);
+
+      if (resource) {
+        URL.revokeObjectURL(resource);
+      }
     };
   }, [incident.id, incident.representative_image_updated_at, session.version]);
+
   return (
     <section className="panel camera-panel live-incident-image">
       <div className="camera stored-camera">
         <div className="camera-overlay-label">
           저장 이미지 · {incident.cctv_name}
         </div>
+
         {url ? (
           <img
             src={url}
@@ -123,15 +151,19 @@ function RepresentativeImage({
           </p>
         )}
       </div>
+
       <div className="camera-caption">
         <span>사건 대표 이미지 · 저장 시점 기준</span>
       </div>
-      <button
-        className="primary camera-live-button"
-        onClick={() => go(`monitor/${incident.cctv_id}`)}
-      >
-        실시간 CCTV 영상
-      </button>
+
+      {isAdmin && (
+        <button
+          className="primary camera-live-button"
+          onClick={() => go(`monitor/${incident.cctv_id}`)}
+        >
+          실시간 CCTV 영상
+        </button>
+      )}
     </section>
   );
 }
@@ -152,20 +184,28 @@ export function LiveIncidentsPage({
   const [period, setPeriod] = useState<Period>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+
   const [list, setList] = useState<PageDto<IncidentDto> | null>(null);
+
   const [detail, setDetail] = useState<IncidentDetailDto | null>(null);
+
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+
   const [loadingList, setLoadingList] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  const isAdmin = session.user.role === "CONTROL_ADMIN";
+
   // 필터가 바뀌면 1페이지부터 실제 서버 목록을 조회합니다.
   useEffect(() => {
     const controller = new AbortController();
+
     setLoadingList(true);
     setListError(null);
     setList(null);
+
     void listServerIncidents(
       session.version,
       {
@@ -180,16 +220,23 @@ export function LiveIncidentsPage({
       controller.signal,
     )
       .then((result) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setList(result);
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
           setListError(incidentErrorMessage(error));
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadingList(false);
+        if (!controller.signal.aborted) {
+          setLoadingList(false);
+        }
       });
+
     return () => controller.abort();
   }, [
     session.version,
@@ -204,7 +251,9 @@ export function LiveIncidentsPage({
 
   // 목록 조회가 처음 완료됐고 선택된 사건이 없다면 첫 번째 실제 DB ID를 선택합니다.
   useEffect(() => {
-    if (selectedId === null && list?.items.length) onSelect(list.items[0].id);
+    if (selectedId === null && list?.items.length) {
+      onSelect(list.items[0].id);
+    }
   }, [selectedId, list, onSelect]);
 
   // 선택된 숫자 DB ID로만 상세 조회. 다른 사건의 늦은 응답은 폐기합니다.
@@ -214,29 +263,42 @@ export function LiveIncidentsPage({
       setDetailError(null);
       return;
     }
+
     const controller = new AbortController();
+
     setLoadingDetail(true);
     setDetail(null);
     setDetailError(null);
+
     void getServerIncident(session.version, selectedId, controller.signal)
       .then((result) => {
-        if (!controller.signal.aborted) setDetail(result);
+        if (!controller.signal.aborted) {
+          setDetail(result);
+        }
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
           setDetailError(incidentErrorMessage(error));
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoadingDetail(false);
+        if (!controller.signal.aborted) {
+          setLoadingDetail(false);
+        }
       });
+
     return () => controller.abort();
   }, [session.version, selectedId, refreshKey]);
 
   // PATCH 후 서버를 다시 조회합니다. 충돌(409) 때는 같은 PATCH를 자동 재시도하지 않습니다.
   const changeStatus = async (operation: "confirm" | "false-positive") => {
-    if (!detail || updating) return;
+    if (!detail || updating || !isAdmin) {
+      return;
+    }
+
     setUpdating(true);
     setDetailError(null);
+
     try {
       await changeServerIncident(session.version, detail.id, operation);
     } catch (error) {
@@ -246,22 +308,31 @@ export function LiveIncidentsPage({
       onRefresh();
     }
   };
+
   const confirmAction = (operation: "confirm" | "false-positive") => {
-    if (!detail || updating) return;
+    if (!detail || updating || !isAdmin) {
+      return;
+    }
+
     show({
       title: operation === "confirm" ? "사건 확인" : "오탐 처리",
-      body: `${detail.incident_no} 사건을 ${operation === "confirm" ? "확인" : "오탐"} 처리할까요?`,
+      body: `${detail.incident_no} 사건을 ${
+        operation === "confirm" ? "확인" : "오탐"
+      } 처리할까요?`,
       confirm: operation === "confirm" ? "사건 확인" : "오탐 처리",
       onConfirm: () => {
         void changeStatus(operation);
       },
     });
   };
+
   const resetPage = (setValue: (value: string) => void) => (value: string) => {
     setPage(1);
     setValue(value);
   };
+
   const pages = Math.ceil((list?.total ?? 0) / PAGE_SIZE);
+
   return (
     <>
       <section className="panel list-panel">
@@ -269,11 +340,14 @@ export function LiveIncidentsPage({
           <h2>
             사건 목록 <span className="count">{list?.total ?? "–"}</span>
           </h2>
+
           <span className="subtle">탐지 시각 기준 · 한국시간</span>
         </div>
+
         <div className="filters live-filters">
           <div className="priority-filter">
             <label>우선순위</label>
+
             <div className="segments">
               {["", "P1", "P2", "P3"].map((value) => (
                 <button
@@ -287,11 +361,12 @@ export function LiveIncidentsPage({
               ))}
             </div>
           </div>
+
           <label>
             상태
             <select
               value={status}
-              onChange={(e) => resetPage(setStatus)(e.target.value)}
+              onChange={(event) => resetPage(setStatus)(event.target.value)}
             >
               <option value="">상태 전체</option>
               <option value="DETECTED">탐지됨</option>
@@ -301,13 +376,15 @@ export function LiveIncidentsPage({
               <option value="FALSE_POSITIVE">오탐 이력</option>
             </select>
           </label>
+
           <label>
             유형
             <select
               value={hazard}
-              onChange={(e) => resetPage(setHazard)(e.target.value)}
+              onChange={(event) => resetPage(setHazard)(event.target.value)}
             >
               <option value="">유형 전체</option>
+
               {Object.entries(hazardLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -315,13 +392,14 @@ export function LiveIncidentsPage({
               ))}
             </select>
           </label>
+
           <label>
             기간
             <select
               value={period}
-              onChange={(e) => {
+              onChange={(event) => {
                 setPage(1);
-                setPeriod(e.target.value as Period);
+                setPeriod(event.target.value as Period);
               }}
             >
               <option value="all">전체 기간</option>
@@ -329,9 +407,10 @@ export function LiveIncidentsPage({
               <option value="week">최근 7일</option>
             </select>
           </label>
+
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               setPage(1);
               setSearch(searchInput.trim());
             }}
@@ -340,21 +419,25 @@ export function LiveIncidentsPage({
               검색
               <input
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(event) => setSearchInput(event.target.value)}
                 placeholder="사건번호 / CCTV명"
               />
             </label>
+
             <button className="secondary" type="submit">
               조회
             </button>
           </form>
         </div>
+
         {loadingList && <p role="status">사건 목록을 조회하고 있습니다.</p>}
+
         {listError && (
           <p role="alert">
             {listError} <button onClick={onRefresh}>다시 조회</button>
           </p>
         )}
+
         <div className="table-scroll">
           <table>
             <thead>
@@ -371,6 +454,7 @@ export function LiveIncidentsPage({
                 ))}
               </tr>
             </thead>
+
             <tbody>
               {list?.items.map((row) => (
                 <tr
@@ -378,13 +462,16 @@ export function LiveIncidentsPage({
                   tabIndex={0}
                   className={selectedId === row.id ? "selected" : ""}
                   onClick={() => onSelect(row.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") onSelect(row.id);
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      onSelect(row.id);
+                    }
                   }}
                   aria-label={`${row.incident_no} 상세 보기`}
                 >
                   <td>{row.incident_no}</td>
                   <td>{hazardLabel(row.hazard_type)}</td>
+
                   <td>
                     {row.priority ? (
                       <Badge priority={row.priority} />
@@ -392,6 +479,7 @@ export function LiveIncidentsPage({
                       "분석 대기"
                     )}
                   </td>
+
                   <td>{statusLabel(row.status)}</td>
                   <td>{row.cctv_name}</td>
                   <td>{formatSeoulTime(row.detected_at)}</td>
@@ -400,13 +488,16 @@ export function LiveIncidentsPage({
             </tbody>
           </table>
         </div>
+
         {list?.items.length === 0 && !loadingList && (
           <p>조건에 맞는 사건이 없습니다.</p>
         )}
+
         <div className="table-footer">
           <span>
             총 {list?.total ?? 0}건 / {page}페이지
           </span>
+
           <nav className="pagination" aria-label="사건 목록 페이지">
             <button
               disabled={page <= 1 || loadingList}
@@ -414,9 +505,12 @@ export function LiveIncidentsPage({
             >
               이전
             </button>
-            {Array.from({ length: Math.min(pages, 7) }, (_, idx) => {
+
+            {Array.from({ length: Math.min(pages, 7) }, (_, index) => {
               const first = Math.max(1, Math.min(page - 3, pages - 6));
-              const current = first + idx;
+
+              const current = first + index;
+
               return (
                 <button
                   key={current}
@@ -428,6 +522,7 @@ export function LiveIncidentsPage({
                 </button>
               );
             })}
+
             <button
               disabled={page >= pages || loadingList}
               onClick={() => setPage(page + 1)}
@@ -437,23 +532,29 @@ export function LiveIncidentsPage({
           </nav>
         </div>
       </section>
+
       <section className="selected-heading">
         <div>
           <span className="eyebrow">SELECTED INCIDENT</span>
+
           <h2>
             {detail
               ? `${hazardLabel(detail.hazard_type)} · ${detail.incident_no}`
               : "선택 사건 상세"}
           </h2>
         </div>
+
         <button className="secondary" onClick={onRefresh}>
           서버 정보 새로고침
         </button>
       </section>
+
       {loadingDetail && (
         <p role="status">선택 사건 상세를 조회하고 있습니다.</p>
       )}
+
       {detailError && <p role="alert">{detailError}</p>}
+
       {!detail && (
         <div
           className="detail-grid restored-detail-grid"
@@ -469,22 +570,28 @@ export function LiveIncidentsPage({
                     : "조회할 사건을 선택해주세요."}
               </div>
             </div>
+
             <div className="camera-caption">사건 대표 이미지</div>
           </section>
+
           <section className="panel info">
             <h2>사건 정보</h2>
+
             <p className="subtle">
               {loadingDetail ? "조회 중" : "선택 사건 없음"}
             </p>
           </section>
+
           <section className="panel risk">
             <h2>위험도 · 우선순위</h2>
+
             <div className="scores">
               <div>
                 <strong>
                   –<small> / 100</small>
                 </strong>
               </div>
+
               <div>
                 <strong>
                   –<small> / 100</small>
@@ -492,12 +599,14 @@ export function LiveIncidentsPage({
               </div>
             </div>
           </section>
+
           <section className="panel external">
             <h2>외부 상황</h2>
             <p className="subtle">조회 대기</p>
           </section>
         </div>
       )}
+
       {detail && (
         <>
           <div className="detail-grid restored-detail-grid">
@@ -505,12 +614,15 @@ export function LiveIncidentsPage({
               key={detail.id}
               session={session}
               incident={detail}
+              isAdmin={isAdmin}
             />
+
             <section className="panel info">
               <div className="section-title">
                 <h2>사건 정보</h2>
                 <span className="tag">{detail.status}</span>
               </div>
+
               <dl>
                 <div>
                   <dt>CCTV</dt>
@@ -518,70 +630,89 @@ export function LiveIncidentsPage({
                     {detail.cctv_name} (#{detail.cctv_id})
                   </dd>
                 </div>
+
                 <div>
                   <dt>좌표</dt>
                   <dd>
                     {detail.latitude}, {detail.longitude}
                   </dd>
                 </div>
+
                 <div>
                   <dt>최초 탐지</dt>
                   <dd>{formatSeoulTime(detail.detected_at)}</dd>
                 </div>
+
                 <div>
                   <dt>최근 탐지</dt>
                   <dd>{formatSeoulTime(detail.last_detected_at)}</dd>
                 </div>
+
                 <div>
                   <dt>상태</dt>
                   <dd>{statusLabel(detail.status)}</dd>
                 </div>
               </dl>
+
               <div className="analysis-note">
                 <span>AI DETECTION</span>
+
                 <div>
                   <strong>
                     {(detail.confidence * 100).toFixed(1)}
                     <small>%</small>
                   </strong>
+
                   <div className="confidence-track">
-                    <i style={{ width: `${detail.confidence * 100}%` }} />
+                    <i
+                      style={{
+                        width: `${detail.confidence * 100}%`,
+                      }}
+                    />
                   </div>
                 </div>
+
                 <small>모델 탐지 신뢰도</small>
               </div>
-              <div className="live-actions">
-                {detail.status === "DETECTED" && (
-                  <button
-                    className="primary"
-                    disabled={updating}
-                    onClick={() => confirmAction("confirm")}
-                  >
-                    사건 확인
-                  </button>
-                )}
-                {(["DETECTED", "CONFIRMED"] as string[]).includes(
-                  detail.status,
-                ) && (
-                  <button
-                    className="secondary"
-                    disabled={updating}
-                    onClick={() => confirmAction("false-positive")}
-                  >
-                    오탐 처리
-                  </button>
-                )}
-              </div>
+
+              {isAdmin && (
+                <div className="live-actions">
+                  {detail.status === "DETECTED" && (
+                    <button
+                      className="primary"
+                      disabled={updating}
+                      onClick={() => confirmAction("confirm")}
+                    >
+                      사건 확인
+                    </button>
+                  )}
+
+                  {(["DETECTED", "CONFIRMED"] as string[]).includes(
+                    detail.status,
+                  ) && (
+                    <button
+                      className="secondary"
+                      disabled={updating}
+                      onClick={() => confirmAction("false-positive")}
+                    >
+                      오탐 처리
+                    </button>
+                  )}
+                </div>
+              )}
             </section>
+
             <section className="panel risk live-risk">
               <div className="section-title">
                 <h2>위험도 · 우선순위</h2>
+
                 <span className="subtle">
                   {detail.analysis_status === "READY"
                     ? "분석 완료"
                     : "분석 대기"}
                 </span>
               </div>
+
               <div className="scores">
                 <div>
                   <label>
@@ -592,51 +723,71 @@ export function LiveIncidentsPage({
                         : "미분석"}
                     </span>
                   </label>
+
                   <strong>
                     {detail.risk_score ?? "–"}
                     <small> / 100</small>
                   </strong>
+
                   <div className="bar red">
-                    <i style={{ width: `${detail.risk_score ?? 0}%` }} />
+                    <i
+                      style={{
+                        width: `${detail.risk_score ?? 0}%`,
+                      }}
+                    />
                   </div>
                 </div>
+
                 <div>
                   <label>
                     대응 우선순위 <span>{detail.priority ?? "미분석"}</span>
                   </label>
+
                   <strong>
                     {detail.priority_score ?? "–"}
                     <small> / 100</small>
                   </strong>
+
                   <div className="bar blue">
-                    <i style={{ width: `${detail.priority_score ?? 0}%` }} />
+                    <i
+                      style={{
+                        width: `${detail.priority_score ?? 0}%`,
+                      }}
+                    />
                   </div>
                 </div>
               </div>
+
               <p className="content-footnote">
                 규칙: {detail.rule_version ?? "분석 결과 없음"}
               </p>
+
               {detail.risk_breakdown_json && (
                 <JsonDetails
                   title="위험도 계산 근거·외부 Context"
                   data={detail.risk_breakdown_json}
                 />
               )}
+
               {detail.priority_breakdown_json && (
                 <JsonDetails
                   title="우선순위 계산 근거"
                   data={detail.priority_breakdown_json}
                 />
               )}
+
               {detail.analysis_status === "PENDING" && (
                 <p>분석 결과가 아직 저장되지 않았습니다.</p>
               )}
             </section>
+
             <IncidentContext incident={detail} />
           </div>
+
           <section className="panel page-section live-delivery">
             <div className="section-title">
-              <h2>기관 추천 · 선택 전달</h2>
+              <h2>{isAdmin ? "기관 추천 · 선택 전달" : "전달 정보 · 경로"}</h2>
+
               <button
                 className="secondary"
                 onClick={() => go(`routes/${detail.id}`)}
@@ -644,21 +795,26 @@ export function LiveIncidentsPage({
                 경로 비교 상세
               </button>
             </div>
+
             <p>
-              사건 상태를 확인한 뒤 실제 추천 기관을 조회하고 사람의 선택으로
-              전달합니다.
+              {isAdmin
+                ? "사건 상태를 확인한 뒤 실제 추천 기관을 조회하고 사람의 선택으로 전달합니다."
+                : "우리 기관에 전달된 사건의 저장 경로와 대응 정보를 조회할 수 있습니다."}
             </p>
-            <button
-              className="primary"
-              disabled={
-                updating || !["CONFIRMED", "SENT"].includes(detail.status)
-              }
-              onClick={openPicker}
-            >
-              추천 기관 확인·전달
-            </button>
+
+            {isAdmin && (
+              <button
+                className="primary"
+                disabled={
+                  updating || !["CONFIRMED", "SENT"].includes(detail.status)
+                }
+                onClick={openPicker}
+              >
+                추천 기관 확인·전달
+              </button>
+            )}
           </section>
-          {/* 기존 세션과 실제 사건 ID를 재사용하고, 사건·세션 전환 시 이전 패널을 비웁니다. */}
+
           <LiveSupportRequestsPanel
             key={`${session.version}:${detail.id}`}
             session={session}

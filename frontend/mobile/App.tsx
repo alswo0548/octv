@@ -53,21 +53,30 @@ export function MobileApp({
     notificationController.getSnapshot,
     notificationController.getSnapshot,
   );
+
   const currentSession = useSyncExternalStore(
     mobileSession.subscribe,
     mobileSession.getSnapshot,
     mobileSession.getSnapshot,
   );
+
   const [notificationDetail, setNotificationDetail] = useState(false);
+
   const [pushError, setPushError] = useState<string | null>(null);
+
   const [pushInitialized, setPushInitialized] = useState(false);
+
   const navigationVersion = useRef(0);
+
   // 메뉴 이동 뒤 끝난 이전 조회와 확인창 콜백을 구분합니다.
   const navigationRequest = useRef(0);
+
   const detailOrigin = useRef<"notifications" | "incidents">("notifications");
+
   const [screen, setScreen] = useState<Screen>("login"),
     [id, setId] = useState("SEL-001"),
     [dialog, setDialog] = useState<DialogState | null>(null);
+
   const scroll = useRef<ScrollView>(null);
 
   // 앱 시작 시 저장된 Android JWT를 서버에서 재검증하고 알림 세션에 인계합니다.
@@ -87,6 +96,7 @@ export function MobileApp({
       );
     } else if (currentSession.status === "waiting") {
       setNotificationDetail(false);
+
       setScreen((old) =>
         ["login", "signup-basic", "signup-agency", "signup-complete"].includes(
           old,
@@ -121,58 +131,84 @@ export function MobileApp({
   // 리스너는 앱당 한 번 연결하고, 드라이버 준비 전에 앱이 닫히면 뒤늦게 등록하지 않습니다.
   useEffect(() => {
     let active = true;
+
     const stop = startAndroidPush({
       onResponse: (data, key) =>
         notificationController.handleNotificationResponse(data, key),
+
       onReceived: () => {
         void notificationController.refreshNotifications();
       },
+
       onTokenChanged: () => {
         void notificationController.refreshDeviceRegistration();
       },
+
       shouldPresent: () => {
         const state = notificationController.getSnapshot();
+
         return (
           state.status === "ready" && !!state.user && state.enabled === true
         );
       },
+
       onStatus: (status) => {
-        if (active)
+        if (active) {
           setPushError(status.state === "ready" ? null : status.message);
+        }
       },
     });
+
     void createAndroidPushDriver()
       .then((driver) => {
         if (active) {
           notificationController.setDeviceDriver(driver);
+
           setPushInitialized(true);
         }
       })
       .catch(() => {
-        if (active)
+        if (active) {
           setPushError(
             "알림 연결을 준비하지 못했습니다. 앱을 다시 열어주세요.",
           );
+        }
       });
+
     return () => {
       active = false;
       stop();
+
       notificationController.setDeviceDriver(null);
     };
   }, []);
 
   // 서버 권한 확인이 완료된 새 사건만 화면을 이동시킵니다. ID를 mock 조회 함수에 넣지 않습니다.
   useEffect(() => {
-    if (navigationVersion.current === notification.navigationVersion) return;
+    if (navigationVersion.current === notification.navigationVersion) {
+      return;
+    }
+
     navigationVersion.current = notification.navigationVersion;
-    if (notification.status !== "ready" || !notification.incident) return;
-    if (notification.openedNotificationId)
+
+    if (notification.status !== "ready" || !notification.incident) {
+      return;
+    }
+
+    if (notification.openedNotificationId) {
       detailOrigin.current = "notifications";
+    }
+
     navigationRequest.current += 1;
+
     setDialog(null);
     setNotificationDetail(true);
     setScreen("detail");
-    scroll.current?.scrollTo({ y: 0, animated: false });
+
+    scroll.current?.scrollTo({
+      y: 0,
+      animated: false,
+    });
   }, [
     notification.navigationVersion,
     notification.status,
@@ -181,6 +217,7 @@ export function MobileApp({
 
   const go: Navigate = (next, incident) => {
     const session = mobileSession.getSnapshot();
+
     // 기존 로그인 화면을 거치지 않고 샘플 사건 화면으로 진입하지 않게 합니다.
     if (
       session.status !== "ready" &&
@@ -189,11 +226,14 @@ export function MobileApp({
       )
     ) {
       navigationRequest.current += 1;
+
       setDialog(null);
       setScreen("login");
       return;
     }
+
     const opened = notificationController.getSnapshot();
+
     const actualIncident =
       notificationDetail &&
       session.api === currentSession.api &&
@@ -201,6 +241,7 @@ export function MobileApp({
       opened.user?.id === session.user?.id
         ? opened.incident
         : null;
+
     // 같은 실제 사건의 상세·경로·지원요청 이동에서는 사건과 원래 목록을 보존합니다.
     if (
       notificationDetail &&
@@ -208,9 +249,16 @@ export function MobileApp({
       (!incident || incident === String(actualIncident?.id))
     ) {
       if (actualIncident || next === "detail") {
-        if (screen !== next) navigationRequest.current += 1;
+        if (screen !== next) {
+          navigationRequest.current += 1;
+        }
+
         setScreen(next);
-        scroll.current?.scrollTo({ y: 0, animated: false });
+
+        scroll.current?.scrollTo({
+          y: 0,
+          animated: false,
+        });
       } else {
         setDialog({
           title: "사건 조회 안내",
@@ -218,39 +266,50 @@ export function MobileApp({
           cancel: false,
         });
       }
+
       return;
     }
+
     const requestVersion = ++navigationRequest.current;
+
     // 실제 DB 번호는 항상 서버 상세 조회로 보내고, 알 수 없는 번호를 샘플 사건으로 대체하지 않습니다.
     if (incident && /^[1-9]\d*$/.test(incident)) {
       if (next === "detail") {
         detailOrigin.current = "incidents";
+
         const ownerApi = session.api;
+
         const openedVersion = opened.navigationVersion;
-        void notificationController.openIncident(incident).then((opened) => {
-          if (
-            !opened &&
-            requestVersion === navigationRequest.current &&
-            mobileSession.getSnapshot().status === "ready" &&
-            mobileSession.getSnapshot().api === ownerApi &&
-            notificationController.getSnapshot().navigationVersion ===
-              openedVersion
-          ) {
-            setDialog({
-              title: "사건 조회 안내",
-              body: "사건 상세를 확인하지 못했습니다. 목록에서 다시 시도해주세요.",
-              cancel: false,
-            });
-          }
-        });
-      } else
+
+        void notificationController
+          .openIncident(incident)
+          .then((openedResult) => {
+            if (
+              !openedResult &&
+              requestVersion === navigationRequest.current &&
+              mobileSession.getSnapshot().status === "ready" &&
+              mobileSession.getSnapshot().api === ownerApi &&
+              notificationController.getSnapshot().navigationVersion ===
+                openedVersion
+            ) {
+              setDialog({
+                title: "사건 조회 안내",
+                body: "사건 상세를 확인하지 못했습니다. 목록에서 다시 시도해주세요.",
+                cancel: false,
+              });
+            }
+          });
+      } else {
         setDialog({
           title: "이용 안내",
           body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
           cancel: false,
         });
+      }
+
       return;
     }
+
     if (
       notificationDetail &&
       ["detail", "live", "routes", "request"].includes(next)
@@ -260,21 +319,36 @@ export function MobileApp({
         body: "이 사건의 해당 기능은 아직 제공되지 않습니다.",
         cancel: false,
       });
+
       return;
     }
+
     // 아직 상세가 열리기 전이라도 사용자가 다른 메뉴를 택하면 진행 중인 조회를 취소 처리합니다.
     setNotificationDetail(false);
+
     notificationController.clearOpenedIncident();
+
     setScreen(next);
-    if (incident) setId(incident);
-    scroll.current?.scrollTo({ y: 0, animated: false });
+
+    if (incident) {
+      setId(incident);
+    }
+
+    scroll.current?.scrollTo({
+      y: 0,
+      animated: false,
+    });
   };
+
   // 화면을 떠난 뒤 도착한 내비 결과나 이전 사건의 확인창은 현재 화면에 표시하지 않습니다.
   const incidentViewVersion = navigationRequest.current;
+
   const showIncidentDialog = (value: DialogState) => {
     const isCurrent = () => {
       const session = mobileSession.getSnapshot();
+
       const opened = notificationController.getSnapshot();
+
       return (
         incidentViewVersion === navigationRequest.current &&
         session.status === "ready" &&
@@ -286,16 +360,23 @@ export function MobileApp({
         opened.navigationVersion === notification.navigationVersion
       );
     };
-    if (!isCurrent()) return;
+
+    if (!isCurrent()) {
+      return;
+    }
+
     setDialog({
       ...value,
       onConfirm: value.onConfirm
         ? () => {
-            if (isCurrent()) value.onConfirm?.();
+            if (isCurrent()) {
+              value.onConfirm?.();
+            }
           }
         : undefined,
     });
   };
+
   const auth = [
       "login",
       "signup-basic",
@@ -303,35 +384,53 @@ export function MobileApp({
       "signup-complete",
     ].includes(screen),
     d = incidentById(id),
-    title = mobileScreens.find((x) => x[2] === screen)?.[1] || "";
+    title = mobileScreens.find((item) => item[2] === screen)?.[1] || "";
+
   const back: Partial<Record<Screen, [Screen, string]>> = {
     detail: notificationDetail
       ? detailOrigin.current === "notifications"
         ? ["notifications", "알림 목록"]
         : ["incidents", "사건 목록"]
       : ["incidents", "사건 목록"],
+
     live: ["incidents", "사건 목록"],
+
     routes: ["detail", "사건 상세"],
+
     request: ["detail", "사건 상세"],
+
     notifications: ["home", "홈"],
+
     "signup-basic": ["login", "로그인"],
+
     "signup-agency": ["signup-basic", "회원가입"],
+
     "signup-complete": ["login", "로그인"],
   };
+
   function navigate(next: Screen) {
-    if (screen === "request")
+    if (screen === "request") {
       (notificationDetail ? showIncidentDialog : setDialog)({
         title: "작성 화면을 나갈까요?",
         body: "입력 내용은 저장되지 않습니다.",
         confirm: "이동",
         onConfirm: () => go(next),
       });
-    else go(next);
+    } else {
+      go(next);
+    }
   }
+
   return (
-    <View style={{ flex: 1, backgroundColor: color.bg }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: color.bg,
+      }}
+    >
       <StatusBar style="light" />
       <Background />
+
       <SafeAreaView
         style={{
           flex: 1,
@@ -346,7 +445,9 @@ export function MobileApp({
       >
         <ScrollView
           ref={scroll}
-          contentContainerStyle={{ paddingBottom: auth ? 40 : 104 }}
+          contentContainerStyle={{
+            paddingBottom: auth ? 40 : 104,
+          }}
           keyboardShouldPersistTaps="handled"
         >
           {screen !== "login" && (
@@ -362,6 +463,7 @@ export function MobileApp({
             >
               <View style={s.row}>
                 <Brand />
+
                 {!auth && (
                   <Pressable
                     accessibilityRole="button"
@@ -386,14 +488,25 @@ export function MobileApp({
                   </Pressable>
                 )}
               </View>
+
               {back[screen] && (
                 <Link onPress={() => navigate(back[screen]![0])}>
                   ‹ {back[screen]![1]}
                 </Link>
               )}
-              <Text style={[s.title, { marginTop: 14, marginBottom: 2 }]}>
+
+              <Text
+                style={[
+                  s.title,
+                  {
+                    marginTop: 14,
+                    marginBottom: 2,
+                  },
+                ]}
+              >
                 {title}
               </Text>
+
               {(screen === "home" || screen === "incidents") && (
                 <Text style={s.muted}>
                   {currentSession.status === "ready"
@@ -403,6 +516,7 @@ export function MobileApp({
               )}
             </View>
           )}
+
           <View
             key={
               auth
@@ -413,7 +527,10 @@ export function MobileApp({
                     ? (notification.incident?.id ?? "restricted")
                     : id)
             }
-            style={{ paddingHorizontal: 20, paddingTop: 20 }}
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 20,
+            }}
           >
             {pushError &&
               (screen === "notifications" || screen === "settings") && (
@@ -421,6 +538,7 @@ export function MobileApp({
                   <T>{pushError}</T>
                 </View>
               )}
+
             {currentSession.status === "checking" ? (
               <View style={s.panel}>
                 <T>저장된 로그인 상태를 확인하고 있습니다.</T>
@@ -448,6 +566,7 @@ export function MobileApp({
                     actualIncident={notification.incident}
                     go={go}
                     backTo={detailOrigin.current}
+                    show={showIncidentDialog}
                   />
                 )
               ) : (
@@ -458,6 +577,7 @@ export function MobileApp({
                         ? "사건 정보를 확인하고 있습니다."
                         : "로그인 후 사건정보를 다시 확인해주세요.")}
                   </T>
+
                   <Button onPress={() => go(detailOrigin.current)}>
                     {detailOrigin.current === "notifications"
                       ? "알림 목록으로"
@@ -472,6 +592,7 @@ export function MobileApp({
                     <T>{currentSession.message}</T>
                   </View>
                 )}
+
                 <AuthScreens
                   screen={screen}
                   go={go}
@@ -493,11 +614,11 @@ export function MobileApp({
               <SettingsScreen
                 go={go}
                 show={setDialog}
-                // 설치 UUID를 읽을 준비가 끝나야 기존 기기 연결의 해제를 확인할 수 있습니다.
                 onLogout={
                   pushInitialized
                     ? async () => {
                         await onLogout?.();
+
                         await mobileSession.logout();
                       }
                     : undefined
@@ -506,6 +627,7 @@ export function MobileApp({
             )}
           </View>
         </ScrollView>
+
         {!auth && (
           <View
             style={{
@@ -555,8 +677,21 @@ export function MobileApp({
                       : "transparent",
                 }}
               >
-                <Text style={{ fontSize: 23, color: color.cyan }}>{icon}</Text>
-                <Text style={{ fontSize: 12, color: color.muted }}>
+                <Text
+                  style={{
+                    fontSize: 23,
+                    color: color.cyan,
+                  }}
+                >
+                  {icon}
+                </Text>
+
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: color.muted,
+                  }}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -564,6 +699,7 @@ export function MobileApp({
           </View>
         )}
       </SafeAreaView>
+
       <Dialog value={dialog} close={() => setDialog(null)} />
     </View>
   );
