@@ -122,11 +122,11 @@ def main() -> None:
     dedup_key = "test:incident-db:" + uuid4().hex
 
     first_at = datetime.now(KST)
-
+    delayed_at = first_at + timedelta(seconds=5)
     second_at = first_at + timedelta(seconds=10)
 
     first_image = make_jpeg(40)
-
+    delayed_image = make_jpeg(90)
     second_image = make_jpeg(180)
 
     print(f"[SETUP] cctv_id={cctv_id}")
@@ -297,12 +297,95 @@ def main() -> None:
         print("[PASS] 대표 이미지와 bbox / confidence / model_version 동기화")
 
         # =================================================
+        # TEST 6
+        # 오래된 Detection이 늦게 도착해도
+        # 최신 대표 이미지와 탐지 메타데이터를 덮어쓰면 안 됨
+        # =================================================
+
+        print()
+        print("[TEST 6] 지연 도착한 과거 Detection 보호")
+
+        delayed_result = register_detection(
+            {
+                "cctv_id": cctv_id,
+                "hazard_type": "flood",
+                "confidence": 0.52,
+                "model_version": "integration-test-delayed",
+                "detection_bbox_json": {
+                    "x1": 30.0,
+                    "y1": 35.0,
+                    "x2": 120.0,
+                    "y2": 118.0,
+                },
+                "dedup_key": dedup_key,
+                "detected_at": delayed_at,
+                "representative_image": delayed_image,
+            }
+        )
+
+        delayed_id = int(delayed_result["id"])
+
+        if delayed_id != first_id:
+            raise AssertionError(
+                "지연 Detection 처리 중 새 Incident가 생성됐습니다. "
+                f"first_id={first_id}, delayed_id={delayed_id}"
+            )
+
+        stored_delayed = find_test_incident(dedup_key)
+
+        if stored_delayed is None:
+            raise AssertionError("지연 Detection 처리 후 Incident를 조회할 수 없습니다.")
+
+        if stored_delayed["last_detected_at"] != stored_second["last_detected_at"]:
+            raise AssertionError(
+                "과거 Detection이 last_detected_at을 되돌렸습니다. "
+                f"before={stored_second['last_detected_at']}, "
+                f"after={stored_delayed['last_detected_at']}"
+            )
+
+        if (
+            stored_delayed["representative_image_updated_at"]
+            != stored_second["representative_image_updated_at"]
+        ):
+            raise AssertionError(
+                "과거 Detection이 대표 이미지 갱신 시각을 덮어썼습니다. "
+                f"before={stored_second['representative_image_updated_at']}, "
+                f"after={stored_delayed['representative_image_updated_at']}"
+            )
+
+        if bytes(stored_delayed["representative_image"]) != second_image:
+            raise AssertionError("과거 Detection이 최신 대표 이미지를 덮어썼습니다.")
+
+        if float(stored_delayed["confidence"]) != 0.88:
+            raise AssertionError(
+                "과거 Detection이 최신 confidence를 덮어썼습니다. "
+                f"actual={stored_delayed['confidence']}"
+            )
+
+        if stored_delayed["model_version"] != "integration-test-v2":
+            raise AssertionError(
+                "과거 Detection이 최신 model_version을 덮어썼습니다. "
+                f"actual={stored_delayed['model_version']}"
+            )
+
+        if stored_delayed["detection_bbox_json"] != expected_bbox:
+            raise AssertionError(
+                "과거 Detection이 최신 detection_bbox_json을 덮어썼습니다. "
+                f"actual={stored_delayed['detection_bbox_json']}"
+            )
+
+        print("[PASS] 과거 Detection 지연 도착 시 최신 이미지/메타데이터 유지")
+
+        # =================================================
         # RESULT
         # =================================================
 
         print()
         print("=" * 70)
-        print("[SUCCESS] Incident DB INSERT → Active Incident UPSERT → 대표 이미지 갱신 정상")
+        print(
+            "[SUCCESS] Incident DB INSERT → Active Incident UPSERT → "
+            "대표 이미지 갱신 → 지연 Detection 보호 정상"
+        )
         print("=" * 70)
 
     finally:
