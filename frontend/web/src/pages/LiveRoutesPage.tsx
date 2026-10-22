@@ -100,7 +100,7 @@ export function LiveRoutesPage({
       )}
 
       <div className="section-title">
-        <h2>기관별 추천경로</h2>
+        <h2>{isAdmin ? "기관별 추천경로" : "우리 기관 경로"}</h2>
 
         <div className="action-row">
           <button
@@ -143,8 +143,9 @@ export function LiveRoutesPage({
             {item.agency_name}
 
             <small>
-              추천 {item.recommendation_rank}
-              순위 · {item.recommendation_status}
+              {isAdmin
+                ? `추천 ${item.recommendation_rank}순위 · ${item.recommendation_status}`
+                : item.recommendation_status}
             </small>
           </button>
         ))}
