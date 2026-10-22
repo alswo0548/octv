@@ -13,10 +13,10 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from math import cos, floor, isfinite, log, pi, sin, tan
 
-MAPPING_VERSION = 1
+MAPPING_VERSION = 2
 MAPPING_TTL_SEC = 7 * 24 * 60 * 60
-CACHE_PREFIX = "octv:context:mapping:v1:"
-LOCK_PREFIX = "octv:context:mapping:lock:v1:"
+CACHE_PREFIX = "octv:context:mapping:v2:"
+LOCK_PREFIX = "octv:context:mapping:lock:v2:"
 KMA_WEATHER_URL = (
     "https://apis.data.go.kr/1360000/"
     "VilageFcstInfoService_2.0/getUltraSrtNcst"
@@ -63,6 +63,8 @@ def _fingerprint(cctv: dict) -> str:
         f"{lat:.7f}", f"{lon:.7f}",
         str(cctv.get("region_code") or ""),
         str(cctv.get("provider") or ""),
+        str(cctv.get("name") or cctv.get("cctv_name") or ""),
+        str(cctv.get("address") or ""),
     ]
     return sha256(json.dumps(scope, ensure_ascii=True).encode("utf-8")).hexdigest()
 
@@ -119,23 +121,51 @@ def prepare_cached_mapping(cctv: dict) -> str:
         from uuid import uuid4
 
         token = uuid4().hex
-        if not client.set(lock, token, nx=True, ex=15):
+        if not client.set(lock, token, nx=True, ex=30):
             return "IN_PROGRESS"
         try:
             # 잠금 대기 중 다른 요청이 채웠을 수 있으므로 재확인.
             if get_cached_mapping(cctv) is not None:
                 return "CACHED"
+            # 인증키와 URL을 Redis로 보내지 않습니다. HTTPS 조회 오류도 기존 분석에
+            # 전파하지 않으며, 추정만 가능한 대상은 NO_MAPPING으로 남깁니다.
+            water_info = {"status": "NEEDS_HYDROLOGY_VERIFICATION"}
+            traffic_info = {"status": "NEEDS_ROAD_DIRECTION_VERIFICATION"}
+            if auto_mapping_enabled():
+                from .auto_match_providers import find_water_mapping, find_traffic_mapping
+                water_candidate = find_water_mapping(
+                    cctv, os.getenv("WATER_LEVEL_API_KEY", ""), client
+                )
+                traffic_candidate = find_traffic_mapping(
+                    cctv, os.getenv("TRAFFIC_API_KEY", ""), client
+                )
+                if water_candidate["status"] == "VERIFIED_EXACT_COLOCATION":
+                    water_info = water_candidate
+                else:
+                    water_info.update({
+                        "reason": water_candidate["status"],
+                        "candidates": water_candidate.get("candidates", []),
+                    })
+                traffic_info.update({
+                    "reason": traffic_candidate["status"],
+                    "candidates": traffic_candidate.get("candidates", []),
+                })
             data = {
                 "version": MAPPING_VERSION,
                 "cctv_id": int(cctv["id"]),
                 "fingerprint": fingerprint,
                 "weather_grid": {"nx": nx, "ny": ny},
-                # 미확정 관측소·도로는 OK로 사용하지 않는다.
-                "water_level": {"status": "NEEDS_HYDROLOGY_VERIFICATION"},
-                "traffic": {"status": "NEEDS_ROAD_DIRECTION_VERIFICATION"},
+                "water_level": water_info,
+                "traffic": traffic_info,
                 "prepared_at_utc": datetime.now(timezone.utc).isoformat(),
             }
-            client.set(key, json.dumps(data, ensure_ascii=True), ex=MAPPING_TTL_SEC)
+            # 승인 오류나 키 미설정은 빠르게 재시도하고, 검토가 필요한 후보는
+            # 하루간 유지해 외부기관 API를 과도하게 반복 호출하지 않습니다.
+            retry_causes = {"MISSING_KEY", "API_UNAVAILABLE_OR_UNAPPROVED",
+                            "API_UNAVAILABLE_OR_UNKNOWN_SCHEMA"}
+            reasons = {water_info.get("reason"), traffic_info.get("reason")}
+            ttl = 600 if reasons & retry_causes else 86400
+            client.set(key, json.dumps(data, ensure_ascii=True), ex=ttl)
             return "CREATED"
         finally:
             client.eval(
@@ -155,6 +185,8 @@ def weather_request_for(incident: dict) -> dict:
         "longitude": incident["longitude"],
         "region_code": incident.get("region_code"),
         "provider": incident.get("provider", "UTIC"),
+        "name": incident.get("cctv_name") or incident.get("name"),
+        "address": incident.get("address"),
     }
     cached = get_cached_mapping(source)
     try:
@@ -187,6 +219,48 @@ def weather_request_for(incident: dict) -> dict:
     }
 
 
+def water_request_for(incident: dict) -> dict:
+    """캐시에 공식 관측소 현장 일치 근거가 있을 때만 자동 수위 요청 생성."""
+    cctv = {
+        "id": incident.get("cctv_id", incident.get("id")),
+        "latitude": incident.get("latitude"),
+        "longitude": incident.get("longitude"),
+        "region_code": incident.get("region_code"),
+        "provider": incident.get("provider", "UTIC"),
+        "name": incident.get("cctv_name") or incident.get("name"),
+        "address": incident.get("address"),
+    }
+    cached = get_cached_mapping(cctv)
+    record = cached.get("water_level", {}) if cached else {}
+    station = str(record.get("station_id") or "")
+    if (record.get("status") != "VERIFIED_EXACT_COLOCATION"
+            or not station.isascii() or not station.isdigit() or not 5 <= len(station) <= 12):
+        return {"mapped": False}
+    # 파서/관측시각 검증은 기존 water_level.py / normalization.py 재사용.
+    return {
+        "mapped": True,
+        "required_env": ["WATER_LEVEL_API_KEY"],
+        "source": "HRFCO_WATERLEVEL_10M",
+        "max_age_sec": 1800,
+        "url": f"https://api.hrfco.go.kr/${{WATER_LEVEL_API_KEY}}/waterlevel/list/10M/{station}.json",
+        "params": {},
+        "spec": {
+            "rows_path": ["content"], "station_key": "wlobscd",
+            "station_id": station, "value_key": "wl", "time_key": "ymdhm",
+            "time_format": "%Y%m%d%H%M", "timezone": "KST", "scale": 1,
+        },
+        "station_info": {
+            "url": "https://api.hrfco.go.kr/${WATER_LEVEL_API_KEY}/waterlevel/info.json",
+            "params": {},
+        },
+    }
+
+
+def traffic_request_for(incident: dict) -> dict:
+    """카메라 방향 검증 자료가 없으므로 안전상 자동으로 통제를 확정하지 않음."""
+    return {}
+
+
 def prepare_monitored_cctv(cctv_id: int) -> str:
     """Worker에서 DB를 읽어 현재 감시 중인 CCTV만 캐시한다."""
     from backend.app.cctvs.repository import get_cctv
@@ -207,7 +281,7 @@ def prepare_all_monitored() -> dict:
 
     with get_connection() as connection:
         rows = connection.execute(
-            "SELECT id, latitude, longitude, region_code, provider "
+            "SELECT id, latitude, longitude, region_code, provider, name, address "
             "FROM cctvs WHERE is_monitored = TRUE ORDER BY id"
         ).fetchall()
 

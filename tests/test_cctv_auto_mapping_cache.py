@@ -85,14 +85,14 @@ class CctvAutoMappingTests(unittest.TestCase):
         factory = create_query_factory({"cctvs": {}}, {"OCTV_AUTO_MAPPING_ENABLED": "1"})
         self.assertFalse(factory(self.incident, self.now)["weather"]["mapped"])
 
-    def test_existing_verified_manual_setting_not_overwritten(self):
+    def test_auto_weather_takes_priority_over_manual_when_enabled(self):
         factory = create_query_factory({"cctvs": {"3": {"weather": {
             "mapped": True, "publication_delay_min": 5, "max_age_sec": 3600,
             "url": "https://example.test/manual", "params": {"nx": 1, "ny": 2},
         }}}}, {"OCTV_AUTO_MAPPING_ENABLED": "1", "WEATHER_API_KEY": "T"})
         query = factory(self.incident, self.now)["weather"]
-        self.assertEqual(query["url"], "https://example.test/manual")
-        self.assertEqual(query["params"]["nx"], 1)
+        self.assertEqual(query["url"], cctv_mapping.KMA_WEATHER_URL)
+        self.assertEqual(query["params"]["nx"], 62)
 
     def test_weather_payload_cache_shared_by_same_grid_and_base_time(self):
         factory = create_query_factory({"cctvs": {}}, {

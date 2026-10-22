@@ -145,11 +145,27 @@ def create_query_factory(settings: dict, environment: dict):
             'REGION_CODE': str(incident.get('region_code') or ''),
         }
 
-        # 검증된 기존 JSON 설정이 있으면 우선합니다. 다른 CCTV는 좌표로
-        # 기상 격자를 자동 계산하고 Redis 캐시를 재사용합니다.
-        if auto_mapping and isinstance(cctv.get('weather', {}), dict) and cctv.get('weather', {}).get('mapped') is not True:
-            from backend.app.integrations.cctv_mapping import weather_request_for
-            cctv['weather'] = weather_request_for(incident)
+        # 기본값은 자동 매핑. 자동으로 확인하지 못한 항목에 한해서만
+        # 기존에 명시적으로 mapped=true로 검증한 JSON 설정을 보존합니다.
+        # 임의로 가까운 수위관측소·도로를 사건의 위험도 근거로 사용하지 않습니다.
+        if auto_mapping:
+            from backend.app.integrations.cctv_mapping import (
+                weather_request_for, water_request_for, traffic_request_for,
+            )
+            automatic_weather = weather_request_for(incident)
+            if automatic_weather.get('mapped') is True:
+                cctv['weather'] = automatic_weather
+            automatic_water = water_request_for(incident)
+            if automatic_water.get('mapped') is True:
+                cctv['water_level'] = automatic_water
+            automatic_traffic = traffic_request_for(incident)
+            if any(isinstance(item, dict) and item.get('mapped') is True
+                   for item in automatic_traffic.values()):
+                previous = cctv.get('traffic', {})
+                cctv['traffic'] = {
+                    **(previous if isinstance(previous, dict) else {}),
+                    **automatic_traffic,
+                }
         weather = cctv.get('weather', {'mapped': False})
         if not isinstance(weather, dict):
             raise ValueError('weather 설정은 JSON 객체여야 합니다.')
