@@ -241,11 +241,15 @@ export default function App() {
               initial={id}
               show={setModal}
             />
-          ) : null
+          ) : (
+            loginRequired
+          )
         ) : page === "stats" ? (
           session && isAdmin ? (
             <StatsPage key={session.version} session={session} />
-          ) : null
+          ) : (
+            loginRequired
+          )
         ) : page === "settings" ? (
           session && isAdmin ? (
             <SettingsPage
@@ -254,14 +258,18 @@ export default function App() {
               tab={id}
               show={setModal}
             />
-          ) : null
+          ) : (
+            loginRequired
+          )
         ) : session && isAdmin ? (
           <TargetsPage
             key={session.version}
             session={session}
             show={setModal}
           />
-        ) : null}
+        ) : (
+          loginRequired
+        )}
       </WebLayout>
 
       {picker && session && isAdmin && <LiveAgencyPicker close={closePicker} />}
