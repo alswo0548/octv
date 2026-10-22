@@ -179,7 +179,9 @@ export function LiveOverviewPage({
           />
 
           <p className="type-caption">
-            마커를 선택하면 해당 사건의 상세정보로 이동합니다.
+            {urgent?.items.length === 0
+              ? "현재 표시할 P1/P2 사건이 없습니다."
+              : "마커를 선택하면 해당 사건의 상세정보로 이동합니다."}
           </p>
         </Panel>
 
