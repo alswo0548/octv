@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   View,
   Text,
@@ -133,23 +133,77 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     </>
   );
 }
+type ChoiceOption =
+  | string
+  | {
+      label: string;
+      value: string;
+    };
+
+function choiceValue(option: ChoiceOption): string {
+  return typeof option === "string" ? option : option.value;
+}
+
+function choiceLabel(option: ChoiceOption): string {
+  return typeof option === "string" ? option : option.label;
+}
+
 export function Choice({
   label,
   options,
+  value,
+  onChange,
+  disabled = false,
 }: {
   label: string;
-  options: string[];
+  options: ChoiceOption[];
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
 }) {
-  const [selected, set] = useState(options[0]),
-    [open, toggle] = useState(false);
+  const firstValue = options[0] ? choiceValue(options[0]) : "";
+  const [internalValue, setInternalValue] = useState(firstValue);
+  const [open, toggle] = useState(false);
+
+  const selectedValue = value ?? internalValue;
+
+  useEffect(() => {
+    if (value !== undefined) return;
+
+    const exists = options.some(
+      (option) => choiceValue(option) === internalValue,
+    );
+
+    if (!exists) {
+      setInternalValue(firstValue);
+    }
+  }, [options, value, internalValue, firstValue]);
+
+  const selected =
+    options.find((option) => choiceValue(option) === selectedValue) ?? null;
+
+  const select = (next: string) => {
+    if (value === undefined) {
+      setInternalValue(next);
+    }
+
+    onChange?.(next);
+    toggle(false);
+  };
+
   return (
     <View style={{ marginBottom: 16 }}>
       <T>{label}</T>
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label + " 선택"}
+        disabled={disabled || options.length === 0}
         onPress={() => toggle(!open)}
-        accessibilityState={{ expanded: open }}
+        accessibilityState={{
+          expanded: open,
+          disabled: disabled || options.length === 0,
+        }}
         style={[
           s.input,
           {
@@ -157,25 +211,28 @@ export function Choice({
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            opacity: disabled ? 0.6 : 1,
           },
         ]}
       >
-        <Text style={[s.text, { flex: 1 }]}>{selected}</Text>
+        <Text style={[s.text, { flex: 1 }]}>
+          {selected ? choiceLabel(selected) : "선택해주세요"}
+        </Text>
+
         <Text style={{ color: color.muted, marginLeft: 12 }}>⌄</Text>
       </Pressable>
-      {open && (
+
+      {open && !disabled && (
         <View style={[s.panel, { marginBottom: 0, padding: 8 }]}>
-          {options.map((x) => (
-            <Link
-              key={x}
-              onPress={() => {
-                set(x);
-                toggle(false);
-              }}
-            >
-              {x}
-            </Link>
-          ))}
+          {options.map((option) => {
+            const optionValue = choiceValue(option);
+
+            return (
+              <Link key={optionValue} onPress={() => select(optionValue)}>
+                {choiceLabel(option)}
+              </Link>
+            );
+          })}
         </View>
       )}
     </View>

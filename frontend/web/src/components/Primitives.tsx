@@ -48,20 +48,59 @@ export const Pair = ({ label, value }: { label: string; value: ReactNode }) => (
     <dd>{value}</dd>
   </div>
 );
+type SelectOption =
+  | string
+  | {
+      label: string;
+      value: string;
+    };
+
 export function Select({
   label,
   options,
+  value,
+  onChange,
+  disabled = false,
 }: {
   label: string;
-  options: string[];
+  options: SelectOption[];
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
 }) {
+  const optionValue = (option: SelectOption) =>
+    typeof option === "string" ? option : option.value;
+
+  const optionLabel = (option: SelectOption) =>
+    typeof option === "string" ? option : option.label;
+
+  const firstValue = options[0] ? optionValue(options[0]) : "";
+
   return (
     <label>
       {label}
-      <select defaultValue={options[0]}>
-        {options.map((v) => (
-          <option key={v}>{v}</option>
-        ))}
+      <select
+        {...(value !== undefined
+          ? {
+              value,
+              onChange: (event) => onChange?.(event.target.value),
+            }
+          : {
+              defaultValue: firstValue,
+            })}
+        disabled={disabled || options.length === 0}
+      >
+        {options.length === 0 && <option value="">선택해주세요</option>}
+
+        {options.map((option) => {
+          const nextValue = optionValue(option);
+
+          return (
+            <option key={nextValue} value={nextValue}>
+              {optionLabel(option)}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
