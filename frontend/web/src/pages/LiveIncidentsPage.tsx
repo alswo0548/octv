@@ -24,6 +24,7 @@ import {
 } from "../incidentData";
 import { IncidentContext } from "../components/IncidentContext";
 import { statusLabel } from "../operationsData";
+import { pollWhileVisible } from "../polling";
 import { go } from "../routing/useRoute";
 import "../styles/live-incidents.css";
 
@@ -198,46 +199,38 @@ export function LiveIncidentsPage({
 
   const isAdmin = session.user.role === "CONTROL_ADMIN";
 
-  // 필터가 바뀌면 1페이지부터 실제 서버 목록을 조회합니다.
+  // 필터·세션 변경은 초기화하고, 같은 화면의 후속 조회는 현재 선택을 유지합니다.
   useEffect(() => {
-    const controller = new AbortController();
-
     setLoadingList(true);
     setListError(null);
     setList(null);
-
-    void listServerIncidents(
-      session.version,
+    return pollWhileVisible(
+      (signal) =>
+        listServerIncidents(
+          session.version,
+          {
+            page,
+            page_size: PAGE_SIZE,
+            priority: (priority || undefined) as "P1" | "P2" | "P3" | undefined,
+            status: (status || undefined) as IncidentDto["status"] | undefined,
+            hazard_type: hazard || undefined,
+            q: search || undefined,
+            start: periodStart(period),
+          },
+          signal,
+        ),
       {
-        page,
-        page_size: PAGE_SIZE,
-        priority: (priority || undefined) as "P1" | "P2" | "P3" | undefined,
-        status: (status || undefined) as IncidentDto["status"] | undefined,
-        hazard_type: hazard || undefined,
-        q: search || undefined,
-        start: periodStart(period),
-      },
-      controller.signal,
-    )
-      .then((result) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setList(result);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
+        onValue: (result) => {
+          setList(result);
+          setListError(null);
+        },
+        onError: (error) => {
+          setList(null);
           setListError(incidentErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingList(false);
-        }
-      });
-
-    return () => controller.abort();
+        },
+        onSettled: () => setLoadingList(false),
+      },
+    );
   }, [
     session.version,
     page,
@@ -264,30 +257,23 @@ export function LiveIncidentsPage({
       return;
     }
 
-    const controller = new AbortController();
-
     setLoadingDetail(true);
     setDetail(null);
     setDetailError(null);
-
-    void getServerIncident(session.version, selectedId, controller.signal)
-      .then((result) => {
-        if (!controller.signal.aborted) {
+    return pollWhileVisible(
+      (signal) => getServerIncident(session.version, selectedId, signal),
+      {
+        onValue: (result) => {
           setDetail(result);
-        }
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
+          setDetailError(null);
+        },
+        onError: (error) => {
+          setDetail(null);
           setDetailError(incidentErrorMessage(error));
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingDetail(false);
-        }
-      });
-
-    return () => controller.abort();
+        },
+        onSettled: () => setLoadingDetail(false),
+      },
+    );
   }, [session.version, selectedId, refreshKey]);
 
   // PATCH 후 서버를 다시 조회합니다. 충돌(409) 때는 같은 PATCH를 자동 재시도하지 않습니다.

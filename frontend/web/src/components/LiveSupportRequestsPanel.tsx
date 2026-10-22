@@ -7,7 +7,12 @@
  * 이 컴포넌트에서는 상태 변경·대응 완료 처리를 하지 않습니다.
  */
 import { useEffect, useState } from "react";
-import { getWebIncidentApi, type WebIncidentSession } from "../incidentData";
+import {
+  getWebIncidentApi,
+  requestWebApi,
+  type WebIncidentSession,
+} from "../incidentData";
+import { pollWhileVisible } from "../polling";
 
 type SupportType = "PERSONNEL" | "EQUIPMENT" | "TRAFFIC_CONTROL" | "OTHER";
 
@@ -77,8 +82,6 @@ export function LiveSupportRequestsPanel({
   useEffect(() => {
     const api = getWebIncidentApi(session.version);
 
-    const controller = new AbortController();
-
     setLoading(true);
     setRequests(null);
     setAgencies(null);
@@ -89,53 +92,77 @@ export function LiveSupportRequestsPanel({
       setRequestError("로그인 상태를 다시 확인해주세요.");
       setLoading(false);
 
-      return () => controller.abort();
+      return;
     }
 
-    void Promise.allSettled([
-      api<SupportItem[]>(`/api/support-requests/incidents/${incidentId}`, {
-        signal: controller.signal,
-      }),
+    return pollWhileVisible(
+      (signal) =>
+        Promise.allSettled([
+          requestWebApi<SupportItem[]>(
+            session.version,
+            `/api/support-requests/incidents/${incidentId}`,
+            {
+              signal,
+            },
+          ),
 
-      api<RecommendationData>(
-        `/api/agencies/incidents/${incidentId}/recommendations`,
-        {
-          signal: controller.signal,
+          requestWebApi<RecommendationData>(
+            session.version,
+            `/api/agencies/incidents/${incidentId}/recommendations`,
+            {
+              signal,
+            },
+          ),
+        ]),
+      {
+        onValue: ([supportResult, agencyResult]) => {
+          for (const result of [supportResult, agencyResult]) {
+            if (
+              result.status === "rejected" &&
+              (result.reason?.status === 401 || result.reason?.status === 403)
+            ) {
+              throw result.reason;
+            }
+          }
+          setRequestError(null);
+          setAgencyError(null);
+
+          if (
+            supportResult.status === "fulfilled" &&
+            Array.isArray(supportResult.value)
+          ) {
+            setRequests(supportResult.value);
+          } else {
+            setRequests(null);
+            setRequestError(
+              "추가 지원 요청을 조회할 수 없습니다. 연결과 권한을 확인해주세요.",
+            );
+          }
+
+          if (
+            agencyResult.status === "fulfilled" &&
+            Array.isArray(agencyResult.value.items)
+          ) {
+            setAgencies(agencyResult.value.items);
+          } else {
+            setAgencies(null);
+            setAgencyError(
+              isAdmin
+                ? "기관별 상태를 조회할 수 없습니다. 연결과 권한을 확인해주세요."
+                : "우리 기관 상태를 조회할 수 없습니다. 연결과 권한을 확인해주세요.",
+            );
+          }
+
+          setLoading(false);
         },
-      ),
-    ]).then(([supportResult, agencyResult]) => {
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      if (
-        supportResult.status === "fulfilled" &&
-        Array.isArray(supportResult.value)
-      ) {
-        setRequests(supportResult.value);
-      } else {
-        setRequestError(
-          "추가 지원 요청을 조회할 수 없습니다. 연결과 권한을 확인해주세요.",
-        );
-      }
-
-      if (
-        agencyResult.status === "fulfilled" &&
-        Array.isArray(agencyResult.value.items)
-      ) {
-        setAgencies(agencyResult.value.items);
-      } else {
-        setAgencyError(
-          isAdmin
-            ? "기관별 상태를 조회할 수 없습니다. 연결과 권한을 확인해주세요."
-            : "우리 기관 상태를 조회할 수 없습니다. 연결과 권한을 확인해주세요.",
-        );
-      }
-
-      setLoading(false);
-    });
-
-    return () => controller.abort();
+        onError: () => {
+          setRequests(null);
+          setAgencies(null);
+          setRequestError("서버 조회에 실패했습니다. 다시 조회해주세요.");
+          setLoading(false);
+        },
+      },
+    );
   }, [session.version, incidentId, refreshKey, reload, isAdmin]);
 
   return (

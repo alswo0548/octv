@@ -37,6 +37,7 @@ export function LiveRoutesPage({
     session,
     `/api/incidents/${incidentId}`,
     revision,
+    10_000,
   );
 
   const agencies = useOperations<{
@@ -45,6 +46,7 @@ export function LiveRoutesPage({
     session,
     `/api/agencies/incidents/${incidentId}/recommendations`,
     revision,
+    10_000,
   );
 
   const agency =
@@ -57,6 +59,7 @@ export function LiveRoutesPage({
       ? `/api/routes/incidents/${incidentId}/agencies/${agency.agency_id}`
       : null,
     revision,
+    10_000,
   );
 
   const active =

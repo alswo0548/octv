@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "./api";
 import { requestWebApi, type WebIncidentSession } from "./incidentData";
+import { pollWhileVisible } from "./polling";
 
 export type Cctv = {
   id: number;
@@ -75,30 +76,32 @@ export function useOperations<T>(
   session: WebIncidentSession,
   path: string | null,
   revision = 0,
+  pollIntervalMs = 0,
 ) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
-    const controller = new AbortController();
     setData(null);
     setError(null);
     setLoading(!!path);
-    if (path)
-      void requestWebApi<T>(session.version, path, {
-        signal: controller.signal,
-      })
-        .then((value) => {
-          if (!controller.signal.aborted) setData(value);
-        })
-        .catch((reason) => {
-          if (!controller.signal.aborted) setError(operationsError(reason));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setLoading(false);
-        });
-    return () => controller.abort();
-  }, [session.version, path, revision]);
+    if (!path) return;
+    return pollWhileVisible(
+      (signal) => requestWebApi<T>(session.version, path, { signal }),
+      {
+        intervalMs: pollIntervalMs,
+        onValue: (value) => {
+          setData(value);
+          setError(null);
+        },
+        onError: (reason) => {
+          setData(null);
+          setError(operationsError(reason));
+        },
+        onSettled: () => setLoading(false),
+      },
+    );
+  }, [session.version, path, revision, pollIntervalMs]);
   return { data, error, loading };
 }
 export const monitoringLabels: Record<string, string> = {
