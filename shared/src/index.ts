@@ -85,6 +85,44 @@ export type CurrentUserDto = UserDto & {
   agency_name: string | null;
 };
 
+// 회원가입 API에서 공통으로 사용하는 타입입니다.
+export type SignupRole = "AGENCY_STAFF" | "RESPONDER";
+
+export type SignupAgencyType =
+  | "FIRE"
+  | "POLICE"
+  | "ROAD_MANAGEMENT"
+  | "LOCAL_GOVERNMENT";
+
+export type EmailCheckDto = {
+  available: boolean;
+};
+
+export type SignupSidoDto = {
+  sido_name: string;
+};
+
+export type SignupSigunguDto = {
+  region_code: string;
+  sigungu_name: string;
+};
+
+export type SignupAgencyDto = {
+  id: number;
+  name: string;
+  agency_type: SignupAgencyType;
+  address: string | null;
+  region_code: string;
+};
+
+export type SignupRequestDto = {
+  email: string;
+  password: string;
+  name: string;
+  role: SignupRole;
+  agency_id: number;
+};
+
 export type IncidentDto = {
   id: number;
   incident_no: string;

@@ -1,9 +1,10 @@
 /**
- * 후속-03 · 실제 사건 화면 조립
- * - 로그인 화면에서 검증해 전달한 관리자 세션만 실제 사건 API에 사용합니다.
- * - 실제 사건 ID를 선택하면 기존 delivery.ts에 전달합니다.
- * - 로그인 세션이 없으면 로그인 안내를 표시합니다.
- * - 운영·CCTV·통계도 같은 관리자 세션으로 연결하며 기존 로그인·전달 흐름을 유지합니다.
+ * 실제 웹 화면 조립
+ *
+ * 역할별 접근:
+ * - CONTROL_ADMIN: 전체 화면
+ * - AGENCY_STAFF / RESPONDER: 통합관제, 사건관리, 경로조회
+ * - 관리자 전용 URL 직접 접근 시 overview로 이동
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRoute, go } from "./routing/useRoute";
@@ -38,10 +39,13 @@ const titles: Record<string, string> = {
   targets: "대상 CCTV 설정",
 };
 
+const ADMIN_ONLY_PAGES = new Set(["monitor", "stats", "settings", "targets"]);
+
 export default function App() {
   const route = useRoute();
   const [raw, id] = route.split("/");
   const page = titles[raw] ? raw : "login";
+
   const routeIncidentId =
     page === "routes" &&
     /^\d+$/.test(id ?? "") &&
@@ -49,28 +53,52 @@ export default function App() {
     Number(id) > 0
       ? Number(id)
       : null;
+
   const session = useSyncExternalStore(
     subscribeWebIncidentSession,
     getWebIncidentSession,
     () => null,
   );
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [picker, setPicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState<ModalSpec | null>(null);
+
   const refresh = () => setRefreshKey((value) => value + 1);
 
-  // 계정 변경 시 다른 계정의 이전 사건 선택과 전달 창을 남겨두지 않습니다.
+  const isAdmin = session?.user.role === "CONTROL_ADMIN";
+
+  const canAccessPage =
+    page === "login" ||
+    page === "signup" ||
+    !session ||
+    !ADMIN_ONLY_PAGES.has(page) ||
+    isAdmin;
+
+  // 비관리자가 관리자 전용 URL을 직접 입력해도
+  // 관리자 화면 자체를 렌더링하지 않습니다.
+  useEffect(() => {
+    if (session && !isAdmin && ADMIN_ONLY_PAGES.has(page)) {
+      setPicker(false);
+      setSelectedId(null);
+      go("overview");
+    }
+  }, [session, isAdmin, page]);
+
+  // 계정 변경 시 이전 계정의 사건 선택과 전달창 제거
   useEffect(() => {
     setSelectedId(null);
     setPicker(false);
   }, [session?.version]);
 
-  // 세션/사건 선택이 실제로 바뀔 때만 기존 기관 전달 모듈에 연결합니다.
+  // 기관 전달 context는 CONTROL_ADMIN만 사용
   useEffect(() => {
     const api = session ? getWebIncidentApi(session.version) : null;
+
     if (
       !session ||
+      !isAdmin ||
       !api ||
       (routeIncidentId ?? selectedId) === null ||
       !["incidents", "overview", "routes"].includes(page)
@@ -78,25 +106,28 @@ export default function App() {
       setDeliveryContext(null);
       return;
     }
+
     setDeliveryContext({
       user: session.user,
       api,
       incidentId: (routeIncidentId ?? selectedId)!,
     });
+
     return () => setDeliveryContext(null);
-  }, [session, selectedId, page, routeIncidentId]);
+  }, [session, isAdmin, selectedId, page, routeIncidentId]);
 
   useEffect(() => {
     document.title = "OCTV · " + titles[page];
   }, [page]);
 
-  // 인증 화면의 JWT 삭제 책임은 기존 로그인 담당 logout 함수에 있습니다.
   const logout = () => {
     setDeliveryContext(null);
+
     void disconnectWebIncidentSession()
       .then(() => go("login"))
       .catch(() => {
         go("login");
+
         setModal({
           title: "로그아웃 처리 확인 필요",
           body: "화면 연결은 해제됐지만, 인증 토큰 삭제 결과를 확인해야 합니다.",
@@ -104,33 +135,38 @@ export default function App() {
         });
       });
   };
+
   const openIncident = (serverId: number) => {
     setSelectedId(serverId);
     go("incidents");
   };
+
   const closePicker = () => {
     setPicker(false);
-    refresh(); // 전달 후 사건 상태는 서버를 재조회합니다.
+    refresh();
   };
 
   const loginRequired = (
     <section className="panel live-placeholder" role="status">
       <h2>로그인이 필요합니다.</h2>
       <p>
-        상황실 관리자 계정으로 로그인하면 실제 사건과 지원요청을 확인할 수
-        있습니다.
+        로그인하면 계정 권한에 따라 허용된 사건과 기능을 확인할 수 있습니다.
       </p>
+
       <button className="secondary" onClick={() => go("login")}>
         로그인 화면으로 이동
       </button>
     </section>
   );
+
   const routePending = (
     <section className="panel live-placeholder" role="status">
       <h2>조회할 사건을 선택해주세요.</h2>
+
       <p>
         사건 상세에서 경로 비교를 열면 해당 사건의 저장된 경로를 조회합니다.
       </p>
+
       <button className="secondary" onClick={() => go("incidents")}>
         사건관리로 돌아가기
       </button>
@@ -144,8 +180,9 @@ export default function App() {
         title={titles[page]}
         show={setModal}
         onLogout={logout}
+        user={session?.user ?? null}
       >
-        {page === "login" || page === "signup" ? (
+        {!canAccessPage ? null : page === "login" || page === "signup" ? (
           <AuthPage key={page} signup={page === "signup"} show={setModal} />
         ) : page === "overview" ? (
           session ? (
@@ -164,7 +201,11 @@ export default function App() {
               session={session}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              openPicker={() => setPicker(true)}
+              openPicker={() => {
+                if (isAdmin) {
+                  setPicker(true);
+                }
+              }}
               show={setModal}
               refreshKey={refreshKey}
               onRefresh={refresh}
@@ -179,7 +220,11 @@ export default function App() {
                 key={`${session.version}:${routeIncidentId}:${refreshKey}`}
                 session={session}
                 incidentId={routeIncidentId}
-                openPicker={() => setPicker(true)}
+                openPicker={() => {
+                  if (isAdmin) {
+                    setPicker(true);
+                  }
+                }}
                 show={setModal}
               />
             ) : (
@@ -189,44 +234,38 @@ export default function App() {
             loginRequired
           )
         ) : page === "monitor" ? (
-          session ? (
+          session && isAdmin ? (
             <MonitorPage
               key={`${session.version}:${id}`}
               session={session}
               initial={id}
               show={setModal}
             />
-          ) : (
-            loginRequired
-          )
+          ) : null
         ) : page === "stats" ? (
-          session ? (
+          session && isAdmin ? (
             <StatsPage key={session.version} session={session} />
-          ) : (
-            loginRequired
-          )
+          ) : null
         ) : page === "settings" ? (
-          session ? (
+          session && isAdmin ? (
             <SettingsPage
               key={session.version}
               session={session}
               tab={id}
               show={setModal}
             />
-          ) : (
-            loginRequired
-          )
-        ) : session ? (
+          ) : null
+        ) : session && isAdmin ? (
           <TargetsPage
             key={session.version}
             session={session}
             show={setModal}
           />
-        ) : (
-          loginRequired
-        )}
+        ) : null}
       </WebLayout>
-      {picker && session && <LiveAgencyPicker close={closePicker} />}
+
+      {picker && session && isAdmin && <LiveAgencyPicker close={closePicker} />}
+
       <Modal spec={modal} close={() => setModal(null)} />
     </>
   );

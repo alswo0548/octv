@@ -405,11 +405,13 @@ export function MobileApp({
           )}
           <View
             key={
-              screen +
-              "|" +
-              (notificationDetail
-                ? (notification.incident?.id ?? "restricted")
-                : id)
+              auth
+                ? "auth"
+                : screen +
+                  "|" +
+                  (notificationDetail
+                    ? (notification.incident?.id ?? "restricted")
+                    : id)
             }
             style={{ paddingHorizontal: 20, paddingTop: 20 }}
           >
