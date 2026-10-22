@@ -116,6 +116,7 @@ def create_query_factory(settings: dict, environment: dict):
     mapping = deepcopy(settings.get('cctvs', {}))
     if not isinstance(mapping, dict):
         raise ValueError('cctvs 설정은 CCTV ID를 키로 가진 JSON 객체여야 합니다.')
+    auto_mapping = str(environment.get('OCTV_AUTO_MAPPING_ENABLED', '0')).strip() == '1'
     secrets = {
         key: str(environment.get(key, '') or '').strip()
         for key in (
@@ -144,6 +145,11 @@ def create_query_factory(settings: dict, environment: dict):
             'REGION_CODE': str(incident.get('region_code') or ''),
         }
 
+        # 검증된 기존 JSON 설정이 있으면 우선합니다. 다른 CCTV는 좌표로
+        # 기상 격자를 자동 계산하고 Redis 캐시를 재사용합니다.
+        if auto_mapping and isinstance(cctv.get('weather', {}), dict) and cctv.get('weather', {}).get('mapped') is not True:
+            from backend.app.integrations.cctv_mapping import weather_request_for
+            cctv['weather'] = weather_request_for(incident)
         weather = cctv.get('weather', {'mapped': False})
         if not isinstance(weather, dict):
             raise ValueError('weather 설정은 JSON 객체여야 합니다.')

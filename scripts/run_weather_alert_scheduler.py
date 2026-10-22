@@ -30,12 +30,24 @@ def sync_snapshot(
     """
 
     with get_connection() as connection:
-        return (
-            synchronize_weather_alerts(
-                connection=connection,
-                warnings=warnings,
-            )
+        result = synchronize_weather_alerts(
+            connection=connection,
+            warnings=warnings,
         )
+    # commit 이후에만 큐 발행 (Scheduler 자동 활성화 CCTV 포함).
+    # 매핑 큐 장애는 특보 저장·감시 정책을 중단시키지 않는다.
+    if result.get("cctv_to_alert_count", 0):
+        from backend.app.integrations.cctv_mapping import auto_mapping_enabled
+        if auto_mapping_enabled():
+            try:
+                from backend.app.workers import prewarm_all_context_mappings
+                prewarm_all_context_mappings.apply_async()
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "특보 CCTV 매핑 등록 실패: type=%s", type(exc).__name__
+                )
+    return result
 
 
 def build_scheduler(
