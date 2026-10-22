@@ -1,8 +1,8 @@
-"""CCTV 좌표 기반 기상 격자 자동 매핑 + Redis 캐시.
+"""CCTV 기상 격자 + 수위 반경 관측소 선택 + 교통 링크 후보 Redis 캐시.
 
-수위 관측소와 도로 구간/방향은 좌표 근접만으로 안전하게 확정할 수
-없으므로 자동 승인하지 않는다. 기존 JSON의 검증된 매핑은 유지한다.
-이 모듈은 API 인증값, DB, Runtime 내부를 변경하지 않는다.
+수위는 거리 기준의 인근 하천 관측소로만 해석하며, 도로 침수 영향권은
+입증하지 않습니다. 교통 방향 미확정 값은 기존 Rule에 주입하지 않습니다.
+인증키·DB·YOLO/CCTV Runtime 내부를 변경하지 않습니다.
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from math import cos, floor, isfinite, log, pi, sin, tan
 
-MAPPING_VERSION = 2
+MAPPING_VERSION = 6
 MAPPING_TTL_SEC = 7 * 24 * 60 * 60
-CACHE_PREFIX = "octv:context:mapping:v2:"
-LOCK_PREFIX = "octv:context:mapping:lock:v2:"
+CACHE_PREFIX = "octv:context:mapping:v6:"
+LOCK_PREFIX = "octv:context:mapping:lock:v6:"
 KMA_WEATHER_URL = (
     "https://apis.data.go.kr/1360000/"
     "VilageFcstInfoService_2.0/getUltraSrtNcst"
@@ -58,6 +58,7 @@ def _fingerprint(cctv: dict) -> str:
     """CCTV ID가 같더라도 위치·지역·제공처 변경 시 캐시 무효화."""
     lat, lon = float(cctv["latitude"]), float(cctv["longitude"])
     kma_grid(lat, lon)  # 유효성 검증
+    from .auto_match_providers import water_search_radius_m
     scope = [
         MAPPING_VERSION, int(cctv["id"]),
         f"{lat:.7f}", f"{lon:.7f}",
@@ -65,6 +66,9 @@ def _fingerprint(cctv: dict) -> str:
         str(cctv.get("provider") or ""),
         str(cctv.get("name") or cctv.get("cctv_name") or ""),
         str(cctv.get("address") or ""),
+        # 사용자 정의 반경이 바뀌면 관측소 선택도 새로 계산합니다.
+        water_search_radius_m(),
+        auto_mapping_enabled(),
     ]
     return sha256(json.dumps(scope, ensure_ascii=True).encode("utf-8")).hexdigest()
 
@@ -129,7 +133,7 @@ def prepare_cached_mapping(cctv: dict) -> str:
                 return "CACHED"
             # 인증키와 URL을 Redis로 보내지 않습니다. HTTPS 조회 오류도 기존 분석에
             # 전파하지 않으며, 추정만 가능한 대상은 NO_MAPPING으로 남깁니다.
-            water_info = {"status": "NEEDS_HYDROLOGY_VERIFICATION"}
+            water_info = {"status": "RADIUS_MAPPING_NOT_PREPARED"}
             traffic_info = {"status": "NEEDS_ROAD_DIRECTION_VERIFICATION"}
             if auto_mapping_enabled():
                 from .auto_match_providers import find_water_mapping, find_traffic_mapping
@@ -139,7 +143,11 @@ def prepare_cached_mapping(cctv: dict) -> str:
                 traffic_candidate = find_traffic_mapping(
                     cctv, os.getenv("TRAFFIC_API_KEY", ""), client
                 )
-                if water_candidate["status"] == "VERIFIED_EXACT_COLOCATION":
+                if water_candidate["status"] in (
+                        "VERIFIED_EXACT_COLOCATION", "NEARBY_STATION_WITH_THRESHOLDS",
+                        "NEARBY_STATION_NO_THRESHOLDS"):
+                    # 공식 관측소 좌표 + 설정 반경만을 매핑 조건으로 사용.
+                    # 수위값과 공식 경보 기준은 사건 발생 시 기존 검증기가 판단.
                     water_info = water_candidate
                 else:
                     water_info.update({
@@ -162,7 +170,9 @@ def prepare_cached_mapping(cctv: dict) -> str:
             # 승인 오류나 키 미설정은 빠르게 재시도하고, 검토가 필요한 후보는
             # 하루간 유지해 외부기관 API를 과도하게 반복 호출하지 않습니다.
             retry_causes = {"MISSING_KEY", "API_UNAVAILABLE_OR_UNAPPROVED",
-                            "API_UNAVAILABLE_OR_UNKNOWN_SCHEMA"}
+                            "API_UNAVAILABLE_OR_UNKNOWN_SCHEMA", "PROVIDER_REJECTED_941",
+                            "PROVIDER_RESPONSE_ERROR", "INVALID_STATION_CATALOG",
+                            "STATION_COORDINATES_UNAVAILABLE", "STATION_CATALOG_EMPTY"}
             reasons = {water_info.get("reason"), traffic_info.get("reason")}
             ttl = 600 if reasons & retry_causes else 86400
             client.set(key, json.dumps(data, ensure_ascii=True), ex=ttl)
@@ -220,7 +230,7 @@ def weather_request_for(incident: dict) -> dict:
 
 
 def water_request_for(incident: dict) -> dict:
-    """캐시에 공식 관측소 현장 일치 근거가 있을 때만 자동 수위 요청 생성."""
+    """캐시에 반경 내 공식 관측소가 선택돼 있으면 10분 수위 요청 생성."""
     cctv = {
         "id": incident.get("cctv_id", incident.get("id")),
         "latitude": incident.get("latitude"),
@@ -233,7 +243,9 @@ def water_request_for(incident: dict) -> dict:
     cached = get_cached_mapping(cctv)
     record = cached.get("water_level", {}) if cached else {}
     station = str(record.get("station_id") or "")
-    if (record.get("status") != "VERIFIED_EXACT_COLOCATION"
+    if (record.get("status") not in (
+            "VERIFIED_EXACT_COLOCATION", "NEARBY_STATION_WITH_THRESHOLDS",
+            "NEARBY_STATION_NO_THRESHOLDS")
             or not station.isascii() or not station.isdigit() or not 5 <= len(station) <= 12):
         return {"mapped": False}
     # 파서/관측시각 검증은 기존 water_level.py / normalization.py 재사용.
@@ -257,8 +269,85 @@ def water_request_for(incident: dict) -> dict:
 
 
 def traffic_request_for(incident: dict) -> dict:
-    """카메라 방향 검증 자료가 없으므로 안전상 자동으로 통제를 확정하지 않음."""
+    """현재 ITS 응답에는 촬영 방향을 검증할 근거가 없어 Rule 입력은 보류.
+
+    주행 속도만으로 정체 등급이나 통제 상태를 추정하지 않습니다.
+    검증 전 후보는 mapping_reference_for()를 통해 MCP에 상태만 전달합니다.
+    """
     return {}
+
+
+def mapping_reference_for(incident: dict) -> dict:
+    """Redis의 안전한 수위·교통 *후보 상태*를 MCP Context에 참고정보로 전달.
+
+    Rule이 사용하는 water_level_m / water_risk_level / traffic_control 등과
+    다른 필드명을 사용하며, 실제 위험도 가산 근거로 활용하지 않습니다.
+    원본 API 키·URL·응답·날짜가 지난 실측값은 저장하거나 반환하지 않습니다.
+    """
+    cctv = {
+        "id": incident.get("cctv_id", incident.get("id")),
+        "latitude": incident.get("latitude"), "longitude": incident.get("longitude"),
+        "region_code": incident.get("region_code"),
+        "provider": incident.get("provider", "UTIC"),
+        "name": incident.get("cctv_name") or incident.get("name"),
+        "address": incident.get("address"),
+    }
+    cached = get_cached_mapping(cctv)
+    result = {}
+    for field, item, provider in (
+        ("water_station_mapping", "water_level", "HRFCO_STATION_CATALOG"),
+        ("traffic_link_mapping", "traffic", "ITS_TRAFFIC_LINK_CANDIDATES"),
+    ):
+        record = cached.get(item, {}) if isinstance(cached, dict) else {}
+        record = record if isinstance(record, dict) else {}
+        candidates = record.get("candidates", [])
+        candidates = candidates if isinstance(candidates, list) else []
+        # 사용자 화면 및 MCP 결과에 참고 가능한 비인증 식별자와 거리만 표시.
+        safe_candidates = []
+        id_key = "station_id" if item == "water_level" else "link_id"
+        for row in candidates[:5]:
+            if not isinstance(row, dict):
+                continue
+            identifier = str(row.get(id_key) or "")
+            if not (identifier.isascii() and identifier.isdecimal() and 5 <= len(identifier) <= 15):
+                continue
+            meters = row.get("distance_m")
+            if not (type(meters) is int and 0 <= meters <= 200000):
+                meters = None
+            safe_candidates.append({id_key: identifier, "distance_m": meters})
+        confirmed_colocation = (item == "water_level" and
+                               record.get("status") == "VERIFIED_EXACT_COLOCATION")
+        nearby_selected = (item == "water_level" and record.get("status") in (
+            "VERIFIED_EXACT_COLOCATION", "NEARBY_STATION_WITH_THRESHOLDS",
+            "NEARBY_STATION_NO_THRESHOLDS"))
+        # cache miss / 후보 없음 / 제공기관 오류는 동일한 정상 상태가 아닙니다.
+        reason = str(record.get("reason") or record.get("status") or "CACHE_NOT_READY")
+        failed = reason in {
+            "PROVIDER_REJECTED_941", "PROVIDER_RESPONSE_ERROR", "MISSING_KEY",
+            "API_UNAVAILABLE_OR_UNAPPROVED", "API_UNAVAILABLE_OR_UNKNOWN_SCHEMA",
+            "INVALID_STATION_CATALOG", "STATION_COORDINATES_UNAVAILABLE",
+        }
+        status = ("ERROR" if failed else "NEARBY_STATION_SELECTED" if nearby_selected
+                  else "REVIEW_REQUIRED" if safe_candidates else "NO_MAPPING")
+        result[field] = {
+            "value": None,
+            "status": status,
+            "observed_at": None,
+            "source": provider,
+            "unit": "mapping_status",
+            "mapping_reason": reason[:80],
+            "candidate_count": len(safe_candidates),
+            "candidates": safe_candidates,
+            "station_colocation_verified": confirmed_colocation,
+            "radius_mapping_selected": nearby_selected,
+            "selected_station_id": (str(record.get("station_id")) if nearby_selected else None),
+            "radius_m": (record.get("radius_m") if nearby_selected else None),
+            "official_thresholds_available": (record.get("thresholds_available") is True
+                                              if nearby_selected else False),
+            "flood_impact_verified": False,
+            "road_direction_verified": False,
+        }
+    return result
 
 
 def prepare_monitored_cctv(cctv_id: int) -> str:

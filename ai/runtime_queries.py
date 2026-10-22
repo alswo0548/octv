@@ -147,11 +147,14 @@ def create_query_factory(settings: dict, environment: dict):
 
         # 기본값은 자동 매핑. 자동으로 확인하지 못한 항목에 한해서만
         # 기존에 명시적으로 mapped=true로 검증한 JSON 설정을 보존합니다.
-        # 임의로 가까운 수위관측소·도로를 사건의 위험도 근거로 사용하지 않습니다.
+        # 수위는 공식 관측소 반경 기반으로 연결. 교통의 미확정 링크는 Rule에서 제외합니다.
+        reference_metadata = {}
         if auto_mapping:
             from backend.app.integrations.cctv_mapping import (
                 weather_request_for, water_request_for, traffic_request_for,
+                mapping_reference_for,
             )
+            reference_metadata = mapping_reference_for(incident)
             automatic_weather = weather_request_for(incident)
             if automatic_weather.get('mapped') is True:
                 cctv['weather'] = automatic_weather
@@ -200,6 +203,17 @@ def create_query_factory(settings: dict, environment: dict):
             water_query.pop('risk_thresholds_m', None)
             water_query.pop('risk_thresholds_verified', None)
 
+        # 돌발정보는 실시간 변동 데이터이므로 감시 ON 매핑 캐시와 분리하여
+        # 사건 수집 시 최대 90초 공유 캐시를 재사용합니다.
+        traffic_events_query = {'mapped': False, 'now': now}
+        if auto_mapping and secrets['TRAFFIC_API_KEY']:
+            from backend.app.integrations.auto_match_providers import traffic_event_radius_m
+            traffic_events_query = {
+                'mapped': True, 'api_key': secrets['TRAFFIC_API_KEY'],
+                'latitude': incident['latitude'], 'longitude': incident['longitude'],
+                'radius_m': traffic_event_radius_m(environment), 'now': now,
+            }
+
         traffic = cctv.get('traffic', {})
         if not isinstance(traffic, dict):
             raise ValueError('traffic 설정은 JSON 객체여야 합니다.')
@@ -215,6 +229,8 @@ def create_query_factory(settings: dict, environment: dict):
             'weather': weather_query,
             'water_level': water_query,
             'traffic': traffic_query,
+            'traffic_nearby_events': traffic_events_query,
+            'mapping_references': reference_metadata,
             'places': {
                 'mapped': bool(places_key),
                 'api_key': places_key,

@@ -203,10 +203,6 @@ export function SettingsPage({
                         }
                       />
                     </div>
-                    <p className="content-footnote">
-                      {settings.data?.application[key].description ??
-                        "설정 조회 대기"}
-                    </p>
                   </div>
                 ))}
               </Panel>

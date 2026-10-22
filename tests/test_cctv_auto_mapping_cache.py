@@ -54,7 +54,7 @@ class CctvAutoMappingTests(unittest.TestCase):
         self.assertEqual(cctv_mapping.prepare_cached_mapping(self.cctv), "CACHED")
         cached = cctv_mapping.get_cached_mapping(self.cctv)
         self.assertEqual(cached["weather_grid"], {"nx": 62, "ny": 118})
-        self.assertEqual(cached["water_level"]["status"], "NEEDS_HYDROLOGY_VERIFICATION")
+        self.assertEqual(cached["water_level"]["status"], "RADIUS_MAPPING_NOT_PREPARED")
         self.assertEqual(cached["traffic"]["status"], "NEEDS_ROAD_DIRECTION_VERIFICATION")
         moved = {**self.cctv, "latitude": 37.5}
         self.assertIsNone(cctv_mapping.get_cached_mapping(moved))

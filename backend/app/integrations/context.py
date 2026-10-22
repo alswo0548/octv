@@ -18,6 +18,7 @@ from ai.contracts import ContextSnapshot
 from ..db.session import get_connection
 from ..incidents.repository import find_detail
 from . import weather, water_level, traffic, places
+from .auto_match_providers import nearby_event_measurement
 
 # 기존 사건과 주변 외부 데이터를 통합하는 함수
 def collect_context(incident_id, query_factory):
@@ -61,6 +62,7 @@ def collect_context(incident_id, query_factory):
             'now': now
         }
     )
+    traffic_events = nearby_event_measurement(queries.get('traffic_nearby_events'))
     facilities = places.fetch_data(
         {
             **queries.get('places', {'mapped': False}),
@@ -74,7 +76,11 @@ def collect_context(incident_id, query_factory):
         'water_level_m': water,
         'water_risk_level': water_risk,
         **road,
+        'traffic_nearby_events': traffic_events,
         **facilities,
+        # 자동 매핑 미확정 사유는 Rule 입력과 별도 이름으로 보존합니다.
+        # 위험 판단·기관 추천 정책은 변경하지 않습니다.
+        **queries.get('mapping_references', {}),
     }
 
     # 사건 ID, 수집 시각, 외부 데이터, 출처를 ContextSnapshot 형식으로 묶음
