@@ -11,4 +11,4 @@ if not exist ".venv\Scripts\python.exe" (
 echo [OCTV] Starting Analysis Celery Worker
 echo [OCTV] Queue: analysis
 
-".venv\Scripts\python.exe" -m celery -A backend.app.workers.celery_app worker -Q analysis -l info -P sologit status --short
+".venv\Scripts\python.exe" -m celery -A backend.app.workers.celery_app worker -Q analysis -l info -P solo
