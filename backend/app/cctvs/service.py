@@ -19,6 +19,9 @@ ALERT / POST_ALERT 상태 전환과
 import requests
 from fastapi import HTTPException
 
+import os
+from threading import Thread
+
 from ..db.session import get_connection
 from . import (
     reconnect_signal,
@@ -37,87 +40,38 @@ def _to_cctv_response(
 
     return schemas.CctvResponse(
         id=row["id"],
-
-        external_cctv_id=(
-            row["external_cctv_id"]
-        ),
-
+        external_cctv_id=(row["external_cctv_id"]),
         name=row["name"],
-
         provider=row["provider"],
-
         address=row["address"],
-
-        latitude=float(
-            row["latitude"]
-        ),
-
-        longitude=float(
-            row["longitude"]
-        ),
-
-        is_monitored=bool(
-            row["is_monitored"]
-        ),
-
-        connection_status=(
-            row["connection_status"]
-        ),
-
-        video_quality_status=(
-            row[
-                "video_quality_status"
-            ]
-        ),
-
-        analysis_status=(
-            row["analysis_status"]
-        ),
-
-        last_frame_at=(
-            row["last_frame_at"]
-        ),
-
-        region_code=(
-            row["region_code"]
-        ),
-
-        sido_name=(
-            row["sido_name"]
-        ),
-
-        sigungu_name=(
-            row["sigungu_name"]
-        ),
-
-        monitored_mode=(
-            row["monitored_mode"]
-        ),
+        latitude=float(row["latitude"]),
+        longitude=float(row["longitude"]),
+        is_monitored=bool(row["is_monitored"]),
+        connection_status=(row["connection_status"]),
+        video_quality_status=(row["video_quality_status"]),
+        analysis_status=(row["analysis_status"]),
+        last_frame_at=(row["last_frame_at"]),
+        region_code=(row["region_code"]),
+        sido_name=(row["sido_name"]),
+        sigungu_name=(row["sigungu_name"]),
+        monitored_mode=(row["monitored_mode"]),
     )
 
 
 def list_cctvs(
     region_code: str | None = None,
-) -> list[
-    schemas.CctvResponse
-]:
+) -> list[schemas.CctvResponse]:
     """
     CCTV 목록 조회.
     """
 
     with get_connection() as connection:
-
         rows = repository.list_cctvs(
             connection,
             region_code=region_code,
         )
 
-    return [
-        _to_cctv_response(
-            row
-        )
-        for row in rows
-    ]
+    return [_to_cctv_response(row) for row in rows]
 
 
 def get_cctv(
@@ -128,24 +82,18 @@ def get_cctv(
     """
 
     with get_connection() as connection:
-
         row = repository.get_cctv(
             connection,
             cctv_id,
         )
 
     if row is None:
-
         raise HTTPException(
             status_code=404,
-            detail=(
-                "CCTV를 찾을 수 없습니다."
-            ),
+            detail=("CCTV를 찾을 수 없습니다."),
         )
 
-    return _to_cctv_response(
-        row
-    )
+    return _to_cctv_response(row)
 
 
 def get_cctv_summary(
@@ -156,41 +104,49 @@ def get_cctv_summary(
     """
 
     with get_connection() as connection:
-
-        row = (
-            repository.get_cctv_summary(
-                connection,
-                region_code=(
-                    region_code
-                ),
-            )
+        row = repository.get_cctv_summary(
+            connection,
+            region_code=(region_code),
         )
 
     return schemas.CctvSummaryResponse(
-        total_count=(
-            row["total_count"]
-        ),
-
-        monitored_count=(
-            row["monitored_count"]
-        ),
-
-        connected_count=(
-            row["connected_count"]
-        ),
-
-        disconnected_count=(
-            row[
-                "disconnected_count"
-            ]
-        ),
-
-        reconnecting_count=(
-            row[
-                "reconnecting_count"
-            ]
-        ),
+        total_count=(row["total_count"]),
+        monitored_count=(row["monitored_count"]),
+        connected_count=(row["connected_count"]),
+        disconnected_count=(row["disconnected_count"]),
+        reconnecting_count=(row["reconnecting_count"]),
     )
+
+
+def _stream_prewarm_enabled() -> bool:
+    return (
+        os.getenv(
+            "OCTV_STREAM_PREWARM_ENABLED",
+            "0",
+        ).strip()
+        == "1"
+    )
+
+
+def _prewarm_stream_safely(
+    cctv_id: int,
+    external_cctv_id: str,
+) -> None:
+    """
+    감시 ON 이후 MediaMTX source를 미리 연결한다.
+
+    prewarm 실패가 CCTV 감시 ON 자체를
+    실패시키지 않도록 별도 Thread에서 실행한다.
+    """
+
+    try:
+        streaming.prewarm_cctv_stream(
+            cctv_id=cctv_id,
+            external_cctv_id=external_cctv_id,
+        )
+
+    except Exception as exc:
+        print(f"[CCTV STREAM PREWARM WARNING] cctv_id={cctv_id} / error={exc}")
 
 
 def prepare_stream(
@@ -212,56 +168,33 @@ def prepare_stream(
     """
 
     with get_connection() as connection:
-
         row = repository.get_cctv(
             connection,
             cctv_id,
         )
 
     if row is None:
-
         raise HTTPException(
             status_code=404,
-            detail=(
-                "CCTV를 찾을 수 없습니다."
-            ),
+            detail=("CCTV를 찾을 수 없습니다."),
         )
 
-    if not bool(
-        row["is_monitored"]
-    ):
-
+    if not bool(row["is_monitored"]):
         raise HTTPException(
             status_code=409,
-            detail=(
-                "현재 감시 중인 CCTV가 "
-                "아닙니다."
-            ),
+            detail=("현재 감시 중인 CCTV가 아닙니다."),
         )
 
-    if str(
-        row["provider"]
-    ).upper() != "UTIC":
-
+    if str(row["provider"]).upper() != "UTIC":
         raise HTTPException(
             status_code=409,
-            detail=(
-                "현재 실시간 스트리밍을 "
-                "지원하지 않는 CCTV입니다."
-            ),
+            detail=("현재 실시간 스트리밍을 지원하지 않는 CCTV입니다."),
         )
 
     try:
-
-        result = (
-            streaming.prepare_cctv_stream(
-                cctv_id=cctv_id,
-                external_cctv_id=str(
-                    row[
-                        "external_cctv_id"
-                    ]
-                ),
-            )
+        result = streaming.prepare_cctv_stream(
+            cctv_id=cctv_id,
+            external_cctv_id=str(row["external_cctv_id"]),
         )
 
     except (
@@ -270,24 +203,14 @@ def prepare_stream(
         ValueError,
         OSError,
     ) as exc:
-
-        print(
-            "[CCTV STREAM ERROR] "
-            f"cctv_id={cctv_id} "
-            f"/ error={exc}"
-        )
+        print(f"[CCTV STREAM ERROR] cctv_id={cctv_id} / error={exc}")
 
         raise HTTPException(
             status_code=502,
-            detail=(
-                "CCTV 실시간 영상을 "
-                "준비하지 못했습니다."
-            ),
+            detail=("CCTV 실시간 영상을 준비하지 못했습니다."),
         ) from exc
 
-    return schemas.CctvStreamResponse(
-        **result
-    )
+    return schemas.CctvStreamResponse(**result)
 
 
 def request_reconnect(
@@ -308,43 +231,27 @@ def request_reconnect(
     """
 
     with get_connection() as connection:
-
         row = repository.get_cctv(
             connection,
             cctv_id,
         )
 
         if row is None:
-
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    "CCTV를 찾을 수 없습니다."
-                ),
+                detail=("CCTV를 찾을 수 없습니다."),
             )
 
-        if not bool(
-            row["is_monitored"]
-        ):
-
+        if not bool(row["is_monitored"]):
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "현재 감시 중인 CCTV가 "
-                    "아니므로 재연결할 수 없습니다."
-                ),
+                detail=("현재 감시 중인 CCTV가 아니므로 재연결할 수 없습니다."),
             )
 
-        if str(
-            row["provider"]
-        ).upper() != "UTIC":
-
+        if str(row["provider"]).upper() != "UTIC":
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "현재 수동 재연결을 지원하지 "
-                    "않는 CCTV입니다."
-                ),
+                detail=("현재 수동 재연결을 지원하지 않는 CCTV입니다."),
             )
 
         reconnect_signal.publish_reconnect_request(
@@ -388,37 +295,19 @@ def change_monitoring(
     """
 
     with get_connection() as connection:
-
         try:
-            row = (
-                repository.update_monitoring(
-                    connection,
-                    cctv_id=cctv_id,
-                    enabled=body.enabled,
-                )
+            row = repository.update_monitoring(
+                connection,
+                cctv_id=cctv_id,
+                enabled=body.enabled,
             )
 
-        except (
-            repository
-            .MonitoringChangeBlockedError
-        ) as exc:
-
-            if (
-                exc.monitored_mode
-                == "ALERT"
-            ):
-
-                detail = (
-                    "기상특보 감시 중인 CCTV는 "
-                    "수동으로 감시를 종료할 수 없습니다."
-                )
+        except repository.MonitoringChangeBlockedError as exc:
+            if exc.monitored_mode == "ALERT":
+                detail = "기상특보 감시 중인 CCTV는 수동으로 감시를 종료할 수 없습니다."
 
             else:
-
-                detail = (
-                    "위험상황 검증 중인 CCTV는 "
-                    "수동으로 감시를 종료할 수 없습니다."
-                )
+                detail = "위험상황 검증 중인 CCTV는 수동으로 감시를 종료할 수 없습니다."
 
             raise HTTPException(
                 status_code=409,
@@ -426,46 +315,55 @@ def change_monitoring(
             ) from exc
 
         if row is None:
-
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    "CCTV를 찾을 수 없습니다."
-                ),
+                detail=("CCTV를 찾을 수 없습니다."),
             )
 
-        response = (
-            _to_cctv_response(
-                row
-            )
-        )
+        response = _to_cctv_response(row)
 
-    # DB 상태 변경은 이미 완료된 뒤다.
-    #
-    # MediaMTX 장애 때문에
-    # CCTV 감시 OFF 자체가 실패하면 안 되므로
-    # remove_cctv_stream() 내부에서
-    # 삭제 실패는 warning만 남긴다.
+    # ========================================================
+    # MediaMTX Stream 상태 동기화
+    # ========================================================
+
     if not body.enabled:
+        # 감시 OFF
+        # → 더 이상 Web Stream을 warm하게 유지하지 않는다.
+        streaming.remove_cctv_stream(cctv_id)
 
-        streaming.remove_cctv_stream(
-            cctv_id
+    elif _stream_prewarm_enabled():
+        # 감시 ON
+        # → API 응답을 막지 않고 MediaMTX를 미리 준비한다.
+        thread = Thread(
+            target=_prewarm_stream_safely,
+            kwargs={
+                "cctv_id": cctv_id,
+                "external_cctv_id": response.external_cctv_id,
+            },
+            name=(f"cctv-stream-prewarm-{cctv_id}"),
+            daemon=True,
         )
+
+        thread.start()
 
     # DB 트랜잭션 완료 후 기존 Celery analysis 큐에서 매핑만 준비합니다.
     # CCTV 감시 IN 시 자동 매핑 요청
     # Redis/Worker 장애가 감시 ON 자체를 실패시키면 안 됩니다.
     if body.enabled:
         from ..integrations.cctv_mapping import auto_mapping_enabled
+
         if auto_mapping_enabled():
             try:
                 from ..workers import prewarm_context_mapping
+
                 prewarm_context_mapping.apply_async(args=(cctv_id,))
             except Exception as exc:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "CCTV 자동 매핑 등록 실패: id=%s, type=%s",
-                    cctv_id, type(exc).__name__,
+                    cctv_id,
+                    type(exc).__name__,
                 )
 
     return response
