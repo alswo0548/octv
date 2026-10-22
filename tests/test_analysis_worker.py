@@ -4,7 +4,19 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-from backend.app import workers
+
+# CI에는 실제 Redis 환경변수가 없을 수 있으므로
+# Worker import 시 사용할 가짜 broker 주소만 임시 주입합니다.
+# 이 테스트에서는 실제 Redis 연결을 하지 않습니다.
+with patch.dict(
+    os.environ,
+    {
+        "OCTV_REDIS_URL":
+            "redis://127.0.0.1:1/0"
+    },
+    clear=False,
+):
+    from backend.app import workers
 
 
 class FakeInsufficientContext(Exception):
