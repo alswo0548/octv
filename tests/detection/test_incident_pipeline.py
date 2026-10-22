@@ -284,6 +284,123 @@ def test_different_bboxes_do_not_accumulate_hits() -> None:
 
 
 
+
+def test_bbox_mismatch_does_not_extend_verify_deadline() -> None:
+
+    verifier = TemporalIncidentVerifier(
+        config=make_config()
+    )
+
+    bboxes = [
+        (
+            10.0,
+            10.0,
+            25.0,
+            25.0,
+        ),
+        (
+            40.0,
+            40.0,
+            55.0,
+            55.0,
+        ),
+        (
+            70.0,
+            70.0,
+            90.0,
+            90.0,
+        ),
+        (
+            10.0,
+            70.0,
+            25.0,
+            90.0,
+        ),
+    ]
+
+    # 최초 후보 t=0.
+    verifier.observe(
+        frame=make_frame(0),
+        detections_by_hazard={
+            "road_obstacle":
+                make_detection(
+                    "road_obstacle",
+                    0.80,
+                    bbox=bboxes[0],
+                ),
+        },
+    )
+
+    # 위치가 계속 바뀌더라도
+    # hit만 다시 1부터 시작해야 한다.
+    # VERIFY 전체 시작 시각은 t=0을 유지한다.
+    for seconds, bbox in zip(
+        (4, 8, 12),
+        bboxes[1:],
+    ):
+        result = verifier.observe(
+            frame=make_frame(seconds),
+            detections_by_hazard={
+                "road_obstacle":
+                    make_detection(
+                        "road_obstacle",
+                        0.80,
+                        bbox=bbox,
+                    ),
+            },
+        )
+
+        if result:
+            raise AssertionError(
+                "서로 다른 위치의 탐지가 "
+                "Incident Candidate로 "
+                "확정되면 안 됩니다."
+            )
+
+        if (
+            verifier.pending_hazards(1)
+            != ("road_obstacle",)
+        ):
+            raise AssertionError(
+                "15초 이내에는 "
+                "VERIFY 후보가 유지되어야 합니다."
+            )
+
+    # 최초 후보 t=0 기준으로 이미 16초가 지났다.
+    # 이 Frame에도 다른 위치의 Detection이 있지만
+    # 기존 VERIFY 세션은 반드시 종료되어야 한다.
+    result = verifier.observe(
+        frame=make_frame(16),
+        detections_by_hazard={
+            "road_obstacle":
+                make_detection(
+                    "road_obstacle",
+                    0.80,
+                    bbox=(
+                        70.0,
+                        10.0,
+                        90.0,
+                        25.0,
+                    ),
+                ),
+        },
+    )
+
+    if result:
+        raise AssertionError(
+            "VERIFY 제한시간을 초과했는데 "
+            "Incident Candidate가 "
+            "생성되었습니다."
+        )
+
+    if verifier.pending_hazards(1):
+        raise AssertionError(
+            "bbox가 계속 달라져도 "
+            "최초 후보로부터 15초가 지나면 "
+            "VERIFY가 종료되어야 합니다."
+        )
+
+
 # =========================================================
 # TEST 2
 # 15초 초과 → 기존 VERIFY 세션 실패
