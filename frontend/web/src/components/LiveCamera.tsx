@@ -16,6 +16,8 @@ import { requestWebApi, type WebIncidentSession } from "../incidentData";
 
 import { operationsError, type Cctv } from "../operationsData";
 
+import { CCTV_SOURCE } from "@octv/shared";
+
 type StreamInfo = {
   cctv_id: number;
   playback_url: string;
@@ -41,6 +43,10 @@ export function LiveCamera({
   const [playing, setPlaying] = useState(false);
 
   const [playback, setPlayback] = useState<string | null>(null);
+
+  const sourceLabel = camera.provider.toUpperCase().includes("UTIC")
+    ? CCTV_SOURCE
+    : `${camera.provider} 제공`;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -429,6 +435,7 @@ export function LiveCamera({
           {" · "}
           {camera.external_cctv_id}
         </div>
+        <div className="camera-source-label">{sourceLabel}</div>
       </div>
 
       <p role="status">{phase}</p>

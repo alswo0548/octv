@@ -75,24 +75,15 @@ def save_detection(
     if suppressed is not None:
         return suppressed
 
-    representative_image = candidate.get(
-        "representative_image"
-    )
+    representative_image = candidate.get("representative_image")
 
     params = {
         **candidate,
-        "incident_no": (
-            "OCTV-" + uuid4().hex
-        ),
-        "bbox": Jsonb(
-            candidate["detection_bbox_json"]
-        ),
-        "representative_image":
-            representative_image,
+        "incident_no": ("OCTV-" + uuid4().hex),
+        "bbox": Jsonb(candidate["detection_bbox_json"]),
+        "representative_image": representative_image,
         "representative_image_updated_at": (
-            candidate["detected_at"]
-            if representative_image is not None
-            else None
+            candidate["detected_at"] if representative_image is not None else None
         ),
     }
 
@@ -139,6 +130,57 @@ def save_detection(
                 incidents.last_detected_at,
                 EXCLUDED.last_detected_at
             ),
+            confidence = CASE
+                WHEN
+                    EXCLUDED.representative_image
+                    IS NOT NULL
+                    AND (
+                        incidents.representative_image_updated_at
+                        IS NULL
+                        OR
+                        EXCLUDED.representative_image_updated_at
+                        >=
+                        incidents.representative_image_updated_at
+                    )
+                THEN
+                    EXCLUDED.confidence
+                ELSE
+                    incidents.confidence
+            END,
+            model_version = CASE
+                WHEN
+                    EXCLUDED.representative_image
+                    IS NOT NULL
+                    AND (
+                        incidents.representative_image_updated_at
+                        IS NULL
+                        OR
+                        EXCLUDED.representative_image_updated_at
+                        >=
+                        incidents.representative_image_updated_at
+                    )
+                THEN
+                    EXCLUDED.model_version
+                ELSE
+                    incidents.model_version
+            END,
+            detection_bbox_json = CASE
+                WHEN
+                    EXCLUDED.representative_image
+                    IS NOT NULL
+                    AND (
+                        incidents.representative_image_updated_at
+                        IS NULL
+                        OR
+                        EXCLUDED.representative_image_updated_at
+                        >=
+                        incidents.representative_image_updated_at
+                    )
+                THEN
+                    EXCLUDED.detection_bbox_json
+                ELSE
+                    incidents.detection_bbox_json
+            END,
             representative_image = CASE
                 WHEN
                     EXCLUDED.representative_image
@@ -230,9 +272,7 @@ LEFT JOIN LATERAL (
 def incident_where(
     filters: dict,
 ):
-    clauses = [
-        "TRUE"
-    ]
+    clauses = ["TRUE"]
     params = []
 
     # --------------------------------------------------------
@@ -242,16 +282,10 @@ def incident_where(
     # 오탐 이력 조회가 가능합니다.
     # --------------------------------------------------------
     if filters.get("status") is None:
-        clauses.append(
-            "i.status <> 'FALSE_POSITIVE'"
-        )
+        clauses.append("i.status <> 'FALSE_POSITIVE'")
     else:
-        clauses.append(
-            "i.status = %s"
-        )
-        params.append(
-            filters["status"]
-        )
+        clauses.append("i.status = %s")
+        params.append(filters["status"])
 
     for key, column in (
         (
@@ -272,16 +306,10 @@ def incident_where(
         ),
     ):
         if filters.get(key) is not None:
-            clauses.append(
-                column + " = %s"
-            )
-            params.append(
-                filters[key]
-            )
+            clauses.append(column + " = %s")
+            params.append(filters[key])
 
-    if filters.get(
-        "confirmed_only"
-    ):
+    if filters.get("confirmed_only"):
         clauses.append(
             """
             i.status IN (
@@ -292,9 +320,7 @@ def incident_where(
             """
         )
 
-    if filters.get(
-        "active_only"
-    ):
+    if filters.get("active_only"):
         clauses.append(
             """
             i.status IN (
@@ -318,14 +344,8 @@ def incident_where(
         ),
     ):
         if filters.get(key) is not None:
-            clauses.append(
-                "i.detected_at "
-                + operator
-                + " %s"
-            )
-            params.append(
-                filters[key]
-            )
+            clauses.append("i.detected_at " + operator + " %s")
+            params.append(filters[key])
 
     if filters.get("q"):
         clauses.append(
@@ -340,11 +360,7 @@ def incident_where(
             """
         )
 
-        search = (
-            "%"
-            + filters["q"]
-            + "%"
-        )
+        search = "%" + filters["q"] + "%"
 
         params.extend(
             [
@@ -355,9 +371,7 @@ def incident_where(
         )
 
     return (
-        " AND ".join(
-            clauses
-        ),
+        " AND ".join(clauses),
         params,
     )
 
@@ -381,22 +395,16 @@ def agency_filter(
             [],
         )
 
-    status_clause = (
-        """
+    status_clause = """
         ar.recommendation_status
         IN ('DELIVERED', 'COMPLETED')
         """
-    )
 
-    if filters.get(
-        "agency_active_only"
-    ):
-        status_clause = (
-            """
+    if filters.get("agency_active_only"):
+        status_clause = """
             ar.recommendation_status
             = 'DELIVERED'
             """
-        )
 
     clause = (
         """
@@ -415,9 +423,7 @@ def agency_filter(
 
     return (
         clause,
-        [
-            filters["agency_id"]
-        ],
+        [filters["agency_id"]],
     )
 
 
@@ -428,33 +434,15 @@ def list_incidents(
     page: int,
     page_size: int,
 ):
-    where, params = (
-        incident_where(
-            filters
-        )
-    )
+    where, params = incident_where(filters)
 
-    scoped_where, scoped_params = (
-        agency_filter(
-            filters
-        )
-    )
+    scoped_where, scoped_params = agency_filter(filters)
 
-    where = (
-        "("
-        + where
-        + ") AND ("
-        + scoped_where
-        + ")"
-    )
+    where = "(" + where + ") AND (" + scoped_where + ")"
 
     params += scoped_params
 
-    base = (
-        READ_SQL
-        + " WHERE "
-        + where
-    )
+    base = READ_SQL + " WHERE " + where
 
     total = connection.execute(
         """
@@ -542,9 +530,7 @@ def find_status(
         FROM incidents
         WHERE id = %s
         """,
-        (
-            incident_id,
-        ),
+        (incident_id,),
     ).fetchone()
 
 
@@ -556,16 +542,9 @@ def update_status(
     allowed_from: tuple[str, ...],
 ):
     if not allowed_from:
-        raise ValueError(
-            "allowed_from은 비어 있을 수 없습니다."
-        )
+        raise ValueError("allowed_from은 비어 있을 수 없습니다.")
 
-    placeholders = ", ".join(
-        [
-            "%s::incident_status_enum"
-            for _ in allowed_from
-        ]
-    )
+    placeholders = ", ".join(["%s::incident_status_enum" for _ in allowed_from])
 
     query = f"""
         UPDATE incidents
@@ -611,9 +590,7 @@ def resolve_if_all_deliveries_completed(
         WHERE id = %s
         FOR UPDATE
         """,
-        (
-            incident_id,
-        ),
+        (incident_id,),
     ).fetchone()
 
     if incident is None:
@@ -642,18 +619,13 @@ def resolve_if_all_deliveries_completed(
         FROM incident_agency_recommendations
         WHERE incident_id = %s
         """,
-        (
-            incident_id,
-        ),
+        (incident_id,),
     ).fetchone()
 
     # 실제 전달 후 완료된 기관이 하나 이상 있고,
     # 아직 처리 중인 DELIVERED 기관이 하나도 없을 때만
     # 사건 전체를 RESOLVED로 변경합니다.
-    if (
-        delivery_state["completed_count"] > 0
-        and delivery_state["delivered_count"] == 0
-    ):
+    if delivery_state["completed_count"] > 0 and delivery_state["delivered_count"] == 0:
         changed = connection.execute(
             """
             UPDATE incidents
@@ -664,9 +636,7 @@ def resolve_if_all_deliveries_completed(
                 id,
                 status
             """,
-            (
-                incident_id,
-            ),
+            (incident_id,),
         ).fetchone()
 
         if changed is not None:
@@ -675,17 +645,13 @@ def resolve_if_all_deliveries_completed(
     return incident
 
 
-
 def find_detail(
     connection,
     incident_id: int,
 ):
     return connection.execute(
-        READ_SQL
-        + " WHERE i.id = %s",
-        (
-            incident_id,
-        ),
+        READ_SQL + " WHERE i.id = %s",
+        (incident_id,),
     ).fetchone()
 
 
@@ -701,7 +667,5 @@ def find_representative_image(
         FROM incidents
         WHERE id = %s
         """,
-        (
-            incident_id,
-        ),
+        (incident_id,),
     ).fetchone()

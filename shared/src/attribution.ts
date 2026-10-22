@@ -1,4 +1,4 @@
-export const CCTV_SOURCE = "경찰청(UTIC) 제공";
+export const CCTV_SOURCE = "경찰청 도시교통정보센터(UTIC) 제공";
 
 /** Display credit only; preserve any existing camera caption. */
 export function cctvCaption(caption = "") {
