@@ -1,9 +1,13 @@
-"""CCTV 조회·감시 상태 API Schema. DB의 마지막 프레임 UTC 시각을 명시적으로 반환합니다."""
+"""CCTV 조회·감시 상태 API Schema. DB의 마지막 프레임 KST 시각을 UTC로 반환합니다."""
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Literal
 
 from pydantic import BaseModel, field_validator
+
+
+KST = ZoneInfo("Asia/Seoul")
 
 
 ConnectionStatus = Literal[
@@ -83,7 +87,11 @@ class CctvResponse(BaseModel):
     def explicit_utc(cls, value):
         if value is None:
             return None
-        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+        # Runtime은 KST 시각을 TIMESTAMP WITHOUT TIME ZONE에 저장한다.
+        # 시간대 없는 DB 값은 KST로 해석한 뒤 UTC로 변환한다.
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=KST)
+        return value.astimezone(timezone.utc)
 
 
 class CctvSummaryResponse(BaseModel):
