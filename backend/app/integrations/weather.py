@@ -135,13 +135,19 @@ def fetch_observations(query: dict) -> dict:
     if not query.get('mapped'):
         return unavailable('NO_MAPPING')
 
-    # 기상청 API 실제 호출
+    # Celery가 자동 매핑 작업 실행
+    # 같은 격자·발표시각은 Redis의 짧은 TTL 캐시를 공유합니다.
+    # 관측값의 STALE 검사는 아래 measurement()에서 매 요청마다 다시 수행.
+    from .cctv_mapping import get_cached_weather_payload, cache_weather_payload
     try:
-        payload = get_json(
-            query['url'],               # 기상청 API 주소
-            query['params'],            # 인증키, 격자, 좌표, 조회시각 등 요청조건
-            query.get('headers')        # 필요한 경우 사용할 HTTP 헤더
-        )
+        payload = get_cached_weather_payload(query)
+        if payload is None:
+            payload = get_json(
+                query['url'],
+                query['params'],
+                query.get('headers'),
+            )
+            cache_weather_payload(query, payload)
     except httpx.TimeoutException:
         return unavailable('TIMEOUT')
     except (httpx.HTTPError, ValueError, KeyError, TypeError):

@@ -130,6 +130,39 @@ def _release_analysis_lock_safely(
         )
 
 
+# CCTV 외부 데이터 매핑 사전 준비 (분석 Worker의 기존 큐 재사용)
+# API 인증·실시간 관측 조회 없음. 현재는 기상 격자만 자동 확정.
+@celery_app.task(
+    name="octv.prewarm_context_mapping",
+    queue="analysis",
+)
+def prewarm_context_mapping(cctv_id: int):
+    from .integrations.cctv_mapping import (
+        auto_mapping_enabled,
+        prepare_monitored_cctv,
+    )
+
+    if not auto_mapping_enabled():
+        return {"status": "DISABLED"}
+    status = prepare_monitored_cctv(cctv_id)
+    return {"status": status, "cctv_id": int(cctv_id)}
+
+
+@celery_app.task(
+    name="octv.prewarm_all_context_mappings",
+    queue="analysis",
+)
+def prewarm_all_context_mappings():
+    from .integrations.cctv_mapping import (
+        auto_mapping_enabled,
+        prepare_all_monitored,
+    )
+
+    if not auto_mapping_enabled():
+        return {"status": "DISABLED"}
+    return prepare_all_monitored()
+
+
 # ---------------------------------------------------------
 # Incident AI 분석 Task
 # ---------------------------------------------------------
