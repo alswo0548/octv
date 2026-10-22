@@ -346,4 +346,24 @@ def change_monitoring(
 
         thread.start()
 
+    # DB 트랜잭션 완료 후 기존 Celery analysis 큐에서 매핑만 준비합니다.
+    # CCTV 감시 IN 시 자동 매핑 요청
+    # Redis/Worker 장애가 감시 ON 자체를 실패시키면 안 됩니다.
+    if body.enabled:
+        from ..integrations.cctv_mapping import auto_mapping_enabled
+
+        if auto_mapping_enabled():
+            try:
+                from ..workers import prewarm_context_mapping
+
+                prewarm_context_mapping.apply_async(args=(cctv_id,))
+            except Exception as exc:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "CCTV 자동 매핑 등록 실패: id=%s, type=%s",
+                    cctv_id,
+                    type(exc).__name__,
+                )
+
     return response
