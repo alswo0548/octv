@@ -21,43 +21,27 @@ from ai.detection.utic import (
 # 환경 설정
 # ============================================================
 
-ROOT = (
-    Path(__file__)
-    .resolve()
-    .parents[3]
-)
+ROOT = Path(__file__).resolve().parents[3]
 
-BACKEND_ENV_PATH = (
-    ROOT
-    / "backend"
-    / ".env"
-)
+BACKEND_ENV_PATH = ROOT / "backend" / ".env"
 
-load_dotenv(
-    dotenv_path=BACKEND_ENV_PATH
-)
+load_dotenv(dotenv_path=BACKEND_ENV_PATH)
 
 
-MEDIAMTX_API_URL = (
-    os.getenv(
-        "MEDIAMTX_API_URL",
-        "http://127.0.0.1:9997",
-    )
-    .rstrip("/")
-)
+MEDIAMTX_API_URL = os.getenv(
+    "MEDIAMTX_API_URL",
+    "http://127.0.0.1:9997",
+).rstrip("/")
 
-MEDIAMTX_WEBRTC_BASE_URL = (
-    os.getenv(
-        "MEDIAMTX_WEBRTC_BASE_URL",
-        "http://127.0.0.1:8889",
-    )
-    .rstrip("/")
-)
+MEDIAMTX_WEBRTC_BASE_URL = os.getenv(
+    "MEDIAMTX_WEBRTC_BASE_URL",
+    "http://127.0.0.1:8889",
+).rstrip("/")
 
 MEDIAMTX_REQUEST_TIMEOUT_SEC = 10
 
 SOURCE_ON_DEMAND_START_TIMEOUT = "15s"
-SOURCE_ON_DEMAND_CLOSE_AFTER = "10s"
+SOURCE_ON_DEMAND_CLOSE_AFTER = "60s"
 
 
 # ============================================================
@@ -80,27 +64,17 @@ def _convert_rtmp_for_mediamtx(
     """
 
     if "/" not in stream_url:
-        raise ValueError(
-            "RTMP Stream URL 형식이 "
-            "올바르지 않습니다."
-        )
+        raise ValueError("RTMP Stream URL 형식이 올바르지 않습니다.")
 
-    base_url, stream_key = (
-        stream_url.rsplit(
-            "/",
-            1,
-        )
+    base_url, stream_key = stream_url.rsplit(
+        "/",
+        1,
     )
 
     if not stream_key:
-        raise ValueError(
-            "RTMP Stream Key가 없습니다."
-        )
+        raise ValueError("RTMP Stream Key가 없습니다.")
 
-    return (
-        f"{base_url}"
-        f"#{stream_key}"
-    )
+    return f"{base_url}#{stream_key}"
 
 
 def _get_https_certificate_fingerprint(
@@ -115,70 +89,40 @@ def _get_https_certificate_fingerprint(
     검증되지 않는 경우 sourceFingerprint로 사용한다.
     """
 
-    parsed = urlsplit(
-        stream_url
-    )
+    parsed = urlsplit(stream_url)
 
     if parsed.scheme.lower() != "https":
-        raise ValueError(
-            "HTTPS URL만 인증서 fingerprint를 "
-            "조회할 수 있습니다."
-        )
+        raise ValueError("HTTPS URL만 인증서 fingerprint를 조회할 수 있습니다.")
 
     hostname = parsed.hostname
 
     if not hostname:
-        raise ValueError(
-            "Stream URL에서 hostname을 "
-            "확인할 수 없습니다."
-        )
+        raise ValueError("Stream URL에서 hostname을 확인할 수 없습니다.")
 
-    port = (
-        parsed.port
-        or 443
-    )
+    port = parsed.port or 443
 
-    context = (
-        ssl.create_default_context()
-    )
+    context = ssl.create_default_context()
 
-    # fingerprint를 직접 검증값으로 사용할 것이므로
-    # 이 연결 자체에서는 CA 검증을 수행하지 않는다.
     context.check_hostname = False
-    context.verify_mode = (
-        ssl.CERT_NONE
-    )
+    context.verify_mode = ssl.CERT_NONE
 
     with socket.create_connection(
         (
             hostname,
             port,
         ),
-        timeout=(
-            MEDIAMTX_REQUEST_TIMEOUT_SEC
-        ),
+        timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
     ) as raw_socket:
-
         with context.wrap_socket(
             raw_socket,
             server_hostname=hostname,
         ) as tls_socket:
-
-            certificate = (
-                tls_socket.getpeercert(
-                    binary_form=True
-                )
-            )
+            certificate = tls_socket.getpeercert(binary_form=True)
 
     if not certificate:
-        raise RuntimeError(
-            "HTTPS source 인증서를 "
-            "가져오지 못했습니다."
-        )
+        raise RuntimeError("HTTPS source 인증서를 가져오지 못했습니다.")
 
-    return hashlib.sha256(
-        certificate
-    ).hexdigest()
+    return hashlib.sha256(certificate).hexdigest()
 
 
 def _build_mediamtx_source(
@@ -190,74 +134,41 @@ def _build_mediamtx_source(
     """
     UTIC Stream URL을 MediaMTX에서 사용할
     source URL과 fingerprint로 변환한다.
-
-    반환:
-        (
-            source_url,
-            source_fingerprint,
-        )
     """
 
-    scheme = (
-        urlsplit(
-            stream_url
-        )
-        .scheme
-        .lower()
-    )
+    scheme = urlsplit(stream_url).scheme.lower()
 
-    # --------------------------------------------------------
     # 서울교통정보센터 RTMP
-    # --------------------------------------------------------
-
     if scheme in {
         "rtmp",
         "rtmps",
     }:
-
         return (
-            _convert_rtmp_for_mediamtx(
-                stream_url
-            ),
+            _convert_rtmp_for_mediamtx(stream_url),
             "",
         )
 
-    # --------------------------------------------------------
     # UTIC HTTPS HLS
-    # --------------------------------------------------------
-
     if scheme == "https":
-
-        fingerprint = (
-            _get_https_certificate_fingerprint(
-                stream_url
-            )
-        )
+        fingerprint = _get_https_certificate_fingerprint(stream_url)
 
         return (
             stream_url,
             fingerprint,
         )
 
-    # --------------------------------------------------------
-    # 기타 HTTP source
-    # --------------------------------------------------------
-
+    # 기타 HTTP
     if scheme == "http":
-
         return (
             stream_url,
             "",
         )
 
-    raise ValueError(
-        "지원하지 않는 CCTV Stream "
-        f"프로토콜입니다: {scheme}"
-    )
+    raise ValueError(f"지원하지 않는 CCTV Stream 프로토콜입니다: {scheme}")
 
 
 # ============================================================
-# MediaMTX Control API
+# MediaMTX URL
 # ============================================================
 
 
@@ -265,9 +176,7 @@ def _path_name(
     cctv_id: int,
 ) -> str:
 
-    return (
-        f"cctv-{cctv_id}"
-    )
+    return f"cctv-{cctv_id}"
 
 
 def _config_path_url(
@@ -280,88 +189,405 @@ def _config_path_url(
         safe="",
     )
 
-    return (
-        f"{MEDIAMTX_API_URL}"
-        "/v3/config/paths/"
-        f"{operation}/"
-        f"{encoded_name}"
+    return f"{MEDIAMTX_API_URL}/v3/config/paths/{operation}/{encoded_name}"
+
+
+def _runtime_path_url(
+    path_name: str,
+) -> str:
+
+    encoded_name = quote(
+        path_name,
+        safe="",
     )
+
+    return f"{MEDIAMTX_API_URL}/v3/paths/get/{encoded_name}"
+
+
+# ============================================================
+# MediaMTX 상태 조회
+# ============================================================
+
+
+def _get_mediamtx_path_config(
+    path_name: str,
+) -> dict | None:
+    """
+    등록된 MediaMTX path 설정을 조회한다.
+    """
+
+    response = requests.get(
+        _config_path_url(
+            "get",
+            path_name,
+        ),
+        timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
+    )
+
+    if response.status_code == 404:
+        return None
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            "MediaMTX path 설정 조회에 "
+            "실패했습니다. "
+            f"path={path_name} "
+            f"status={response.status_code}"
+        )
+
+    data = response.json()
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+        raise RuntimeError("MediaMTX path 설정 응답이 올바르지 않습니다.")
+
+    return data
+
+
+def _get_mediamtx_runtime_path(
+    path_name: str,
+) -> dict | None:
+    """
+    현재 활성화된 MediaMTX path 상태 조회.
+    """
+
+    response = requests.get(
+        _runtime_path_url(path_name),
+        timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
+    )
+
+    if response.status_code == 404:
+        return None
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            "MediaMTX path 상태 조회에 "
+            "실패했습니다. "
+            f"path={path_name} "
+            f"status={response.status_code}"
+        )
+
+    data = response.json()
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+        raise RuntimeError("MediaMTX path 상태 응답이 올바르지 않습니다.")
+
+    return data
+
+
+def _is_mediamtx_path_online(
+    path_name: str,
+) -> bool:
+    """
+    MediaMTX source가 현재 online 상태인지 확인한다.
+    """
+
+    data = _get_mediamtx_runtime_path(path_name)
+
+    if data is None:
+        return False
+
+    return bool(
+        data.get(
+            "online",
+            False,
+        )
+    )
+
+
+# ============================================================
+# MediaMTX Path 설정 비교
+# ============================================================
+
+
+def _path_config_matches(
+    current: dict,
+    desired: dict,
+) -> bool:
+    """
+    이미 동일한 설정이면 PATCH를 생략한다.
+
+    MediaMTX PATCH는 configuration reload를 일으키므로
+    불필요한 reload와 source 재연결을 방지한다.
+    """
+
+    current_source = str(
+        current.get(
+            "source",
+            "",
+        )
+        or ""
+    )
+
+    desired_source = str(
+        desired.get(
+            "source",
+            "",
+        )
+        or ""
+    )
+
+    current_fingerprint = str(
+        current.get(
+            "sourceFingerprint",
+            "",
+        )
+        or ""
+    )
+
+    desired_fingerprint = str(
+        desired.get(
+            "sourceFingerprint",
+            "",
+        )
+        or ""
+    )
+
+    current_on_demand = bool(
+        current.get(
+            "sourceOnDemand",
+            False,
+        )
+    )
+
+    desired_on_demand = bool(
+        desired.get(
+            "sourceOnDemand",
+            False,
+        )
+    )
+
+    return (
+        current_source == desired_source
+        and current_fingerprint == desired_fingerprint
+        and current_on_demand == desired_on_demand
+    )
+
+
+# ============================================================
+# MediaMTX Control API
+# ============================================================
 
 
 def _upsert_mediamtx_path(
     path_name: str,
     source_url: str,
     source_fingerprint: str,
+    *,
+    keep_warm: bool,
 ) -> None:
     """
-    MediaMTX path가 이미 있으면 PATCH,
-    없으면 ADD한다.
+    MediaMTX path 생성 또는 갱신.
+
+    keep_warm=True:
+        sourceOnDemand=False
+        → 등록 즉시 원본 CCTV source 연결
+        → 감시 중인 동안 source 유지
+
+    keep_warm=False:
+        sourceOnDemand=True
+        → 브라우저 reader가 있을 때만 source 연결
     """
 
     payload = {
-        "source":
-            source_url,
-
-        "sourceOnDemand":
-            True,
-
-        "sourceOnDemandStartTimeout":
-            SOURCE_ON_DEMAND_START_TIMEOUT,
-
-        "sourceOnDemandCloseAfter":
-            SOURCE_ON_DEMAND_CLOSE_AFTER,
-
-        "sourceFingerprint":
-            source_fingerprint,
+        "source": source_url,
+        "sourceOnDemand": not keep_warm,
+        "sourceOnDemandStartTimeout": SOURCE_ON_DEMAND_START_TIMEOUT,
+        "sourceOnDemandCloseAfter": SOURCE_ON_DEMAND_CLOSE_AFTER,
+        "sourceFingerprint": source_fingerprint,
     }
 
     # --------------------------------------------------------
-    # 기존 path 갱신 시도
+    # 현재 설정 조회
     # --------------------------------------------------------
 
-    patch_response = requests.patch(
-        _config_path_url(
-            "patch",
-            path_name,
-        ),
-        json=payload,
-        timeout=(
-            MEDIAMTX_REQUEST_TIMEOUT_SEC
-        ),
-    )
+    current = _get_mediamtx_path_config(path_name)
 
-    if patch_response.status_code == 200:
+    # --------------------------------------------------------
+    # 이미 같은 설정이면 아무것도 하지 않는다.
+    # --------------------------------------------------------
+
+    if current is not None and _path_config_matches(
+        current,
+        payload,
+    ):
+        print(f"[CCTV STREAM] MediaMTX path 설정 유지 / path={path_name} / keep_warm={keep_warm}")
+
         return
 
     # --------------------------------------------------------
-    # 없는 path이면 신규 생성
+    # 기존 path 갱신
     # --------------------------------------------------------
 
-    if patch_response.status_code == 404:
-
-        add_response = requests.post(
+    if current is not None:
+        response = requests.patch(
             _config_path_url(
-                "add",
+                "patch",
                 path_name,
             ),
             json=payload,
-            timeout=(
-                MEDIAMTX_REQUEST_TIMEOUT_SEC
-            ),
+            timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
         )
 
-        if add_response.status_code == 200:
-            return
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"MediaMTX path 갱신에 실패했습니다. path={path_name} status={response.status_code}"
+            )
 
-        raise RuntimeError(
-            "MediaMTX path 생성에 실패했습니다. "
-            f"status={add_response.status_code}"
-        )
+        print(f"[CCTV STREAM] MediaMTX path 갱신 / path={path_name} / keep_warm={keep_warm}")
 
-    raise RuntimeError(
-        "MediaMTX path 갱신에 실패했습니다. "
-        f"status={patch_response.status_code}"
+        return
+
+    # --------------------------------------------------------
+    # 신규 path 생성
+    # --------------------------------------------------------
+
+    response = requests.post(
+        _config_path_url(
+            "add",
+            path_name,
+        ),
+        json=payload,
+        timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
     )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"MediaMTX path 생성에 실패했습니다. path={path_name} status={response.status_code}"
+        )
+
+    print(f"[CCTV STREAM] MediaMTX path 생성 / path={path_name} / keep_warm={keep_warm}")
+
+
+# ============================================================
+# Stream Response
+# ============================================================
+
+
+def _stream_response(
+    cctv_id: int,
+) -> dict:
+
+    path_name = _path_name(cctv_id)
+
+    playback_url = f"{MEDIAMTX_WEBRTC_BASE_URL}/{path_name}"
+
+    whep_url = f"{playback_url}/whep"
+
+    return {
+        "cctv_id": cctv_id,
+        "path": path_name,
+        "playback_url": playback_url,
+        "whep_url": whep_url,
+    }
+
+
+# ============================================================
+# 단일 CCTV Prewarm
+# ============================================================
+
+
+def prewarm_cctv_stream(
+    cctv_id: int,
+    external_cctv_id: str,
+) -> dict:
+    """
+    감시 중 CCTV의 MediaMTX source를
+    미리 연결한다.
+
+    최신 UTIC Stream URL을 조회한 뒤
+    sourceOnDemand=False path를 구성한다.
+    """
+
+    (
+        stream_url,
+        _,
+    ) = get_utic_stream_url(external_cctv_id)
+
+    (
+        source_url,
+        source_fingerprint,
+    ) = _build_mediamtx_source(stream_url)
+
+    path_name = _path_name(cctv_id)
+
+    _upsert_mediamtx_path(
+        path_name=path_name,
+        source_url=source_url,
+        source_fingerprint=(source_fingerprint),
+        keep_warm=True,
+    )
+
+    return _stream_response(cctv_id)
+
+
+# ============================================================
+# 감시 중 CCTV 전체 Prewarm
+# ============================================================
+
+
+def prewarm_monitored_cctv_streams() -> dict:
+    """
+    DB에서 현재 감시 중인 UTIC CCTV를 조회하여
+    모두 MediaMTX에 미리 연결한다.
+
+    특정 CCTV 하나가 실패해도
+    다른 CCTV prewarm은 계속 진행한다.
+    """
+
+    # 순환 import 방지
+    from backend.app.cctvs import (
+        repository,
+    )
+
+    from backend.app.db.session import (
+        get_connection,
+    )
+
+    with get_connection() as connection:
+        rows = repository.list_monitored_utic_cctvs(connection)
+
+    success = 0
+    failed = 0
+
+    print(f"[CCTV STREAM PREWARM] 감시 중 CCTV {len(rows)}대 준비 시작")
+
+    for row in rows:
+        try:
+            prewarm_cctv_stream(
+                cctv_id=int(row["id"]),
+                external_cctv_id=str(row["external_cctv_id"]),
+            )
+
+            success += 1
+
+        except Exception as exc:
+            failed += 1
+
+            print(
+                "[CCTV STREAM PREWARM WARNING] "
+                f"CCTV {row['id']} 실패 "
+                f"/ type={type(exc).__name__} "
+                f"/ error={exc}"
+            )
+
+    print(f"[CCTV STREAM PREWARM] 완료 / success={success} / failed={failed}")
+
+    return {
+        "total": len(rows),
+        "success": success,
+        "failed": failed,
+    }
+
+
+# ============================================================
+# CCTV Stream 제거
+# ============================================================
 
 
 def remove_cctv_stream(
@@ -375,26 +601,23 @@ def remove_cctv_stream(
     CCTV 감시 상태 변경 자체는 실패시키지 않는다.
     """
 
-    path_name = _path_name(
-        cctv_id
-    )
+    path_name = _path_name(cctv_id)
 
     try:
-
         response = requests.delete(
             _config_path_url(
                 "delete",
                 path_name,
             ),
-            timeout=(
-                MEDIAMTX_REQUEST_TIMEOUT_SEC
-            ),
+            timeout=(MEDIAMTX_REQUEST_TIMEOUT_SEC),
         )
 
         if response.status_code in {
             200,
             404,
         }:
+            print(f"[CCTV STREAM] MediaMTX path 제거 / cctv_id={cctv_id}")
+
             return
 
         print(
@@ -405,12 +628,8 @@ def remove_cctv_stream(
         )
 
     except requests.RequestException as exc:
-
         print(
-            "[CCTV STREAM WARNING] "
-            "MediaMTX path 삭제 요청 실패 "
-            f"/ cctv_id={cctv_id} "
-            f"/ error={exc}"
+            f"[CCTV STREAM WARNING] MediaMTX path 삭제 요청 실패 / cctv_id={cctv_id} / error={exc}"
         )
 
 
@@ -424,58 +643,52 @@ def prepare_cctv_stream(
     external_cctv_id: str,
 ) -> dict:
     """
-    최신 UTIC Stream URL을 조회하고
-    MediaMTX path를 생성 또는 갱신한다.
+    W04에서 CCTV 영상을 요청할 때 호출한다.
 
-    실제 영상 source URL은 API 응답으로 노출하지 않는다.
+    이미 MediaMTX source가 online 상태라면
+    UTIC 재조회나 MediaMTX PATCH 없이
+    바로 WebRTC 주소를 반환한다.
+
+    online이 아니면 최신 UTIC Stream URL을
+    다시 조회하여 warm path를 구성한다.
     """
+
+    path_name = _path_name(cctv_id)
+
+    # --------------------------------------------------------
+    # 이미 source가 online이면 즉시 반환
+    # --------------------------------------------------------
+
+    try:
+        if _is_mediamtx_path_online(path_name):
+            print(f"[CCTV STREAM] 기존 online source 재사용 / cctv_id={cctv_id}")
+
+            return _stream_response(cctv_id)
+
+    except requests.RequestException:
+        # MediaMTX 상태 조회 실패 시
+        # 아래의 정상 준비 흐름을 다시 시도한다.
+        pass
+
+    # --------------------------------------------------------
+    # source 없음 / offline
+    # --------------------------------------------------------
 
     (
         stream_url,
         _,
-    ) = get_utic_stream_url(
-        external_cctv_id
-    )
+    ) = get_utic_stream_url(external_cctv_id)
 
     (
         source_url,
         source_fingerprint,
-    ) = _build_mediamtx_source(
-        stream_url
-    )
-
-    path_name = _path_name(
-        cctv_id
-    )
+    ) = _build_mediamtx_source(stream_url)
 
     _upsert_mediamtx_path(
         path_name=path_name,
         source_url=source_url,
-        source_fingerprint=(
-            source_fingerprint
-        ),
+        source_fingerprint=(source_fingerprint),
+        keep_warm=True,
     )
 
-    playback_url = (
-        f"{MEDIAMTX_WEBRTC_BASE_URL}"
-        f"/{path_name}"
-    )
-
-    whep_url = (
-        f"{playback_url}"
-        "/whep"
-    )
-
-    return {
-        "cctv_id":
-            cctv_id,
-
-        "path":
-            path_name,
-
-        "playback_url":
-            playback_url,
-
-        "whep_url":
-            whep_url,
-    }
+    return _stream_response(cctv_id)
