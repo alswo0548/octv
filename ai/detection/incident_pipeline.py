@@ -753,15 +753,20 @@ class TemporalIncidentVerifier:
                             "[TEMPORAL] "
                             f"CCTV {cctv_id} "
                             f"/ hazard={hazard_type} "
-                            "/ bbox 불일치 → VERIFY 재시작 "
+                            "/ bbox 불일치 → hit 누적 재시작 "
                             f"/ iou={bbox_iou:.3f} "
                             f"/ required="
                             f"{self._config.temporal_min_iou:.3f}"
                         )
 
-                        track.first_positive_at = (
-                            frame.captured_at
-                        )
+                        # 서로 다른 위치의 같은 hazard는
+                        # 동일 객체의 연속 탐지로 누적하지 않는다.
+                        #
+                        # 단, VERIFY 전체 제한시간은 최초 후보
+                        # 탐지 시점부터 계속 유지한다.
+                        # bbox가 바뀌었다는 이유로
+                        # first_positive_at을 갱신하면
+                        # VERIFY가 무한 연장될 수 있다.
                         track.last_positive_at = (
                             frame.captured_at
                         )
