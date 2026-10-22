@@ -128,6 +128,8 @@ export type IncidentDto = {
   incident_no: string;
   cctv_id: number;
   cctv_name: string;
+  provider: string | null;
+  address: string | null;
   hazard_type: string;
   status: "DETECTED" | "CONFIRMED" | "SENT" | "RESOLVED" | "FALSE_POSITIVE";
   confidence: number;

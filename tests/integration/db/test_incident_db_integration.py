@@ -18,9 +18,7 @@ from backend.app.incidents.service import (
 )
 
 
-KST = timezone(
-    timedelta(hours=9)
-)
+KST = timezone(timedelta(hours=9))
 
 
 def make_jpeg(
@@ -43,9 +41,7 @@ def make_jpeg(
     )
 
     if not success:
-        raise RuntimeError(
-            "테스트 JPEG 인코딩 실패"
-        )
+        raise RuntimeError("테스트 JPEG 인코딩 실패")
 
     return encoded.tobytes()
 
@@ -53,7 +49,6 @@ def make_jpeg(
 def get_test_cctv_id() -> int:
 
     with get_connection() as connection:
-
         row = connection.execute(
             """
             SELECT id
@@ -64,13 +59,9 @@ def get_test_cctv_id() -> int:
         ).fetchone()
 
     if row is None:
-        raise RuntimeError(
-            "테스트에 사용할 CCTV가 없습니다."
-        )
+        raise RuntimeError("테스트에 사용할 CCTV가 없습니다.")
 
-    return int(
-        row["id"]
-    )
+    return int(row["id"])
 
 
 def find_test_incident(
@@ -78,7 +69,6 @@ def find_test_incident(
 ):
 
     with get_connection() as connection:
-
         return connection.execute(
             """
             SELECT
@@ -88,6 +78,7 @@ def find_test_incident(
                 hazard_type,
                 confidence,
                 model_version,
+                detection_bbox_json,
                 dedup_key,
                 status,
                 detected_at,
@@ -99,9 +90,7 @@ def find_test_incident(
             ORDER BY id DESC
             LIMIT 1;
             """,
-            (
-                dedup_key,
-            ),
+            (dedup_key,),
         ).fetchone()
 
 
@@ -110,75 +99,41 @@ def cleanup(
 ) -> None:
 
     with get_connection() as connection:
-
         deleted = connection.execute(
             """
             DELETE FROM incidents
             WHERE dedup_key = %s
             RETURNING id;
             """,
-            (
-                dedup_key,
-            ),
+            (dedup_key,),
         ).fetchall()
 
-    print(
-        "[CLEANUP] "
-        f"삭제된 테스트 Incident="
-        f"{len(deleted)}"
-    )
+    print(f"[CLEANUP] 삭제된 테스트 Incident={len(deleted)}")
 
 
 def main() -> None:
 
-    print(
-        "=" * 70
-    )
-    print(
-        "OCTV INCIDENT DB INTEGRATION TEST"
-    )
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
+    print("OCTV INCIDENT DB INTEGRATION TEST")
+    print("=" * 70)
 
-    cctv_id = (
-        get_test_cctv_id()
-    )
+    cctv_id = get_test_cctv_id()
 
-    dedup_key = (
-        "test:incident-db:"
-        + uuid4().hex
-    )
+    dedup_key = "test:incident-db:" + uuid4().hex
 
-    first_at = datetime.now(
-        KST
-    )
+    first_at = datetime.now(KST)
 
-    second_at = (
-        first_at
-        + timedelta(
-            seconds=10
-        )
-    )
+    second_at = first_at + timedelta(seconds=10)
 
-    first_image = make_jpeg(
-        40
-    )
+    first_image = make_jpeg(40)
 
-    second_image = make_jpeg(
-        180
-    )
+    second_image = make_jpeg(180)
 
-    print(
-        f"[SETUP] cctv_id={cctv_id}"
-    )
+    print(f"[SETUP] cctv_id={cctv_id}")
 
-    print(
-        f"[SETUP] dedup_key={dedup_key}"
-    )
+    print(f"[SETUP] dedup_key={dedup_key}")
 
     try:
-
         # =================================================
         # TEST 1
         # 첫 검증된 Detection
@@ -186,110 +141,49 @@ def main() -> None:
         # =================================================
 
         print()
-        print(
-            "[TEST 1] 첫 검증 Detection 저장"
-        )
+        print("[TEST 1] 첫 검증 Detection 저장")
 
         first_result = register_detection(
             {
-                "cctv_id":
-                    cctv_id,
-
-                "hazard_type":
-                    "flood",
-
-                "confidence":
-                    0.71,
-
-                "model_version":
-                    "integration-test-v1",
-
-                "detection_bbox_json":
-                    {
-                        "x1": 10.0,
-                        "y1": 20.0,
-                        "x2": 100.0,
-                        "y2": 110.0,
-                    },
-
-                "dedup_key":
-                    dedup_key,
-
-                "detected_at":
-                    first_at,
-
-                "representative_image":
-                    first_image,
+                "cctv_id": cctv_id,
+                "hazard_type": "flood",
+                "confidence": 0.71,
+                "model_version": "integration-test-v1",
+                "detection_bbox_json": {
+                    "x1": 10.0,
+                    "y1": 20.0,
+                    "x2": 100.0,
+                    "y2": 110.0,
+                },
+                "dedup_key": dedup_key,
+                "detected_at": first_at,
+                "representative_image": first_image,
             }
         )
 
-        first_id = int(
-            first_result["id"]
-        )
+        first_id = int(first_result["id"])
 
-        print(
-            "[INSERT] "
-            f"incident_id={first_id} "
-            f"/ incident_no="
-            f"{first_result['incident_no']}"
-        )
+        print(f"[INSERT] incident_id={first_id} / incident_no={first_result['incident_no']}")
 
-        stored_first = (
-            find_test_incident(
-                dedup_key
-            )
-        )
+        stored_first = find_test_incident(dedup_key)
 
         if stored_first is None:
+            raise AssertionError("Incident가 DB에 저장되지 않았습니다.")
+
+        if int(stored_first["id"]) != first_id:
+            raise AssertionError("DB Incident ID와 반환 ID가 다릅니다.")
+
+        if stored_first["status"] != "DETECTED":
             raise AssertionError(
-                "Incident가 DB에 "
-                "저장되지 않았습니다."
+                f"새 사건 상태가 DETECTED가 아닙니다. actual={stored_first['status']}"
             )
 
-        if (
-            int(
-                stored_first["id"]
-            )
-            != first_id
-        ):
-            raise AssertionError(
-                "DB Incident ID와 "
-                "반환 ID가 다릅니다."
-            )
+        if bytes(stored_first["representative_image"]) != first_image:
+            raise AssertionError("첫 대표 이미지가 정상 저장되지 않았습니다.")
 
-        if (
-            stored_first["status"]
-            != "DETECTED"
-        ):
-            raise AssertionError(
-                "새 사건 상태가 "
-                "DETECTED가 아닙니다. "
-                f"actual="
-                f"{stored_first['status']}"
-            )
-
-        if (
-            bytes(
-                stored_first[
-                    "representative_image"
-                ]
-            )
-            != first_image
-        ):
-            raise AssertionError(
-                "첫 대표 이미지가 "
-                "정상 저장되지 않았습니다."
-            )
-
-        print(
-            "[PASS] 새 Incident INSERT"
-        )
-        print(
-            "[PASS] status=DETECTED"
-        )
-        print(
-            "[PASS] 대표 이미지 BYTEA 저장"
-        )
+        print("[PASS] 새 Incident INSERT")
+        print("[PASS] status=DETECTED")
+        print("[PASS] 대표 이미지 BYTEA 저장")
 
         # =================================================
         # TEST 2
@@ -299,46 +193,27 @@ def main() -> None:
         # =================================================
 
         print()
-        print(
-            "[TEST 2] 같은 사건 재탐지"
-        )
+        print("[TEST 2] 같은 사건 재탐지")
 
         second_result = register_detection(
             {
-                "cctv_id":
-                    cctv_id,
-
-                "hazard_type":
-                    "flood",
-
-                "confidence":
-                    0.88,
-
-                "model_version":
-                    "integration-test-v1",
-
-                "detection_bbox_json":
-                    {
-                        "x1": 15.0,
-                        "y1": 25.0,
-                        "x2": 105.0,
-                        "y2": 115.0,
-                    },
-
-                "dedup_key":
-                    dedup_key,
-
-                "detected_at":
-                    second_at,
-
-                "representative_image":
-                    second_image,
+                "cctv_id": cctv_id,
+                "hazard_type": "flood",
+                "confidence": 0.88,
+                "model_version": "integration-test-v2",
+                "detection_bbox_json": {
+                    "x1": 15.0,
+                    "y1": 25.0,
+                    "x2": 105.0,
+                    "y2": 115.0,
+                },
+                "dedup_key": dedup_key,
+                "detected_at": second_at,
+                "representative_image": second_image,
             }
         )
 
-        second_id = int(
-            second_result["id"]
-        )
+        second_id = int(second_result["id"])
 
         if second_id != first_id:
             raise AssertionError(
@@ -348,22 +223,12 @@ def main() -> None:
                 f"second_id={second_id}"
             )
 
-        stored_second = (
-            find_test_incident(
-                dedup_key
-            )
-        )
+        stored_second = find_test_incident(dedup_key)
 
         if stored_second is None:
-            raise AssertionError(
-                "재탐지 이후 Incident를 "
-                "조회할 수 없습니다."
-            )
+            raise AssertionError("재탐지 이후 Incident를 조회할 수 없습니다.")
 
-        print(
-            "[PASS] 같은 사건 "
-            "→ 기존 Incident UPSERT"
-        )
+        print("[PASS] 같은 사건 → 기존 Incident UPSERT")
 
         # =================================================
         # TEST 3
@@ -371,26 +236,12 @@ def main() -> None:
         # =================================================
 
         print()
-        print(
-            "[TEST 3] 최근 탐지 시각 갱신"
-        )
+        print("[TEST 3] 최근 탐지 시각 갱신")
 
-        if (
-            stored_second[
-                "last_detected_at"
-            ]
-            <= stored_second[
-                "detected_at"
-            ]
-        ):
-            raise AssertionError(
-                "last_detected_at이 "
-                "갱신되지 않았습니다."
-            )
+        if stored_second["last_detected_at"] <= stored_second["detected_at"]:
+            raise AssertionError("last_detected_at이 갱신되지 않았습니다.")
 
-        print(
-            "[PASS] last_detected_at 갱신"
-        )
+        print("[PASS] last_detected_at 갱신")
 
         # =================================================
         # TEST 4
@@ -398,58 +249,68 @@ def main() -> None:
         # =================================================
 
         print()
-        print(
-            "[TEST 4] 대표 이미지 갱신"
-        )
+        print("[TEST 4] 대표 이미지 갱신")
 
-        stored_image = bytes(
-            stored_second[
-                "representative_image"
-            ]
-        )
+        stored_image = bytes(stored_second["representative_image"])
 
         if stored_image != second_image:
+            raise AssertionError("대표 이미지가 최신 Frame 이미지로 교체되지 않았습니다.")
+
+        print("[PASS] 대표 이미지 최신화")
+
+        # =================================================
+        # TEST 5
+        # 대표 이미지와 탐지 메타데이터 동기화
+        # =================================================
+
+        print()
+        print("[TEST 5] 대표 이미지 탐지 메타데이터 동기화")
+
+        expected_bbox = {
+            "x1": 15.0,
+            "y1": 25.0,
+            "x2": 105.0,
+            "y2": 115.0,
+        }
+
+        if float(stored_second["confidence"]) != 0.88:
             raise AssertionError(
-                "대표 이미지가 "
-                "최신 Frame 이미지로 "
-                "교체되지 않았습니다."
+                "대표 이미지 갱신 시 confidence가 "
+                "같이 갱신되지 않았습니다. "
+                f"actual={stored_second['confidence']}"
             )
 
-        print(
-            "[PASS] 대표 이미지 최신화"
-        )
+        if stored_second["model_version"] != "integration-test-v2":
+            raise AssertionError(
+                "대표 이미지 갱신 시 model_version이 "
+                "같이 갱신되지 않았습니다. "
+                f"actual={stored_second['model_version']}"
+            )
+
+        if stored_second["detection_bbox_json"] != expected_bbox:
+            raise AssertionError(
+                "대표 이미지 갱신 시 detection_bbox_json이 "
+                "같이 갱신되지 않았습니다. "
+                f"actual={stored_second['detection_bbox_json']}"
+            )
+
+        print("[PASS] 대표 이미지와 bbox / confidence / model_version 동기화")
 
         # =================================================
         # RESULT
         # =================================================
 
         print()
-        print(
-            "=" * 70
-        )
-        print(
-            "[SUCCESS] "
-            "Incident DB INSERT "
-            "→ Active Incident UPSERT "
-            "→ 대표 이미지 갱신 정상"
-        )
-        print(
-            "=" * 70
-        )
+        print("=" * 70)
+        print("[SUCCESS] Incident DB INSERT → Active Incident UPSERT → 대표 이미지 갱신 정상")
+        print("=" * 70)
 
     finally:
-
         print()
-        print(
-            "[FINALIZE] "
-            "테스트 데이터 삭제"
-        )
+        print("[FINALIZE] 테스트 데이터 삭제")
 
-        cleanup(
-            dedup_key
-        )
+        cleanup(dedup_key)
 
 
 if __name__ == "__main__":
-
     main()

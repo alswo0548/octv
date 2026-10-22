@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import {
+  CCTV_SOURCE,
   hazardLabel,
   hazardLabels,
   type IncidentDto,
@@ -76,6 +77,31 @@ function JsonDetails({ title, data }: { title: string; data: unknown }) {
   );
 }
 
+type DetectionBox = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+function readDetectionBox(value: unknown): DetectionBox | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const box = value as Record<string, unknown>;
+  const x1 = Number(box.x1);
+  const y1 = Number(box.y1);
+  const x2 = Number(box.x2);
+  const y2 = Number(box.y2);
+
+  if (![x1, y1, x2, y2].every(Number.isFinite) || x2 <= x1 || y2 <= y1) {
+    return null;
+  }
+
+  return { x1, y1, x2, y2 };
+}
+
 // JPEG를 Authorization 헤더로 별도 조회합니다. 사건/세션 변경 시 URL을 해제합니다.
 function RepresentativeImage({
   session,
@@ -88,10 +114,26 @@ function RepresentativeImage({
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [imageSize, setImageSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const detectionBox = readDetectionBox(incident.detection_bbox_json);
+
+  const detectionLabel =
+    `${hazardLabel(incident.hazard_type)} ` +
+    `${(incident.confidence * 100).toFixed(1)}%`;
+
+  const sourceLabel =
+    incident.provider?.toUpperCase().includes("UTIC") || !incident.provider
+      ? CCTV_SOURCE
+      : `${incident.provider} 제공`;
 
   useEffect(() => {
     setUrl(null);
     setUnavailable(false);
+    setImageSize(null);
 
     if (!incident.representative_image_updated_at) {
       return;
@@ -133,14 +175,47 @@ function RepresentativeImage({
         </div>
 
         {url ? (
-          <img
-            src={url}
-            onError={() => {
-              setUnavailable(true);
-              setUrl(null);
-            }}
-            alt={`${incident.incident_no} 사건 대표 JPEG`}
-          />
+          <>
+            <img
+              src={url}
+              onLoad={(event) => {
+                setImageSize({
+                  width: event.currentTarget.naturalWidth,
+                  height: event.currentTarget.naturalHeight,
+                });
+              }}
+              onError={() => {
+                setUnavailable(true);
+                setUrl(null);
+                setImageSize(null);
+              }}
+              alt={`${incident.incident_no} 사건 대표 JPEG`}
+            />
+
+            {imageSize && detectionBox && (
+              <div className="incident-detection-summary">
+                <span>AI 탐지</span>
+                <strong>{detectionLabel}</strong>
+              </div>
+            )}
+
+            {imageSize && detectionBox && (
+              <svg
+                className="incident-detection-overlay"
+                viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+                preserveAspectRatio="xMidYMid meet"
+                aria-label={`${detectionLabel} 탐지 영역`}
+              >
+                <rect
+                  className="incident-detection-box"
+                  x={detectionBox.x1}
+                  y={detectionBox.y1}
+                  width={detectionBox.x2 - detectionBox.x1}
+                  height={detectionBox.y2 - detectionBox.y1}
+                />
+              </svg>
+            )}
+          </>
         ) : (
           <p className="live-image-empty" role="status">
             {unavailable
@@ -154,6 +229,7 @@ function RepresentativeImage({
 
       <div className="camera-caption">
         <span>사건 대표 이미지 · 저장 시점 기준</span>
+        <span className="incident-source-credit">{sourceLabel}</span>
       </div>
 
       {isAdmin && (
