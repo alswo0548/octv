@@ -139,7 +139,7 @@ def _run_stream_prewarm() -> None:
 
         print(
             "[CCTV STREAM PREWARM] "
-            "startup 완료 "
+            "startup complete "
             f"/ total={result['total']} "
             f"/ success={result['success']} "
             f"/ failed={result['failed']}"
@@ -147,7 +147,8 @@ def _run_stream_prewarm() -> None:
 
     except Exception as exc:
         print(
-            f"[CCTV STREAM PREWARM WARNING] startup 실패 / type={type(exc).__name__} / error={exc}"
+            f"[CCTV STREAM PREWARM WARNING] startup failed "
+            f"/ type={type(exc).__name__} / error={exc}"
         )
 
 
@@ -159,10 +160,10 @@ def start_stream_prewarm() -> None:
     """
 
     if not _stream_prewarm_enabled():
-        print("[CCTV STREAM PREWARM] 비활성화")
+        print("[CCTV STREAM PREWARM] disabled")
         return
 
-    print("[CCTV STREAM PREWARM] 백그라운드 시작")
+    print("[CCTV STREAM PREWARM] background start")
 
     thread = Thread(
         target=_run_stream_prewarm,
