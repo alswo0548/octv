@@ -280,11 +280,18 @@ def _get_mediamtx_runtime_path(
     return data
 
 
-def _is_mediamtx_path_online(
+def _is_mediamtx_path_ready(
     path_name: str,
 ) -> bool:
     """
-    MediaMTX source가 현재 online 상태인지 확인한다.
+    MediaMTX path가 실제 재생 가능한 상태인지 확인한다.
+
+    online=True는 source 프로세스가 실행 중이라는 뜻일 뿐,
+    실제 영상 track이 준비되었다는 의미는 아니다.
+
+    KTICT HLS 인증 만료 등으로 source가 죽으면
+    online=True 상태에서도
+    ready=False / available=False / tracks=[]가 될 수 있다.
     """
 
     data = _get_mediamtx_runtime_path(path_name)
@@ -292,11 +299,13 @@ def _is_mediamtx_path_online(
     if data is None:
         return False
 
-    return bool(
-        data.get(
-            "online",
-            False,
-        )
+    tracks = data.get("tracks") or []
+
+    return (
+        bool(data.get("online", False))
+        and bool(data.get("ready", False))
+        and bool(data.get("available", False))
+        and bool(tracks)
     )
 
 
@@ -380,6 +389,7 @@ def _upsert_mediamtx_path(
     source_fingerprint: str,
     *,
     keep_warm: bool,
+    force_reload: bool = False,
 ) -> None:
     """
     MediaMTX path 생성 또는 갱신.
@@ -412,11 +422,20 @@ def _upsert_mediamtx_path(
     # 이미 같은 설정이면 아무것도 하지 않는다.
     # --------------------------------------------------------
 
-    if current is not None and _path_config_matches(
-        current,
-        payload,
+    if (
+        current is not None
+        and not force_reload
+        and _path_config_matches(
+            current,
+            payload,
+        )
     ):
-        print(f"[CCTV STREAM] MediaMTX path 설정 유지 / path={path_name} / keep_warm={keep_warm}")
+        print(
+            "[CCTV STREAM] "
+            "MediaMTX path 설정 유지 "
+            f"/ path={path_name} "
+            f"/ keep_warm={keep_warm}"
+        )
 
         return
 
@@ -645,12 +664,13 @@ def prepare_cctv_stream(
     """
     W04에서 CCTV 영상을 요청할 때 호출한다.
 
-    이미 MediaMTX source가 online 상태라면
-    UTIC 재조회나 MediaMTX PATCH 없이
-    바로 WebRTC 주소를 반환한다.
+    이미 MediaMTX source가 실제 재생 가능한
+    ready 상태라면 UTIC 재조회나
+    MediaMTX PATCH 없이 바로 WebRTC 주소를 반환한다.
 
-    online이 아니면 최신 UTIC Stream URL을
-    다시 조회하여 warm path를 구성한다.
+    source가 없거나 실제 재생 불가능한 상태라면
+    최신 UTIC Stream URL을 다시 조회하고
+    MediaMTX path를 강제로 reload한다.
     """
 
     path_name = _path_name(cctv_id)
@@ -660,18 +680,20 @@ def prepare_cctv_stream(
     # --------------------------------------------------------
 
     try:
-        if _is_mediamtx_path_online(path_name):
-            print(f"[CCTV STREAM] 기존 online source 재사용 / cctv_id={cctv_id}")
+        if _is_mediamtx_path_ready(path_name):
+            print(
+                "[CCTV STREAM] "
+                "기존 ready source 재사용 "
+                f"/ cctv_id={cctv_id}"
+            )
 
             return _stream_response(cctv_id)
 
     except requests.RequestException:
-        # MediaMTX 상태 조회 실패 시
-        # 아래의 정상 준비 흐름을 다시 시도한다.
         pass
 
     # --------------------------------------------------------
-    # source 없음 / offline
+    # source 없음 / 재생 불가
     # --------------------------------------------------------
 
     (
@@ -687,8 +709,9 @@ def prepare_cctv_stream(
     _upsert_mediamtx_path(
         path_name=path_name,
         source_url=source_url,
-        source_fingerprint=(source_fingerprint),
+        source_fingerprint=source_fingerprint,
         keep_warm=True,
+        force_reload=True,
     )
 
     return _stream_response(cctv_id)
