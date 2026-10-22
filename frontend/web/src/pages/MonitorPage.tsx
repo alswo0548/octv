@@ -55,6 +55,7 @@ export function MonitorPage({
     session,
     "/api/cctvs",
     revision,
+    10_000,
   );
 
   const rows = (data ?? []).filter(

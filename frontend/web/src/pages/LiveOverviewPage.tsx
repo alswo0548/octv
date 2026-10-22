@@ -72,6 +72,7 @@ export function LiveOverviewPage({
     session,
     `/api/dashboard?page=${page}&page_size=5`,
     revision,
+    10_000,
   );
 
   const urgent = data?.incidents;
@@ -81,6 +82,7 @@ export function LiveOverviewPage({
     session,
     first ? `/api/dashboard/incidents/${first.id}/external-status` : null,
     revision,
+    60_000,
   );
 
   const cards: [string, number | string, string][] = [
