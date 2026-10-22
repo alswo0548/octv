@@ -12,6 +12,13 @@ export type MapMarker = {
   latitude: number;
   priority?: string;
 };
+const SEOUL_DEFAULT_BOUNDS: MapLine = {
+  id: 0,
+  coords: [
+    [126.76, 37.43],
+    [127.18, 37.7],
+  ],
+};
 export function geometryLines(id: number, geometry: unknown): MapLine[] {
   if (!geometry || typeof geometry !== "object") return [];
   const item = geometry as { type?: string; coordinates?: unknown };
@@ -65,7 +72,9 @@ export function LiveMap({
     () =>
       makeMapViewport(
         [
-          ...lines,
+          ...(lines.length === 0 && goodMarkers.length === 0
+            ? [SEOUL_DEFAULT_BOUNDS]
+            : lines),
           ...goodMarkers.map((m) => ({
             id: -m.id,
             coords: [[m.longitude, m.latitude] as LonLat],
