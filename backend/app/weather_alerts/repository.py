@@ -393,7 +393,9 @@ def _list_active_alert_rows(
         FROM weather_alerts
         WHERE status =
             'ACTIVE'
-            ::weather_status_enum;
+            ::weather_status_enum
+        AND external_alert_id
+            NOT LIKE 'DEMO:%';
     """
 
     with connection.cursor() as cursor:
@@ -602,7 +604,8 @@ def _set_post_alert_mode(
             'POST_ALERT'
             ::monitored_mode_enum
         WHERE is_monitored = TRUE
-          AND region_code =
+            AND provider = 'UTIC'
+            AND region_code =
               ANY(
                   %s::varchar[]
               )

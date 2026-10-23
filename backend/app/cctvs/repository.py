@@ -662,6 +662,72 @@ def list_monitored_utic_cctvs(
         return cursor.fetchall()
 
 
+
+def list_monitored_runtime_cctvs(
+    connection,
+    *,
+    include_demo: bool = False,
+):
+    """
+    CCTV Runtime에서 현재 Capture 대상 CCTV를 조회한다.
+
+    기본:
+    - UTIC
+
+    Demo 활성화 시:
+    - UTIC
+    - DEMO
+
+    조건:
+    - is_monitored = TRUE
+    """
+
+    providers = [
+        "UTIC",
+    ]
+
+    if include_demo:
+        providers.append(
+            "DEMO"
+        )
+
+    query = """
+        SELECT
+            id,
+            external_cctv_id,
+            name,
+            provider,
+            address,
+            latitude,
+            longitude,
+            stream_url,
+            is_monitored,
+            connection_status,
+            video_quality_status,
+            analysis_status,
+            last_frame_at,
+            region_code,
+            monitored_mode
+        FROM cctvs
+        WHERE provider =
+              ANY(
+                  %s::varchar[]
+              )
+          AND is_monitored = TRUE
+        ORDER BY id;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (
+                providers,
+            ),
+        )
+
+        return cursor.fetchall()
+
+
 # ============================================================
 # Runtime connection status
 # ============================================================
