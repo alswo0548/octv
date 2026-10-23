@@ -270,6 +270,57 @@ export async function loadIncidentImageUrl(
   return URL.createObjectURL(blob);
 }
 
+export async function loadDemoVideoUrl(
+  sessionVersion: number,
+  cctvId: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  if (!isId(cctvId)) {
+    throw new Error("CCTV ID를 확인할 수 없습니다.");
+  }
+
+  const session = requireSession(sessionVersion);
+  const token = session.getToken();
+
+  if (!token) {
+    throw new Error("로그인 상태를 확인할 수 없습니다.");
+  }
+
+  const combined = signal
+    ? AbortSignal.any([session.controller.signal, signal])
+    : session.controller.signal;
+
+  const response = await fetch(
+    `${session.baseUrl}/api/demo/cctvs/${cctvId}/video`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: combined,
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      "Demo 영상을 불러올 수 없습니다.",
+    );
+  }
+
+  const blob = await response.blob();
+
+  if (active !== session || combined.aborted) {
+    throw new Error("세션이 변경되었습니다.");
+  }
+
+  if (!blob.type.startsWith("video/")) {
+    throw new Error("영상 형식을 확인할 수 없습니다.");
+  }
+
+  return URL.createObjectURL(blob);
+}
+
 export function incidentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) {

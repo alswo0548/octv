@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { requestWebApi, type WebIncidentSession } from "../incidentData";
+import { loadDemoVideoUrl, requestWebApi, type WebIncidentSession } from "../incidentData";
 
 import { operationsError, type Cctv } from "../operationsData";
 
@@ -54,6 +54,8 @@ export function LiveCamera({
     let peer: RTCPeerConnection | null = null;
 
     let resource: string | null = null;
+
+    let demoObjectUrl: string | null = null;
 
     let stopped = false;
 
@@ -109,6 +111,12 @@ export function LiveCamera({
 
         resource = null;
       }
+
+      if (demoObjectUrl) {
+        URL.revokeObjectURL(demoObjectUrl);
+
+        demoObjectUrl = null;
+      }
     };
 
     // =====================================================
@@ -123,6 +131,9 @@ export function LiveCamera({
 
       return;
     }
+
+
+    const isDemo = camera.provider.trim().toUpperCase() === "DEMO";
 
     // =====================================================
     // 1. FastAPI → UTIC → MediaMTX 준비
@@ -151,6 +162,54 @@ export function LiveCamera({
     // =====================================================
 
     void (async () => {
+      if (isDemo) {
+        setPhase("Demo 영상 준비 중");
+
+        const url = await loadDemoVideoUrl(
+          session.version,
+          camera.id,
+          controller.signal,
+        );
+
+        if (stopped || controller.signal.aborted) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        clearPrepareTimer();
+
+        prepared = true;
+        demoObjectUrl = url;
+
+        const element = video.current;
+
+        if (!element) {
+          throw new Error("영상 요소를 찾을 수 없습니다.");
+        }
+
+        element.srcObject = null;
+        element.src = url;
+        element.loop = true;
+
+        setPhase("Demo 영상 준비됨 · 영상 연결 중");
+
+        playbackTimer = window.setTimeout(() => {
+          if (stopped || playing) {
+            return;
+          }
+
+          setPlaying(false);
+          setPhase("Demo 영상 수신 시간 초과. 다시 연결해주세요.");
+
+          controller.abort();
+          stop();
+        }, PLAYBACK_TIMEOUT_MS);
+
+        await element.play();
+
+        return;
+      }
+
       const info = await requestWebApi<StreamInfo>(
         session.version,
         `/api/cctvs/${camera.id}/stream`,
@@ -399,9 +458,11 @@ export function LiveCamera({
 
       if (element) {
         element.srcObject = null;
+        element.removeAttribute("src");
+        element.load();
       }
     };
-  }, [session.version, camera.id, camera.is_monitored, attempt]);
+  }, [session.version, camera.id, camera.provider, camera.is_monitored, attempt]);
 
   return (
     <>

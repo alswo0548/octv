@@ -4,7 +4,12 @@ from fastapi import (
     HTTPException,
 )
 
-from ..dependencies import require_control_admin
+from fastapi.responses import FileResponse
+
+from ..dependencies import (
+    get_current_user,
+    require_control_admin,
+)
 from . import schemas, service
 
 
@@ -12,6 +17,55 @@ router = APIRouter(
     prefix="/demo",
     tags=["Demo Scenario"],
 )
+
+
+@router.get(
+    "/cctvs/{cctv_id}/video",
+    response_class=FileResponse,
+    summary="Demo CCTV 영상 재생",
+)
+def get_demo_cctv_video(
+    cctv_id: int,
+    _user=Depends(get_current_user),
+):
+    """
+    활성화된 Demo CCTV의 MP4 영상을 반환한다.
+    WEB / MOBILE에서 공통으로 사용한다.
+    """
+
+    try:
+        video_path = service.get_demo_video_path(cctv_id)
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except service.DemoPreconditionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        FileNotFoundError,
+        RuntimeError,
+    ) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    return FileResponse(
+        path=video_path,
+        media_type="video/mp4",
+        filename=video_path.name,
+        content_disposition_type="inline",
+        headers={
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get(

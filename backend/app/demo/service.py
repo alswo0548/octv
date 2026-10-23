@@ -88,7 +88,9 @@ def _load_scenarios() -> dict[str, Any]:
     path = _resolve_scenario_path()
 
     if not path.exists():
-        raise FileNotFoundError(f"Demo Scenario 설정 파일을 찾을 수 없습니다. path={path}")
+        raise FileNotFoundError(
+            f"Demo Scenario 설정 파일을 찾을 수 없습니다. path={path}"
+        )
 
     with path.open(
         "r",
@@ -158,10 +160,14 @@ def _get_scenario_cases(
         ).strip()
 
         if not provider:
-            raise RuntimeError(f"Demo Scenario case에 provider가 없습니다. index={index}")
+            raise RuntimeError(
+                f"Demo Scenario case에 provider가 없습니다. index={index}"
+            )
 
         if not external_cctv_id:
-            raise RuntimeError(f"Demo Scenario case에 external_cctv_id가 없습니다. index={index}")
+            raise RuntimeError(
+                f"Demo Scenario case에 external_cctv_id가 없습니다. index={index}"
+            )
 
         key = (
             provider,
@@ -229,9 +235,44 @@ def _validate_demo_video(
         ) from exc
 
     if not video_path.exists() or not video_path.is_file():
-        raise DemoPreconditionError(f"Demo 영상 파일을 찾을 수 없습니다. path={video_path}")
+        raise DemoPreconditionError(
+            f"Demo 영상 파일을 찾을 수 없습니다. path={video_path}"
+        )
 
     return relative_path.as_posix()
+
+
+def get_demo_video_path(
+    cctv_id: int,
+) -> Path:
+    """
+    활성화된 Demo CCTV의 실제 영상 파일 경로를 반환한다.
+    """
+
+    with get_connection() as connection:
+        row = repository.get_demo_cctv_by_id(
+            connection,
+            cctv_id,
+        )
+
+    if row is None:
+        raise LookupError(f"Demo CCTV를 찾을 수 없습니다. cctv_id={cctv_id}")
+
+    if not bool(row["is_monitored"]):
+        raise DemoPreconditionError(
+            f"현재 활성화된 Demo CCTV가 아닙니다. cctv_id={cctv_id}"
+        )
+
+    video = str(row["stream_url"] or "").strip()
+
+    if not video:
+        raise DemoPreconditionError(
+            f"Demo CCTV에 영상이 설정되지 않았습니다. cctv_id={cctv_id}"
+        )
+
+    relative_path = _validate_demo_video(video)
+
+    return (_resolve_video_dir() / relative_path).resolve()
 
 
 # ============================================================
@@ -278,7 +319,11 @@ def get_demo_status() -> schemas.DemoStatusResponse:
             scenario_name=(scenario_name),
         )
 
-    active = len(cases) > 0 and active_cctv_count == len(cases) and active_alert_count == len(cases)
+    active = (
+        len(cases) > 0
+        and active_cctv_count == len(cases)
+        and active_alert_count == len(cases)
+    )
 
     return schemas.DemoStatusResponse(
         enabled=True,
@@ -458,7 +503,9 @@ def start_demo(
                 external_alert_id=(external_alert_id),
                 alert_type=(item["alert_type"]),
                 alert_level=(item["alert_level"]),
-                title=(f"[DEMO] {item['alert_type']} {item['alert_level']} - {cctv_row['name']}"),
+                title=(
+                    f"[DEMO] {item['alert_type']} {item['alert_level']} - {cctv_row['name']}"
+                ),
                 issued_at=(issued_at),
                 region_code=str(cctv_row["region_code"]),
             )
@@ -502,7 +549,9 @@ def start_demo(
             provider=str(row["provider"]),
             external_cctv_id=str(row["external_cctv_id"]),
             name=str(row["name"]),
-            region_code=(str(row["region_code"]) if row["region_code"] is not None else None),
+            region_code=(
+                str(row["region_code"]) if row["region_code"] is not None else None
+            ),
         )
         for row in activated_rows
     ]

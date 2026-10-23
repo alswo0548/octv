@@ -44,6 +44,37 @@ def get_cctv_by_external_id(
         return cursor.fetchone()
 
 
+def get_demo_cctv_by_id(
+    connection,
+    cctv_id: int,
+):
+    """
+    Demo 영상 재생에 필요한 CCTV 정보를 조회한다.
+    """
+
+    query = """
+        SELECT
+            id,
+            external_cctv_id,
+            name,
+            provider,
+            stream_url,
+            is_monitored
+        FROM cctvs
+        WHERE id = %s
+          AND provider = 'DEMO'
+        LIMIT 1;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            query,
+            (cctv_id,),
+        )
+
+        return cursor.fetchone()
+
+
 def activate_demo_cctv(
     connection,
     *,
