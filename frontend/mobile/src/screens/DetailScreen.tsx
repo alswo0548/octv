@@ -28,11 +28,7 @@ import {
   notificationController,
   parseNotificationTime,
 } from "../notifications";
-import {
-  VideoView,
-  useVideoPlayer,
-  type VideoSource,
-} from "expo-video";
+import { VideoView, useVideoPlayer, type VideoSource } from "expo-video";
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
 function incidentTime(value: string) {
@@ -60,12 +56,7 @@ type CompletionResponse = {
   incident_status: IncidentDto["status"];
 };
 
-
-function DemoIncidentVideo({
-  source,
-}: {
-  source: VideoSource;
-}) {
+function DemoIncidentVideo({ source }: { source: VideoSource }) {
   const player = useVideoPlayer(source, (player) => {
     player.loop = true;
     player.play();
@@ -88,7 +79,6 @@ function DemoIncidentVideo({
     </Panel>
   );
 }
-
 
 // 실제 사건에는 API에 없는 기상·경로·샘플 이미지를 채워 넣지 않습니다.
 function DeliveredIncidentDetail({
@@ -283,10 +273,7 @@ function DeliveredIncidentDetail({
       </View>
 
       {demoVideoSource && (
-        <DemoIncidentVideo
-          key={incident.id}
-          source={demoVideoSource}
-        />
+        <DemoIncidentVideo key={incident.id} source={demoVideoSource} />
       )}
 
       {incident.representative_image_updated_at && imageSource && (

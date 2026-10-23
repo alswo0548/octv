@@ -302,10 +302,7 @@ export async function loadDemoVideoUrl(
   );
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      "Demo 영상을 불러올 수 없습니다.",
-    );
+    throw new ApiError(response.status, "Demo 영상을 불러올 수 없습니다.");
   }
 
   const blob = await response.blob();

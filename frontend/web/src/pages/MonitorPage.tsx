@@ -2,7 +2,11 @@ import { useState } from "react";
 
 /** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
 
-import { formatSeoulTime, requestWebApi, type WebIncidentSession } from "../incidentData";
+import {
+  formatSeoulTime,
+  requestWebApi,
+  type WebIncidentSession,
+} from "../incidentData";
 
 import {
   useOperations,
@@ -15,7 +19,6 @@ import {
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
 import { go } from "../routing/useRoute";
-
 
 type DemoStartResponse = {
   scenario: string;
@@ -40,7 +43,6 @@ type DemoStopResponse = {
   stopped_cctv_count: number;
   ended_alert_count: number;
 };
-
 
 /**
  * CCTV 수집 Runtime의 연결 상태를 표시합니다.
@@ -177,16 +179,12 @@ export function MonitorPage({
     setDemoMessage(null);
 
     try {
-      await requestWebApi<DemoStopResponse>(
-        session.version,
-        "/api/demo/stop",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            scenario: "main_demo",
-          }),
-        },
-      );
+      await requestWebApi<DemoStopResponse>(session.version, "/api/demo/stop", {
+        method: "POST",
+        body: JSON.stringify({
+          scenario: "main_demo",
+        }),
+      });
 
       setDemoActive(false);
       setId("");

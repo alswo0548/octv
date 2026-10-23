@@ -12,7 +12,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { loadDemoVideoUrl, requestWebApi, type WebIncidentSession } from "../incidentData";
+import {
+  loadDemoVideoUrl,
+  requestWebApi,
+  type WebIncidentSession,
+} from "../incidentData";
 
 import { operationsError, type Cctv } from "../operationsData";
 
@@ -131,7 +135,6 @@ export function LiveCamera({
 
       return;
     }
-
 
     const isDemo = camera.provider.trim().toUpperCase() === "DEMO";
 
@@ -462,7 +465,13 @@ export function LiveCamera({
         element.load();
       }
     };
-  }, [session.version, camera.id, camera.provider, camera.is_monitored, attempt]);
+  }, [
+    session.version,
+    camera.id,
+    camera.provider,
+    camera.is_monitored,
+    attempt,
+  ]);
 
   return (
     <>
