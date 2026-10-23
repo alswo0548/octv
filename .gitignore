@@ -86,3 +86,7 @@ frontend/mobile/ios/
 *.apk
 *.aab
 credentials.json
+
+# Demo video assets
+demo/videos/*
+!demo/videos/.gitkeep

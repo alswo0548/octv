@@ -50,7 +50,7 @@ from ai.detection.utic import (
 )
 
 from backend.app.cctvs.repository import (
-    list_monitored_utic_cctvs,
+    list_monitored_runtime_cctvs,
     update_analysis_status,
     update_connection_status,
     update_last_frame_at,
@@ -460,12 +460,22 @@ class CctvDetectionRuntime:
     def _load_monitored_cctvs() -> list[
         Mapping[str, Any]
     ]:
+        demo_enabled = (
+            os.getenv(
+                "OCTV_DEMO_ENABLED",
+                "0",
+            ).strip()
+            == "1"
+        )
 
         with get_connection() as connection:
 
             rows = (
-                list_monitored_utic_cctvs(
-                    connection
+                list_monitored_runtime_cctvs(
+                    connection,
+                    include_demo=(
+                        demo_enabled
+                    ),
                 )
             )
 
@@ -549,6 +559,24 @@ class CctvDetectionRuntime:
             ]
         )
 
+        provider = str(
+            cctv[
+                "provider"
+            ]
+        ).upper()
+
+        configured_stream_url = (
+            str(
+                cctv[
+                    "stream_url"
+                ]
+            ).strip()
+            if cctv.get(
+                "stream_url"
+            )
+            else None
+        )
+
         # Worker가 새로 생성되는 시점의
         # 최신 reconnect 설정 사용
         settings = (
@@ -566,6 +594,107 @@ class CctvDetectionRuntime:
                 "max_reconnect_attempts"
             ]
         )
+
+        # =====================================================
+        # Demo local MP4
+        # =====================================================
+
+        if provider == "DEMO":
+
+            if not configured_stream_url:
+
+                raise RuntimeError(
+                    "Demo CCTV에 stream_url이 "
+                    "설정되지 않았습니다. "
+                    f"cctv_id={cctv_id} "
+                    f"external={external_cctv_id}"
+                )
+
+            demo_video_dir = Path(
+                os.getenv(
+                    "OCTV_DEMO_VIDEO_DIR",
+                    "demo/videos",
+                )
+            )
+
+            if not demo_video_dir.is_absolute():
+
+                demo_video_dir = (
+                    ROOT
+                    / demo_video_dir
+                )
+
+            demo_video_dir = (
+                demo_video_dir.resolve()
+            )
+
+            demo_path = Path(
+                configured_stream_url
+            )
+
+            if not demo_path.is_absolute():
+
+                demo_path = (
+                    demo_video_dir
+                    / demo_path
+                )
+
+            demo_path = (
+                demo_path.resolve()
+            )
+
+            try:
+
+                demo_path.relative_to(
+                    demo_video_dir
+                )
+
+            except ValueError as exc:
+
+                raise RuntimeError(
+                    "Demo 영상 경로가 "
+                    "OCTV_DEMO_VIDEO_DIR 밖을 "
+                    "가리킵니다. "
+                    f"path={demo_path}"
+                ) from exc
+
+            if not demo_path.exists():
+
+                raise FileNotFoundError(
+                    "Demo 영상 파일을 "
+                    "찾을 수 없습니다. "
+                    f"path={demo_path}"
+                )
+
+            print(
+                f"[DEMO SOURCE] "
+                f"CCTV {cctv_id} "
+                f"/ external="
+                f"{external_cctv_id} "
+                f"/ video={demo_path}"
+            )
+
+            return CaptureWorker(
+                cctv_id=cctv_id,
+
+                stream_url=str(
+                    demo_path
+                ),
+
+                reconnect_delay_sec=(
+                    reconnect_interval_sec
+                ),
+
+                max_reconnect_attempts=(
+                    max_reconnect_attempts
+                ),
+
+                realtime_pacing=True,
+            )
+
+        # =====================================================
+        # UTIC
+        # =====================================================
 
         def resolve_stream_url() -> str:
 

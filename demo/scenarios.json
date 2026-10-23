@@ -1,0 +1,27 @@
+{
+  "main_demo": {
+    "cases": [
+      {
+        "provider": "DEMO",
+        "external_cctv_id": "DEMO-N001",
+        "video": "N001_demo.mp4",
+        "alert_type": "호우",
+        "alert_level": "경보"
+      },
+      {
+        "provider": "DEMO",
+        "external_cctv_id": "DEMO-N002",
+        "video": "N002_demo.mp4",
+        "alert_type": "호우",
+        "alert_level": "주의보"
+      },
+      {
+        "provider": "DEMO",
+        "external_cctv_id": "DEMO-N003",
+        "video": "N003_demo.mp4",
+        "alert_type": "강풍",
+        "alert_level": "경보"
+      }
+    ]
+  }
+}

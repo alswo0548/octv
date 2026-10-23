@@ -1,0 +1,28 @@
+{
+  "cctvs": [
+    {
+      "external_cctv_id": "DEMO-N001",
+      "name": "Demo CCTV N001 - 강남차병원 인근",
+      "address": "서울특별시 강남구 강남차병원 인근",
+      "latitude": 37.50655,
+      "longitude": 127.03435,
+      "region_code": "11680"
+    },
+    {
+      "external_cctv_id": "DEMO-N002",
+      "name": "Demo CCTV N002 - 역삼역 인근",
+      "address": "서울특별시 강남구 역삼역 인근",
+      "latitude": 37.50082,
+      "longitude": 127.03696,
+      "region_code": "11680"
+    },
+    {
+      "external_cctv_id": "DEMO-N003",
+      "name": "Demo CCTV N003 - 역삼역 남측",
+      "address": "서울특별시 강남구 역삼역 남측",
+      "latitude": 37.4982,
+      "longitude": 127.0376,
+      "region_code": "11680"
+    }
+  ]
+}

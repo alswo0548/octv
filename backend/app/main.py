@@ -72,6 +72,10 @@ from .dashboard.router import (
     router as dashboard_router,
 )
 
+from .demo.router import (
+    router as demo_router,
+)
+
 
 # ============================================================
 # FastAPI
@@ -264,3 +268,16 @@ app.include_router(
     dashboard_router,
     prefix="/api",
 )
+
+
+if (
+    os.getenv(
+        "OCTV_DEMO_ENABLED",
+        "0",
+    ).strip()
+    == "1"
+):
+    app.include_router(
+        demo_router,
+        prefix="/api",
+    )
