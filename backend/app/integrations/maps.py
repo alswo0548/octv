@@ -90,20 +90,40 @@ def fetch_data(query: dict) -> dict:
         'roadevent': 0,  # 전체 차로 통제 반영을 해제하지 않습니다.
     }
     attempts = []           # 어떤 방식으로 경로를 조회했는지 기록
+    supplemental_failures = []  # 보충 조회 실패 기준만 기록 (인증키/URL 제외)
     error_codes = []        # 카카오 응답의 실패 결과 코드
     kind = 'INCIDENT'       # 경로 목적지가 실제 사건 위치인지 구분
     with httpx.Client(timeout=7) as client:
         routes, codes = _request_routes(client, query['api_key'], params)
         error_codes.extend(codes)
         attempts.append('RECOMMEND')
-        if not routes:
-            # 대안이 0개일 때만 최단시간/최단거리 옵션으로 제한적 재탐색합니다.
-            for priority in ('TIME', 'DISTANCE'):
-                params['priority'] = priority
-                routes, codes = _request_routes(client, query['api_key'], params)
-                error_codes.extend(codes)
-                attempts.append(priority)
-                if routes:
+        # 기본 경로가 1~2개여도 다른 탐색 기준으로 후보를 보충합니다.
+        # 처음 확보한 순서를 유지하며, 좌표가 동일한 경로는 합칩니다.
+        seen_paths = {
+            tuple(map(tuple, route['route_path_json']['coordinates']))
+            for route in routes
+        }
+        for priority in ('TIME', 'DISTANCE'):
+            if len(routes) >= 3:
+                break
+            params['priority'] = priority
+            attempts.append(priority)
+            try:
+                extra_routes, codes = _request_routes(client, query['api_key'], params)
+            except (httpx.HTTPError, ValueError, KeyError, TypeError):
+                if not routes:
+                    raise
+                # 보충 조회 실패 때문에 이미 확보한 경로를 버리지 않습니다.
+                supplemental_failures.append(priority)
+                continue
+            error_codes.extend(codes)
+            for route in extra_routes:
+                path_key = tuple(map(tuple, route['route_path_json']['coordinates']))
+                if path_key in seen_paths:
+                    continue
+                seen_paths.add(path_key)
+                routes.append(route)
+                if len(routes) >= 3:
                     break
         if not routes and query.get('verified_waypoints'):
             # 추가 경유지는 외부에서 확인한 실제 도로 지점만 사용합니다.
@@ -129,13 +149,15 @@ def fetch_data(query: dict) -> dict:
             attempts.append('VERIFIED_ACCESS_POINT')
             kind = 'NEAR_INCIDENT'
 
-    for route in routes:
+    for index, route in enumerate(routes, start=1):
+        route['route_name'] = f'후보 {index}'
         route['destination_kind'] = kind
     return {
         'candidates': routes[:3],
         'source': 'KAKAO_MOBILITY',
         'status': 'OK' if routes else 'NO_ROUTE',
         'attempts': attempts,
+        'supplemental_failures': supplemental_failures,
         'failure_result_codes': error_codes if not routes else [],
         'destination_kind': kind,
         'reason': None if routes else '재탐색 후에도 경로를 확보하지 못했습니다.',

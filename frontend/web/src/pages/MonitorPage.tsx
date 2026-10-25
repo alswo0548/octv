@@ -18,6 +18,8 @@ import {
 
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
+import { DemoV5Video } from "../components/DemoV5Video";
+import { NewIncidentToastV5 } from "../components/NewIncidentToastV5";
 import { go } from "../routing/useRoute";
 
 type DemoStartResponse = {
@@ -91,10 +93,29 @@ export function MonitorPage({
     10_000,
   );
 
+  // Existing Demo start/stop buttons remain the single control surface.
+  // V5 observes the same server-side scenario without creating additional buttons.
+  const demoStatus = useOperations<{
+    active: boolean;
+    active_alert_count: number;
+  }>(session, "/api/demo/status", revision, 5_000);
+  const demoSync = useOperations<{
+    active: boolean;
+    started_at: string | null;
+  }>(session, "/api/demo/v5/sync", revision, 5_000);
+  const activeDemoAlert = (demoStatus.data?.active_alert_count ?? 0) > 0;
+  const isDemoActive = demoStatus.data?.active ?? demoActive;
+  const startedAt = demoSync.data?.active ? demoSync.data.started_at : null;
   const visibleData = (data ?? []).filter(
     (camera) =>
-      camera.provider.trim().toUpperCase() !== "DEMO" || camera.is_monitored,
-  );
+      camera.provider.trim().toUpperCase() !== "DEMO" ||
+      (activeDemoAlert && camera.is_monitored),
+  ).sort((a, b) => {
+    // Demo cameras first during the scenario; preserve original UTIC order.
+    const isActiveDemo = (camera: Cctv) =>
+      camera.provider.trim().toUpperCase() === "DEMO" && camera.is_monitored;
+    return Number(isActiveDemo(b)) - Number(isActiveDemo(a));
+  });
 
   const rows = visibleData.filter(
     (camera) =>
@@ -240,7 +261,7 @@ export function MonitorPage({
       {error && <p role="alert">{error}</p>}
 
       <div className="action-row">
-        {!demoActive ? (
+        {!isDemoActive ? (
           <button
             className="primary"
             disabled={demoBusy}
@@ -267,6 +288,16 @@ export function MonitorPage({
       </div>
 
       {demoMessage && <p role="status">{demoMessage}</p>}
+
+      {activeDemoAlert && visibleData.some(
+        (camera) => camera.provider.trim().toUpperCase() === "DEMO" &&
+          camera.is_monitored && camera.analysis_status !== "RUNNING",
+      ) && (
+        <p role="alert">
+          시연 영상 표시와 YOLO 분석은 별개입니다. 일부 Demo CCTV의
+          분석 상태가 RUNNING이 아닙니다. v5 Runtime 로그를 확인해주세요.
+        </p>
+      )}
 
       <div className="monitor-layout">
         <Panel title="CCTV 목록" className="monitor-list-panel">
@@ -318,13 +349,20 @@ export function MonitorPage({
             </div>
           )}
 
-          {c && (
+          {c && (c.provider.trim().toUpperCase() === "DEMO" && startedAt ? (
+            <DemoV5Video
+              key={`${session.version}:${c.id}:${c.is_monitored}`}
+              session={session}
+              camera={c}
+              startedAt={startedAt}
+            />
+          ) : (
             <LiveCamera
               key={`${session.version}:${c.id}:${c.is_monitored}`}
               session={session}
               camera={c}
             />
-          )}
+          ))}
 
           {c && (
             <div className="status-grid">
@@ -374,6 +412,7 @@ export function MonitorPage({
           </div>
         </Panel>
       </div>
+      <NewIncidentToastV5 session={session} />
     </>
   );
 }
