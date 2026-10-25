@@ -246,6 +246,7 @@ export function LiveRoutesPage({
                   <td>
                     {(route.distance_m / 1000).toFixed(1)} km /{" "}
                     {Math.ceil(route.duration_sec / 60)}분
+                    {route.demo_duration_sec != null && route.demo_traffic?.type === "SIMULATED_DELAY" && <small> · 시연 {Math.ceil(route.demo_duration_sec / 60)}분</small>}
                   </td>
 
                   <td>{route.total_score ?? "미평가"}
