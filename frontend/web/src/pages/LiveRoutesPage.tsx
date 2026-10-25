@@ -15,8 +15,12 @@ type DemoRouteResponse = Omit<RouteResponse, "items"> & {
       label: string;
       reason: string;
       simulated: boolean;
+      point?: number[] | null;
+      delay_sec?: number;
     } | null;
-    demo_rank_status?: "EXCLUDED" | "DEPRIORITIZED" | "UNCHANGED" | null;
+    demo_rank_status?: "SIMULATED_EXCLUDED" | "SIMULATED_DELAY" | "ALTERNATIVE" | null;
+    demo_total_score?: number | null;
+    demo_duration_sec?: number | null;
   })[];
 };
 
@@ -253,9 +257,9 @@ export function LiveRoutesPage({
                         : "저장된 경로 평가")}
                   </td>
 
-                  <td>{route.demo_rank_status === "EXCLUDED"
+                  <td>{route.demo_rank_status === "SIMULATED_EXCLUDED"
                       ? "시연상 제외"
-                      : route.demo_rank_status === "DEPRIORITIZED"
+                      : route.demo_rank_status === "SIMULATED_DELAY"
                         ? "시연상 후순위"
                         : route.verification_status ?? "미확인"}</td>
                 </tr>
