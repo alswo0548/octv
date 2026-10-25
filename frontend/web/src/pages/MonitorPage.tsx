@@ -2,21 +2,49 @@ import { useState } from "react";
 
 /** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
 
-import { formatSeoulTime, type WebIncidentSession } from "../incidentData";
+import {
+  formatSeoulTime,
+  requestWebApi,
+  type WebIncidentSession,
+} from "../incidentData";
 
 import {
   useOperations,
   monitoringLabels,
+  operationsError,
   statusLabel,
   type Cctv,
 } from "../operationsData";
 
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
-import { DemoV5Controls } from "../components/DemoV5Controls";
 import { DemoV5Video } from "../components/DemoV5Video";
 import { NewIncidentToastV5 } from "../components/NewIncidentToastV5";
 import { go } from "../routing/useRoute";
+
+type DemoStartResponse = {
+  scenario: string;
+  ready: boolean;
+  started: boolean;
+  case_count: number;
+  resolved_cctv_count: number;
+  fake_alert_count: number;
+  cctvs: {
+    id: number;
+    provider: string;
+    external_cctv_id: string;
+    name: string;
+    region_code: string | null;
+  }[];
+};
+
+type DemoStopResponse = {
+  scenario: string;
+  stopped: boolean;
+  case_count: number;
+  stopped_cctv_count: number;
+  ended_alert_count: number;
+};
 
 /**
  * CCTV 수집 Runtime의 연결 상태를 표시합니다.
@@ -54,6 +82,10 @@ export function MonitorPage({
   const [query, setQuery] = useState("");
   const [errorsOnly, setErrorsOnly] = useState(false);
 
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoActive, setDemoActive] = useState(false);
+  const [demoMessage, setDemoMessage] = useState<string | null>(null);
+
   const { data, loading, error } = useOperations<Cctv[]>(
     session,
     "/api/cctvs",
@@ -61,35 +93,31 @@ export function MonitorPage({
     10_000,
   );
 
-  // 시연 시작은 가상 특보와 DEMO CCTV 활성화를 같은 DB 트랜잭션에서 처리한다.
-  // 일반 UTIC는 언제나 보이지만, DEMO 목록은 특보 ACTIVE + 감시 ON일 때만 표시한다.
-  const demoStatus = useOperations<{ active_alert_count: number }>(
-    session,
-    "/api/demo/status",
-    revision,
-    5_000,
-  );
-  // Runtime/video playback is synchronized with the *same* scenario's issued_at.
-  const demoSync = useOperations<{ active: boolean; started_at: string | null }>(
-    session,
-    "/api/demo/v5/sync",
-    revision,
-    5_000,
-  );
+  // Existing Demo start/stop buttons remain the single control surface.
+  // V5 observes the same server-side scenario without creating additional buttons.
+  const demoStatus = useOperations<{
+    active: boolean;
+    active_alert_count: number;
+  }>(session, "/api/demo/status", revision, 5_000);
+  const demoSync = useOperations<{
+    active: boolean;
+    started_at: string | null;
+  }>(session, "/api/demo/v5/sync", revision, 5_000);
   const activeDemoAlert = (demoStatus.data?.active_alert_count ?? 0) > 0;
+  const isDemoActive = demoStatus.data?.active ?? demoActive;
   const startedAt = demoSync.data?.active ? demoSync.data.started_at : null;
-  const visibleCctvs = (data ?? []).filter(
+  const visibleData = (data ?? []).filter(
     (camera) =>
-      camera.provider.toUpperCase() !== "DEMO" ||
+      camera.provider.trim().toUpperCase() !== "DEMO" ||
       (activeDemoAlert && camera.is_monitored),
   ).sort((a, b) => {
-    // Active alerts first; ordinary UTIC selection/order stays untouched.
-    const aAlert = a.provider.toUpperCase() === "DEMO" && a.is_monitored;
-    const bAlert = b.provider.toUpperCase() === "DEMO" && b.is_monitored;
-    return Number(bAlert) - Number(aAlert);
+    // Demo cameras first during the scenario; preserve original UTIC order.
+    const isActiveDemo = (camera: Cctv) =>
+      camera.provider.trim().toUpperCase() === "DEMO" && camera.is_monitored;
+    return Number(isActiveDemo(b)) - Number(isActiveDemo(a));
   });
 
-  const rows = visibleCctvs.filter(
+  const rows = visibleData.filter(
     (camera) =>
       (!errorsOnly || camera.connection_status !== "CONNECTED") &&
       `${camera.external_cctv_id} ${camera.name} ${camera.address ?? ""}`
@@ -103,19 +131,92 @@ export function MonitorPage({
     ) ?? rows[0];
 
   const cards: [string, number | string][] = [
-    ["전체 CCTV", data ? visibleCctvs.length : "–"],
-    ["감시 중", data ? visibleCctvs.filter((camera) => camera.is_monitored).length : "–"],
+    ["전체 CCTV", data ? visibleData.length : "–"],
+    [
+      "감시 중",
+      data ? visibleData.filter((camera) => camera.is_monitored).length : "–",
+    ],
     [
       "수집 연결됨",
-      data ? visibleCctvs.filter((camera) => camera.connection_status === "CONNECTED")
-        .length : "–",
+      data
+        ? visibleData.filter(
+            (camera) => camera.connection_status === "CONNECTED",
+          ).length
+        : "–",
     ],
     [
       "수집 연결 확인 필요",
-      data ? visibleCctvs.filter((camera) => camera.connection_status !== "CONNECTED")
-        .length : "–",
+      data
+        ? visibleData.filter(
+            (camera) => camera.connection_status !== "CONNECTED",
+          ).length
+        : "–",
     ],
   ];
+
+  async function startDemo() {
+    if (demoBusy) {
+      return;
+    }
+
+    setDemoBusy(true);
+    setDemoMessage(null);
+
+    try {
+      const result = await requestWebApi<DemoStartResponse>(
+        session.version,
+        "/api/demo/start",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            scenario: "main_demo",
+          }),
+        },
+      );
+
+      setDemoActive(true);
+
+      const firstDemo = result.cctvs[0];
+
+      if (firstDemo) {
+        setId(String(firstDemo.id));
+      }
+
+      setRevision((value) => value + 1);
+      setDemoMessage("기상특보가 발효되어 Demo CCTV 감시가 시작됐습니다.");
+    } catch (error) {
+      setDemoMessage(operationsError(error));
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
+  async function stopDemo() {
+    if (demoBusy) {
+      return;
+    }
+
+    setDemoBusy(true);
+    setDemoMessage(null);
+
+    try {
+      await requestWebApi<DemoStopResponse>(session.version, "/api/demo/stop", {
+        method: "POST",
+        body: JSON.stringify({
+          scenario: "main_demo",
+        }),
+      });
+
+      setDemoActive(false);
+      setId("");
+      setRevision((value) => value + 1);
+      setDemoMessage("Demo 기상특보가 종료되고 Demo CCTV가 비활성화됐습니다.");
+    } catch (error) {
+      setDemoMessage(operationsError(error));
+    } finally {
+      setDemoBusy(false);
+    }
+  }
 
   return (
     <>
@@ -159,21 +260,42 @@ export function MonitorPage({
 
       {error && <p role="alert">{error}</p>}
 
-      <button
-        className="secondary"
-        onClick={() => setRevision((value) => value + 1)}
-      >
-        현재 상태 새로고침
-      </button>
+      <div className="action-row">
+        {!isDemoActive ? (
+          <button
+            className="primary"
+            disabled={demoBusy}
+            onClick={() => void startDemo()}
+          >
+            {demoBusy ? "재난 시연 시작 중…" : "재난 발생 · 시연 시작"}
+          </button>
+        ) : (
+          <button
+            className="secondary"
+            disabled={demoBusy}
+            onClick={() => void stopDemo()}
+          >
+            {demoBusy ? "시연 종료 중…" : "재난 시연 종료"}
+          </button>
+        )}
 
-      {activeDemoAlert && visibleCctvs.some((camera) =>
-        camera.provider.toUpperCase() === "DEMO" && camera.is_monitored &&
-        camera.analysis_status !== "RUNNING"
+        <button
+          className="secondary"
+          onClick={() => setRevision((value) => value + 1)}
+        >
+          현재 상태 새로고침
+        </button>
+      </div>
+
+      {demoMessage && <p role="status">{demoMessage}</p>}
+
+      {activeDemoAlert && visibleData.some(
+        (camera) => camera.provider.trim().toUpperCase() === "DEMO" &&
+          camera.is_monitored && camera.analysis_status !== "RUNNING",
       ) && (
-        <p role="alert" style={{ marginBottom: 12 }}>
-          주의: 시연 영상 표시와 YOLO 분석은 별개입니다. 현재 Demo CCTV 중
-          YOLO가 RUNNING이 아닌 기기가 있습니다. v5 CCTV Runtime 창에서
-          [RUNTIME SYNC] started 및 [YOLO WORKER] cctv=4/5/6 로그를 확인해주세요.
+        <p role="alert">
+          시연 영상 표시와 YOLO 분석은 별개입니다. 일부 Demo CCTV의
+          분석 상태가 RUNNING이 아닙니다. v5 Runtime 로그를 확인해주세요.
         </p>
       )}
 
@@ -227,22 +349,20 @@ export function MonitorPage({
             </div>
           )}
 
-          {c && (
-            c.provider.toUpperCase() === "DEMO" ? (
-              <DemoV5Video
-                key={`${session.version}:${c.id}:${c.is_monitored}`}
-                session={session}
-                camera={c}
-                startedAt={startedAt}
-              />
-            ) : (
-              <LiveCamera
-                key={`${session.version}:${c.id}:${c.is_monitored}`}
-                session={session}
-                camera={c}
-              />
-            )
-          )}
+          {c && (c.provider.trim().toUpperCase() === "DEMO" && startedAt ? (
+            <DemoV5Video
+              key={`${session.version}:${c.id}:${c.is_monitored}`}
+              session={session}
+              camera={c}
+              startedAt={startedAt}
+            />
+          ) : (
+            <LiveCamera
+              key={`${session.version}:${c.id}:${c.is_monitored}`}
+              session={session}
+              camera={c}
+            />
+          ))}
 
           {c && (
             <div className="status-grid">
@@ -292,14 +412,7 @@ export function MonitorPage({
           </div>
         </Panel>
       </div>
-
       <NewIncidentToastV5 session={session} />
-
-      {/* 기존 CCTV 모니터링을 방해하지 않도록 시연 제어는 맨 아래에 둔다. */}
-      <DemoV5Controls
-        session={session}
-        onChanged={() => setRevision((value) => value + 1)}
-      />
     </>
   );
 }

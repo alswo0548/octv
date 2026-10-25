@@ -227,6 +227,27 @@ function incidentImageSource(incident: IncidentDto) {
   };
 }
 
+function demoVideoSource(incident: IncidentDto) {
+  if (!activeToken || snapshot.status !== "ready") {
+    return null;
+  }
+
+  if (incident.provider?.trim().toUpperCase() !== "DEMO") {
+    return null;
+  }
+
+  if (!Number.isSafeInteger(incident.cctv_id) || incident.cctv_id <= 0) {
+    return null;
+  }
+
+  return {
+    uri: `${requireServerUrl()}/api/demo/cctvs/${incident.cctv_id}/video`,
+    headers: {
+      Authorization: `Bearer ${activeToken}`,
+    },
+  };
+}
+
 export const mobileSession = {
   getSnapshot: () => snapshot,
   subscribe(listener: () => void) {
@@ -240,4 +261,5 @@ export const mobileSession = {
   logout,
   invalidate,
   incidentImageSource,
+  demoVideoSource,
 };

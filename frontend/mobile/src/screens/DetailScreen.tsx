@@ -28,6 +28,7 @@ import {
   notificationController,
   parseNotificationTime,
 } from "../notifications";
+import { VideoView, useVideoPlayer, type VideoSource } from "expo-video";
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
 function incidentTime(value: string) {
@@ -54,6 +55,30 @@ type CompletionResponse = {
   recommendation_status: "COMPLETED";
   incident_status: IncidentDto["status"];
 };
+
+function DemoIncidentVideo({ source }: { source: VideoSource }) {
+  const player = useVideoPlayer(source, (player) => {
+    player.loop = true;
+    player.play();
+  });
+
+  return (
+    <Panel title="시연 CCTV 영상">
+      <VideoView
+        player={player}
+        nativeControls
+        contentFit="contain"
+        style={{
+          width: "100%",
+          aspectRatio: 16 / 9,
+          backgroundColor: "#000",
+        }}
+      />
+
+      <T muted>DEMO CCTV 시연 영상입니다.</T>
+    </Panel>
+  );
+}
 
 // 실제 사건에는 API에 없는 기상·경로·샘플 이미지를 채워 넣지 않습니다.
 function DeliveredIncidentDetail({
@@ -97,6 +122,8 @@ function DeliveredIncidentDetail({
 
   // 로그인 JWT를 이미지 주소에 붙이지 않고 인증 헤더로 전달합니다.
   const imageSource = mobileSession.incidentImageSource(incident);
+
+  const demoVideoSource = mobileSession.demoVideoSource(incident);
 
   // RESPONDER는 자기 기관의 전달 상태를 먼저 확인합니다.
   useEffect(() => {
@@ -244,6 +271,10 @@ function DeliveredIncidentDetail({
 
         <T muted>현재 계정에 허용된 사건정보입니다.</T>
       </View>
+
+      {demoVideoSource && (
+        <DemoIncidentVideo key={incident.id} source={demoVideoSource} />
+      )}
 
       {incident.representative_image_updated_at && imageSource && (
         <Panel title="대표 탐지 이미지">
