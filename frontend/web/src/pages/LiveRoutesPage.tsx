@@ -8,6 +8,22 @@ import { LiveMap, geometryLines } from "../components/LiveMap";
 import { Badge, type ShowModal } from "../components/Primitives";
 import type { RouteResponse } from "../../../mobile/src/liveRoutes";
 
+type DemoRouteResponse = Omit<RouteResponse, "items"> & {
+  items: (RouteResponse["items"][number] & {
+    demo_traffic?: {
+      type: "SIMULATED_FULL_CLOSURE" | "SIMULATED_DELAY";
+      label: string;
+      reason: string;
+      simulated: boolean;
+      point?: number[] | null;
+      delay_sec?: number;
+    } | null;
+    demo_rank_status?: "SIMULATED_EXCLUDED" | "SIMULATED_DELAY" | "ALTERNATIVE" | null;
+    demo_total_score?: number | null;
+    demo_duration_sec?: number | null;
+  })[];
+};
+
 type Agency = {
   agency_id: number;
   agency_name: string;
@@ -53,7 +69,7 @@ export function LiveRoutesPage({
     agencies.data?.items.find((item) => item.agency_id === agencyId) ??
     agencies.data?.items[0];
 
-  const routes = useOperations<RouteResponse>(
+  const routes = useOperations<DemoRouteResponse>(
     session,
     agency
       ? `/api/routes/incidents/${incidentId}/agencies/${agency.agency_id}`
@@ -64,7 +80,7 @@ export function LiveRoutesPage({
 
   const active =
     routes.data?.items.find((route) => route.id === selectedId) ??
-    routes.data?.items.find((route) => route.navigation_available) ??
+    routes.data?.items.find((route) => route.navigation_available && route.demo_rank_status !== "SIMULATED_EXCLUDED") ??
     routes.data?.items[0];
 
   const lines = (routes.data?.items ?? []).flatMap((route) =>
@@ -181,6 +197,13 @@ export function LiveRoutesPage({
         onSelect={setSelectedId}
       />
 
+      {routes.data?.items.some((route) => route.demo_traffic) && (
+        <p role="status" className="content-footnote">
+          시연용 가상 교통상황 적용 중 · 통제 및 정체는 실제 교통 API 정보가 아닙니다.
+          원본 시간·거리 점수는 유지하며 시연 종료 시 자동 해제됩니다.
+        </p>
+      )}
+
       <section className="panel page-section section-gap">
         <div className="table-scroll">
           <table className="route-table">
@@ -223,18 +246,27 @@ export function LiveRoutesPage({
                   <td>
                     {(route.distance_m / 1000).toFixed(1)} km /{" "}
                     {Math.ceil(route.duration_sec / 60)}분
+                    {route.demo_duration_sec != null && route.demo_traffic?.type === "SIMULATED_DELAY" && <small> · 시연 {Math.ceil(route.demo_duration_sec / 60)}분</small>}
                   </td>
 
-                  <td>{route.total_score ?? "미평가"}</td>
+                  <td>{route.total_score ?? "미평가"}
+                    {route.demo_traffic?.type === "SIMULATED_DELAY" && route.demo_total_score != null && (
+                      <small> · 시연 {route.demo_total_score}점</small>
+                    )}
+                  </td>
 
                   <td>
-                    {route.disqualify_reason ??
+                    {route.demo_traffic?.reason ?? route.disqualify_reason ??
                       (route.requires_review
                         ? "통제 정보 추가 확인 필요"
                         : "저장된 경로 평가")}
                   </td>
 
-                  <td>{route.verification_status ?? "미확인"}</td>
+                  <td>{route.demo_rank_status === "SIMULATED_EXCLUDED"
+                      ? "시연상 제외"
+                      : route.demo_rank_status === "SIMULATED_DELAY"
+                        ? "시연상 후순위"
+                        : route.verification_status ?? "미확인"}</td>
                 </tr>
               ))}
             </tbody>
