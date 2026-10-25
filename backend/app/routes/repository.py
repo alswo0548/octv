@@ -15,8 +15,11 @@ def find_route_scope(connection, incident_id: int, agency_id: int):
                    WHERE a.incident_id = i.id
                ) AS has_assessment,
                ar.id AS recommendation_id,
-               ar.recommendation_status
+               ar.recommendation_status,
+               c.provider AS cctv_provider,
+               c.external_cctv_id AS cctv_external_id
         FROM incidents i
+        JOIN cctvs c ON c.id = i.cctv_id
         LEFT JOIN incident_agency_recommendations ar
           ON ar.incident_id = i.id AND ar.agency_id = %s
         WHERE i.id = %s
