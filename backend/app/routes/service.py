@@ -5,13 +5,16 @@ LangGraph가 저장한 경로를 가져오기 전에 누가 조회하는지 확�
 관리자는 추천된 기관의 후보를 조회하고, 기관 사용자는 전달받은 자기 기관의 경로만 조회.
 """
 
+import json
+import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
 
 from ..db.session import get_connection
 from . import repository, schemas
-from ..demo.traffic_overlay import overlay_candidates
+from ..demo.traffic_overlay import DEMO_CCTV_IDS, overlay_candidates
 
 
 def _valid_path(path: Any) -> bool:
@@ -106,17 +109,33 @@ def list_candidates(
             else:
                 result_status = "NEEDS_REVIEW"
 
-    # Admin-only presentation overlay. Original scores and DB records are untouched.
-    if is_admin and candidates and incident_id in (4, 5, 19):
+    # Presentation-only simulation for approved DEMO cameras, not incidental IDs.
+    if (
+        is_admin
+        and candidates
+        and scope["cctv_provider"] == "DEMO"
+        and scope["cctv_external_id"] in DEMO_CCTV_IDS
+        and os.getenv("OCTV_DEMO_ENABLED", "0") == "1"
+    ):
         try:
             from ..demo.service import get_demo_status
-            from os import getenv
-            if getenv("OCTV_DEMO_ENABLED", "0") == "1" and get_demo_status().active:
+            if get_demo_status().active:
+                config_path = Path(os.getenv("OCTV_RUNTIME_CONFIG", "ai/runtime_config.json"))
+                if not config_path.is_absolute():
+                    config_path = Path(__file__).resolve().parents[3] / config_path
+                policy = json.loads(config_path.read_text(encoding="utf-8-sig"))["route_policy"]
+                if policy.get("time_points", 70) != 70 or policy.get("distance_points", 30) != 30:
+                    raise ValueError("Route weights mismatch")
                 candidates = [
-                    schemas.RouteCandidateResponse.model_validate(item)
-                    for item in overlay_candidates(incident_id, candidates)
+                    schemas.RouteCandidateResponse.model_validate(x)
+                    for x in overlay_candidates(
+                        candidates,
+                        duration_scale_sec=float(policy["duration_scale_sec"]),
+                        distance_scale_m=float(policy["distance_scale_m"]),
+                    )
                 ]
-        except (RuntimeError, FileNotFoundError, LookupError):
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError, LookupError):
+            # Fall back to original routes without affecting production behavior.
             pass
 
     return schemas.RouteCandidatesResponse.model_validate({
