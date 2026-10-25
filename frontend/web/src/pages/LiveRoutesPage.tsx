@@ -80,7 +80,7 @@ export function LiveRoutesPage({
 
   const active =
     routes.data?.items.find((route) => route.id === selectedId) ??
-    routes.data?.items.find((route) => route.navigation_available) ??
+    routes.data?.items.find((route) => route.navigation_available && route.demo_rank_status !== "SIMULATED_EXCLUDED") ??
     routes.data?.items[0];
 
   const lines = (routes.data?.items ?? []).flatMap((route) =>
@@ -248,7 +248,11 @@ export function LiveRoutesPage({
                     {Math.ceil(route.duration_sec / 60)}분
                   </td>
 
-                  <td>{route.total_score ?? "미평가"}</td>
+                  <td>{route.total_score ?? "미평가"}
+                    {route.demo_traffic?.type === "SIMULATED_DELAY" && route.demo_total_score != null && (
+                      <small> · 시연 {route.demo_total_score}점</small>
+                    )}
+                  </td>
 
                   <td>
                     {route.demo_traffic?.reason ?? route.disqualify_reason ??
