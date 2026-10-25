@@ -181,6 +181,13 @@ export function LiveRoutesPage({
         onSelect={setSelectedId}
       />
 
+      {routes.data?.items.some((route) => route.demo_traffic) && (
+        <p role="status" className="content-footnote">
+          시연용 가상 교통상황 적용 중 · 통제 및 정체는 실제 교통 API 정보가 아닙니다.
+          원본 시간·거리 점수는 유지하며 시연 종료 시 자동 해제됩니다.
+        </p>
+      )}
+
       <section className="panel page-section section-gap">
         <div className="table-scroll">
           <table className="route-table">
@@ -228,13 +235,17 @@ export function LiveRoutesPage({
                   <td>{route.total_score ?? "미평가"}</td>
 
                   <td>
-                    {route.disqualify_reason ??
+                    {route.demo_traffic?.reason ?? route.disqualify_reason ??
                       (route.requires_review
                         ? "통제 정보 추가 확인 필요"
                         : "저장된 경로 평가")}
                   </td>
 
-                  <td>{route.verification_status ?? "미확인"}</td>
+                  <td>{route.demo_rank_status === "EXCLUDED"
+                      ? "시연상 제외"
+                      : route.demo_rank_status === "DEPRIORITIZED"
+                        ? "시연상 후순위"
+                        : route.verification_status ?? "미확인"}</td>
                 </tr>
               ))}
             </tbody>
