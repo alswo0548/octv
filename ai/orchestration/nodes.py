@@ -187,7 +187,8 @@ def create_nodes(config: dict) -> dict:
     """
     def assess_risk(state):
         policy = config['risk_policies'][state['incident']['hazard_type']]
-        return {'assessment': assess(state['context'], policy)}
+        assessor = config.get('risk_assessor')
+        return {'assessment': assessor(state['context'], policy, state['incident']) if assessor else assess(state['context'], policy)}
     """
     State에 새로 들어가는 결과: agencies, preliminary
     """

@@ -1,3 +1,4 @@
+import { hiddenIncidentIds } from "./incidentVisibility";
 /**
  * 웹 실제 사건 데이터 연결
  *
@@ -189,9 +190,32 @@ export async function listServerIncidents(
     }
   });
 
-  return read(sessionVersion, `/api/incidents?${params}`, {
-    signal,
-  });
+  const current = requireSession(sessionVersion);
+  if (current.visible.user.role !== "CONTROL_ADMIN") {
+    return read(sessionVersion, `/api/incidents?${params}`, { signal });
+  }
+  // Filtering a server page would leave holes and incorrect totals. Read every
+  // authorized page before applying this web-only archive and pagination.
+  const hidden = new Set(hiddenIncidentIds(sessionVersion));
+  try {
+    const archive = await read<{ archived_ids: number[] }>(sessionVersion, "/api/demo/v5/archive-scope", { signal });
+    archive.archived_ids.forEach(id => hidden.add(id));
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    // Standard non-demo API has no v5 extension; retain original incidents.
+  }
+  const items: IncidentDto[] = [];
+  params.set("page_size", "100");
+  for (let page = 1; ; page++) {
+    params.set("page", String(page));
+    const result = await read<PageDto<IncidentDto>>(sessionVersion, `/api/incidents?${params}`, { signal });
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) break;
+  }
+  const visible = items.filter(item => !hidden.has(item.id));
+  const page = filters.page ?? 1;
+  const size = filters.page_size ?? 5;
+  return { items: visible.slice((page - 1) * size, page * size), total: visible.length, page, page_size: size };
 }
 
 export async function getServerIncident(

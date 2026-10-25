@@ -1591,3 +1591,14 @@ th {
     display: none;
   }
 }
+
+/* PR69: notice belongs to the header rather than floating over content. */
+.octv-global-header { position: sticky; top: 0; z-index: 700; padding: 9px 0; background: rgba(10,19,29,.90); backdrop-filter: blur(12px); }
+.octv-global-header .header-right { gap: 12px; flex-wrap: nowrap; }
+.octv-global-header .header-right time { white-space: nowrap; }
+.new-incident-notice { position: relative; flex-shrink: 0; }
+.new-incident-notice > button { white-space: nowrap; }
+.incident-notice-dropdown,.incident-notice-popup { position: absolute; top: calc(100% + 10px); right: 0; z-index: 900; }
+.incident-notice-popup { min-width: 260px; }
+@media (max-width: 1200px) { .octv-global-header .header-right .signal { display: none; } }
+@media (max-width: 700px) { .incident-notice-dropdown { max-width: min(360px, 85vw); } }

@@ -18,9 +18,9 @@ export function StatsPage({ session }: { session: WebIncidentSession }) {
   const [end, setEnd] = useState(() => seoulDate());
   const [region, setRegion] = useState("");
   const [camera, setCamera] = useState("");
-  const [confirmed, setConfirmed] = useState(true);
+  const [confirmed, setConfirmed] = useState(false);
   const [revision, setRevision] = useState(0);
-  const cameras = useOperations<Cctv[]>(session, "/api/cctvs");
+  const cameras = useOperations<Cctv[]>(session, "/api/cctvs", revision, 10_000);
   const params = new URLSearchParams({
     start,
     end,
@@ -37,6 +37,7 @@ export function StatsPage({ session }: { session: WebIncidentSession }) {
     session,
     validPeriod ? `/api/stats?${params}` : null,
     revision,
+    10_000,
   );
   const typeKeys = Array.from(
     new Set([
@@ -201,6 +202,14 @@ export function StatsPage({ session }: { session: WebIncidentSession }) {
           ),
         )}
       </div>
+      <Panel title="현재 CCTV 운영 상태 · 10초마다 갱신">
+        <dl>
+          <Pair label="감시 활성" value={cameras.data?.filter(c => c.is_monitored).length ?? "조회 대기"} />
+          <Pair label="수집 연결" value={cameras.data?.filter(c => c.is_monitored && c.connection_status === "CONNECTED").length ?? "조회 대기"} />
+          <Pair label="수집 끊김" value={cameras.data?.filter(c => c.is_monitored && c.connection_status === "DISCONNECTED").length ?? "조회 대기"} />
+          <Pair label="집중 검증" value={cameras.data?.filter(c => c.is_monitored && c.monitored_mode === "VERIFY").length ?? "조회 대기"} />
+        </dl>
+      </Panel>
       <Panel title="유형별 사건 수">
         <div className="stats-columns">
           {types.map(([name, count, height]) => (

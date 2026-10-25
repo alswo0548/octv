@@ -25,6 +25,7 @@ export type DeliveryContext = Readonly<{
 }>;
 export type DeliveryIncident = Readonly<{
   id: number;
+  priority?: string | null;
   incident_no: string;
   cctv_name: string;
   hazard_type: string;
@@ -305,6 +306,7 @@ function parseSnapshot(
   return Object.freeze({
     incident: Object.freeze({
       id: incidentId,
+      priority: typeof incident.priority === "string" ? incident.priority : null,
       incident_no: incident.incident_no,
       cctv_name: incident.cctv_name,
       hazard_type: incident.hazard_type,

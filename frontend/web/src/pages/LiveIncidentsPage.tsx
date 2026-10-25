@@ -1,3 +1,5 @@
+import { hideIncident, restoreHiddenIncidents } from "../incidentVisibility";
+import { incidentLabel } from "../incidentLabel";
 /**
  * 후속-03 · 관제 웹 실제 사건관리 화면
  * 목록 API → 사건 ID 선택 → 상세/판단 근거 → 관리자 확인 → 기존 기관 전달 모달.
@@ -18,6 +20,7 @@ import {
   formatSeoulTime,
   getServerIncident,
   incidentErrorMessage,
+  requestWebApi,
   listServerIncidents,
   loadIncidentImageUrl,
   type IncidentDetailDto,
@@ -67,15 +70,6 @@ function periodStart(period: Period): string | undefined {
   }
 
   return start.toISOString();
-}
-
-function JsonDetails({ title, data }: { title: string; data: unknown }) {
-  return (
-    <details className="live-json">
-      <summary>{title}</summary>
-      <pre>{JSON.stringify(data, null, 2)}</pre>
-    </details>
-  );
 }
 
 type DetectionBox = {
@@ -190,7 +184,7 @@ function RepresentativeImage({
                 setUrl(null);
                 setImageSize(null);
               }}
-              alt={`${incident.incident_no} 사건 대표 JPEG`}
+              alt={`${incidentLabel(incident)} 사건 대표 JPEG`}
             />
 
             {imageSize && detectionBox && (
@@ -272,6 +266,19 @@ export function LiveIncidentsPage({
   const [loadingList, setLoadingList] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [llmBusy, setLlmBusy] = useState(false);
+  const [llmResult, setLlmResult] = useState<{status:string;text:string}|null>(null);
+  useEffect(() => { setLlmResult(null); setLlmBusy(false); }, [detail?.id]);
+  const explainWithLlm = async () => {
+    if (!detail || llmBusy) return;
+    setLlmBusy(true);
+    try {
+      const result = await requestWebApi<{status:string;text:string}>(session.version,
+        `/api/demo/v5/incidents/${detail.id}/explain`, { method: 'POST' });
+      setLlmResult(result);
+    } catch { setLlmResult({status:'ERROR',text:'LLM 설명 요청 실패 · API/설정을 확인해주세요.'}); }
+    finally { setLlmBusy(false); }
+  };
 
   const isAdmin = session.user.role === "CONTROL_ADMIN";
 
@@ -353,6 +360,11 @@ export function LiveIncidentsPage({
   }, [session.version, selectedId, refreshKey]);
 
   // PATCH 후 서버를 다시 조회합니다. 충돌(409) 때는 같은 PATCH를 자동 재시도하지 않습니다.
+  const hideSelected = () => {
+    if (!detail || !isAdmin) return;
+    hideIncident(session.version, detail.id);
+    setList(null); onSelect(null); onRefresh();
+  };
   const changeStatus = async (operation: "confirm" | "false-positive") => {
     if (!detail || updating || !isAdmin) {
       return;
@@ -363,6 +375,11 @@ export function LiveIncidentsPage({
 
     try {
       await changeServerIncident(session.version, detail.id, operation);
+      if (operation === "false-positive") show({
+        title: "오탐 처리 완료",
+        body: "오탐 처리된 사건을 이번 로그인 세션의 목록에서 제거하시겠습니까? DB와 전달 이력은 보존됩니다.",
+        confirm: "목록에서 숨김", onConfirm: hideSelected,
+      });
     } catch (error) {
       setDetailError(incidentErrorMessage(error));
     } finally {
@@ -378,7 +395,7 @@ export function LiveIncidentsPage({
 
     show({
       title: operation === "confirm" ? "사건 확인" : "오탐 처리",
-      body: `${detail.incident_no} 사건을 ${
+      body: `${incidentLabel(detail)} 사건을 ${
         operation === "confirm" ? "확인" : "오탐"
       } 처리할까요?`,
       confirm: operation === "confirm" ? "사건 확인" : "오탐 처리",
@@ -404,6 +421,7 @@ export function LiveIncidentsPage({
           </h2>
 
           <span className="subtle">탐지 시각 기준 · 한국시간</span>
+          {isAdmin && <button className="secondary" onClick={() => { restoreHiddenIncidents(session.version); onRefresh(); }}>직접 숨긴 사건 복원</button>}
         </div>
 
         <div className="filters live-filters">
@@ -529,9 +547,9 @@ export function LiveIncidentsPage({
                       onSelect(row.id);
                     }
                   }}
-                  aria-label={`${row.incident_no} 상세 보기`}
+                  aria-label={`${incidentLabel(row)} 상세 보기`}
                 >
-                  <td>{row.incident_no}</td>
+                  <td>{incidentLabel(row)}</td>
                   <td>{hazardLabel(row.hazard_type)}</td>
 
                   <td>
@@ -601,7 +619,7 @@ export function LiveIncidentsPage({
 
           <h2>
             {detail
-              ? `${hazardLabel(detail.hazard_type)} · ${detail.incident_no}`
+              ? `${hazardLabel(detail.hazard_type)} · ${incidentLabel(detail)}`
               : "선택 사건 상세"}
           </h2>
         </div>
@@ -760,6 +778,11 @@ export function LiveIncidentsPage({
                       오탐 처리
                     </button>
                   )}
+                  <button className="secondary" onClick={() => show({
+                    title: '사건 숨김',
+                    body: '이 로그인 세션의 웹 목록에서만 숨깁니다. DB 사건·기관·경로·알림 이력은 삭제하지 않습니다.',
+                    confirm: '사건 숨김', onConfirm: hideSelected,
+                  })}>사건 숨김</button>
                 </div>
               )}
             </section>
@@ -821,23 +844,17 @@ export function LiveIncidentsPage({
               </div>
 
               <p className="content-footnote">
-                규칙: {detail.rule_version ?? "분석 결과 없음"}
+                {detail.risk_breakdown_json?.demo_simulation ? '시연용 가상 위험도 · 실제 관측 기반 점수 아님' : '규칙: ' + (detail.rule_version ?? '분석 결과 없음')}
               </p>
 
-              {detail.risk_breakdown_json && (
-                <JsonDetails
-                  title="위험도 계산 근거·외부 Context"
-                  data={detail.risk_breakdown_json}
-                />
-              )}
-
-              {detail.priority_breakdown_json && (
-                <JsonDetails
-                  title="우선순위 계산 근거"
-                  data={detail.priority_breakdown_json}
-                />
-              )}
-
+              <div className="live-llm-explanation">
+                <p><strong>AI 분석 설명</strong> · LLM 결과는 저장된 점수를 변경하지 않습니다.</p>
+                {isAdmin && <button className="secondary" disabled={llmBusy || detail.risk_score == null} onClick={() => void explainWithLlm()}>
+                  {llmBusy ? 'LLM 설명 생성 중…' : 'LLM 설명 생성'}
+                </button>}
+                {llmResult ? <p role="status">{llmResult.status === 'OK' ? 'LLM 설명: ' : 'LLM 상태: '}{llmResult.text}</p> :
+                  <p>{detail.risk_score == null ? '분석 결과 저장 대기 중입니다.' : '저장된 위험도에 대한 설명은 버튼을 눌러 생성할 수 있습니다.'}</p>}
+              </div>
               {detail.analysis_status === "PENDING" && (
                 <p>분석 결과가 아직 저장되지 않았습니다.</p>
               )}
@@ -864,11 +881,12 @@ export function LiveIncidentsPage({
                 : "우리 기관에 전달된 사건의 저장 경로와 대응 정보를 조회할 수 있습니다."}
             </p>
 
+            {isAdmin && detail.status === "DETECTED" && <p>추천 기관은 지금 조회할 수 있습니다. 실제 전달은 위의 ‘사건 확인’ 처리 후 가능합니다.</p>}
             {isAdmin && (
               <button
                 className="primary"
                 disabled={
-                  updating || !["CONFIRMED", "SENT"].includes(detail.status)
+                  updating
                 }
                 onClick={openPicker}
               >

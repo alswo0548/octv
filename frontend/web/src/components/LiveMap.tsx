@@ -1,10 +1,10 @@
 /** 기존 모바일 지도 투영 함수를 재사용해 실제 좌표·경로를 표시합니다. 배경 타일 실패를 별도로 알립니다. */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import {
   makeMapViewport,
   type MapLine,
   type LonLat,
-} from "../../../mobile/src/routeMapMath";
+} from "../mapViewport";
 export type MapMarker = {
   id: number;
   label: string;
@@ -54,12 +54,34 @@ export function LiveMap({
   markers = [],
   selectedId = null,
   onSelect,
+  onMarkerSelect,
 }: {
   lines?: MapLine[];
   markers?: MapMarker[];
   selectedId?: number | null;
   onSelect?: (id: number) => void;
+  onMarkerSelect?: (id: number) => void;
 }) {
+  const [camera, setCamera] = useState({ zoomDelta: 0, dx: 0, dy: 0 });
+  const [hovered, setHovered] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ x: number; y: number; dx: number; dy: number; moved: boolean } | null>(null);
+  const geometryKey = JSON.stringify([lines, markers]);
+  useEffect(() => { setCamera({ zoomDelta: 0, dx: 0, dy: 0 }); setFailed(false); }, [geometryKey]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setCamera(c => {
+        const z = Math.max(-13, Math.min(16, c.zoomDelta + (event.deltaY < 0 ? 1 : -1)));
+        const factor = 2 ** (z - c.zoomDelta);
+        return { zoomDelta: z, dx: c.dx * factor, dy: c.dy * factor };
+      });
+    };
+    svg.addEventListener("wheel", wheel, { passive: false });
+    return () => svg.removeEventListener("wheel", wheel);
+  }, []);
   const [failed, setFailed] = useState(false);
   const goodMarkers = markers.filter(
     (m) =>
@@ -83,15 +105,34 @@ export function LiveMap({
         null,
         820,
         430,
+        camera,
       ),
-    [lines, markers],
+    [geometryKey, camera],
   );
   return (
-    <div className="map-shell">
+    <div className="map-shell" style={{ position: "relative" }}>
+      <button className="secondary" style={{ position: "absolute", right: 12, top: 12, zIndex: 2 }} onClick={() => { setCamera({ zoomDelta: 0, dx: 0, dy: 0 }); setFailed(false); }}>전체보기</button>
       {!view ? (
         <div className="map-empty">표시할 위치 좌표가 없습니다.</div>
       ) : (
         <svg
+          ref={svgRef}
+          style={{ touchAction: "none", cursor: "grab" }}
+          onPointerDown={e => {
+            if (e.button !== 0) return;
+            drag.current = { x: e.clientX, y: e.clientY, dx: camera.dx, dy: camera.dy, moved: false };
+          }}
+          onPointerMove={e => {
+            if (e.buttons === 0) { drag.current = null; return; }
+            const d = drag.current;
+            if (!d) return;
+            const scale = 820 / e.currentTarget.getBoundingClientRect().width;
+            if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) { d.moved = true; e.currentTarget.setPointerCapture(e.pointerId); }
+            setCamera(c => ({ ...c, dx: d.dx + (e.clientX - d.x) * scale, dy: d.dy + (e.clientY - d.y) * scale }));
+          }}
+          onPointerUp={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); else setTimeout(() => { drag.current = null; }, 0); }}
+          onLostPointerCapture={() => { setTimeout(() => { drag.current = null; }, 0); }}
+          onClickCapture={e => { if (drag.current?.moved) { e.preventDefault(); e.stopPropagation(); } }}
           className="road-map"
           viewBox="0 0 820 430"
           role="img"
@@ -117,8 +158,10 @@ export function LiveMap({
                 key={`${path.id}:${index}`}
                 points={path.points}
                 fill="none"
-                stroke={path.id === selectedId ? "#ffe16d" : "#26bad2"}
-                strokeWidth={path.id === selectedId ? 6 : 3}
+                stroke={path.id === selectedId ? "#ffe16d" : ["#26bad2", "#ba99ff", "#60dfa2", "#ffa264"][index % 4]}
+                strokeWidth={path.id === selectedId || path.id === hovered ? 7 : 3}
+                onMouseEnter={() => setHovered(path.id)}
+                onMouseLeave={() => setHovered(null)}
                 onClick={() => onSelect?.(path.id)}
               />
             ))}
@@ -131,23 +174,27 @@ export function LiveMap({
               point && (
                 <g
                   key={marker.id}
+                  className={"incident-pin" + (hovered === marker.id ? " pin-active" : "")}
+                  style={{ color: marker.priority === "P1" ? "#e94c66" : marker.priority === "P2" ? "#ecac35" : marker.priority === "P3" ? "#378acd" : "#b5bdc9" }}
+                  onMouseEnter={() => setHovered(marker.id)}
+                  onMouseLeave={() => setHovered(null)}
                   transform={`translate(${point[0]} ${point[1]})`}
                   role="button"
                   tabIndex={0}
                   aria-label={marker.label}
-                  onClick={() => onSelect?.(marker.id)}
+                  onClick={() => (onMarkerSelect ?? onSelect)?.(marker.id)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") onSelect?.(marker.id);
+                    if (e.key === "Enter") (onMarkerSelect ?? onSelect)?.(marker.id);
                   }}
                 >
-                  <circle
-                    r="11"
-                    fill={marker.priority === "P1" ? "#f49caa" : "#66ddeb"}
-                    stroke="#fff"
-                    strokeWidth="2"
-                  />
+                  <ellipse className="pin-ripple" cx="0" cy="0" rx="21" ry="8" />
+                  <ellipse className="pin-ripple ripple-late" cx="0" cy="0" rx="21" ry="8" />
+                  <g className="pin-body">
+                    <path d="M0 0 C-4 -7 -15 -17 -15 -27 A15 15 0 1 1 15 -27 C15 -17 4 -7 0 0Z" fill="currentColor" />
+                    <text textAnchor="middle" y="-23" fontSize="10" fontWeight="bold" fill="#fff">{marker.priority ?? "사건"}</text>
+                  </g>
                   <text
-                    y="-19"
+                    y="-48"
                     textAnchor="middle"
                     fill="#fff"
                     stroke="#07131d"

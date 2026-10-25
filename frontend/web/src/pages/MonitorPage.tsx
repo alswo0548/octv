@@ -1,3 +1,4 @@
+import { InferencePreview } from "../components/InferencePreview";
 import { useState } from "react";
 
 /** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
@@ -19,7 +20,7 @@ import {
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
 import { DemoV5Video } from "../components/DemoV5Video";
-import { NewIncidentToastV5 } from "../components/NewIncidentToastV5";
+
 import { go } from "../routing/useRoute";
 
 type DemoStartResponse = {
@@ -163,6 +164,21 @@ export function MonitorPage({
     setDemoMessage(null);
 
     try {
+      // Prepare actual coordinate-based external mappings before starting Demo.
+      // This is a backend operation, not a UI/test fixture or a Risk score override.
+      // External data may still be unavailable when official matching is unverified.
+      try {
+        await requestWebApi(
+          session.version,
+          "/api/demo/v5/prepare-mapping",
+          { method: "POST" },
+        );
+      } catch {
+        // Do not prevent the original Demo start when a provider is unavailable.
+        // Missing measurements remain unverified in existing Context/Rule.
+        console.warn("[OCTV Demo] 외부 데이터 매핑 사전 준비 실패");
+      }
+
       const result = await requestWebApi<DemoStartResponse>(
         session.version,
         "/api/demo/start",
@@ -364,6 +380,7 @@ export function MonitorPage({
             />
           ))}
 
+          {c && <InferencePreview key={c.id} session={session} cctvId={c.id} />}
           {c && (
             <div className="status-grid">
               <dl>
@@ -400,7 +417,7 @@ export function MonitorPage({
                   value="Runtime 기준 · 현재 주기 미제공"
                 />
 
-                <Pair label="위험 후보" value="현재 후보 수 미제공" />
+                <Pair label="위험 후보" value="위 실제 추론 프레임 참조 · 시간 검증 중 후보 수와 별개" />
               </dl>
             </div>
           )}
@@ -412,7 +429,7 @@ export function MonitorPage({
           </div>
         </Panel>
       </div>
-      <NewIncidentToastV5 session={session} />
+
     </>
   );
 }
