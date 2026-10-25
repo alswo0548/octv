@@ -8,6 +8,18 @@ import { LiveMap, geometryLines } from "../components/LiveMap";
 import { Badge, type ShowModal } from "../components/Primitives";
 import type { RouteResponse } from "../../../mobile/src/liveRoutes";
 
+type DemoRouteResponse = Omit<RouteResponse, "items"> & {
+  items: (RouteResponse["items"][number] & {
+    demo_traffic?: {
+      type: "SIMULATED_FULL_CLOSURE" | "SIMULATED_DELAY";
+      label: string;
+      reason: string;
+      simulated: boolean;
+    } | null;
+    demo_rank_status?: "EXCLUDED" | "DEPRIORITIZED" | "UNCHANGED" | null;
+  })[];
+};
+
 type Agency = {
   agency_id: number;
   agency_name: string;
@@ -53,7 +65,7 @@ export function LiveRoutesPage({
     agencies.data?.items.find((item) => item.agency_id === agencyId) ??
     agencies.data?.items[0];
 
-  const routes = useOperations<RouteResponse>(
+  const routes = useOperations<DemoRouteResponse>(
     session,
     agency
       ? `/api/routes/incidents/${incidentId}/agencies/${agency.agency_id}`
