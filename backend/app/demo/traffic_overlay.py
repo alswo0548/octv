@@ -54,7 +54,10 @@ def overlay_candidates(incident_id: int, candidates: list[Any]) -> list[dict[str
             copies[index]["demo_rank_status"] = "UNCHANGED"
     return sorted(
         copies,
-        key=lambda item: {"UNCHANGED": 0, "DEPRIORITIZED": 1, "EXCLUDED": 2}.get(
-            item.get("demo_rank_status"), 0
+        key=lambda item: (
+            3 if item.get("disqualify_reason") or item.get("verification_status") == "DISQUALIFIED"
+            else {"UNCHANGED": 0, "DEPRIORITIZED": 1, "EXCLUDED": 2}.get(
+                item.get("demo_rank_status"), 0
+            )
         ),
     )
