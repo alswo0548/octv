@@ -153,7 +153,7 @@ export function SettingsPage({
                 </strong>
               </div>
               <button className="primary" onClick={() => go("targets")}>
-                대상 선택
+                대상 CCTV ON/OFF 설정
               </button>
             </div>
             <dl className="section-gap">

@@ -8,6 +8,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRoute, go } from "./routing/useRoute";
+import { NewIncidentToastV5 } from "./components/NewIncidentToastV5";
 import { WebLayout } from "./layouts/WebLayout";
 import { Modal, type ModalSpec } from "./components/Primitives";
 import { LiveAgencyPicker } from "./components/AgencyPicker";
@@ -175,6 +176,7 @@ export default function App() {
 
   return (
     <>
+      {session && isAdmin && <NewIncidentToastV5 key={session.version} session={session} openIncident={openIncident} />}
       <WebLayout
         page={page}
         title={titles[page]}

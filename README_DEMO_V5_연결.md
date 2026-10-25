@@ -10,7 +10,7 @@
 - Demo 시작: 기상특보/감시 모드만 변경. 가짜 YOLO 탐지나 Incident는 만들지 않습니다.
 
 ## 실제 변경
-신규: `ai/demo_v5/*`, `backend/app/demo_v5_media/*`, `scripts/run_demo_api_v5.py`, `scripts/run_cctv_runtime_v5.py`, `frontend/web/src/components/DemoV5Controls.tsx`, `frontend/web/src/components/DemoV5Video.tsx`, `tests/test_demo_v5_model_router.py`
+신규: `ai/demo_v5/*`, `backend/app/demo_v5_media/*`, `scripts/run_demo_api_v5.py`, `scripts/run_cctv_runtime_v5.py`, `frontend/web/src/components/DemoV5Video.tsx`, `tests/test_demo_v5_model_router.py`
 한 곳만 소규모 수정: `frontend/web/src/pages/MonitorPage.tsx` (시연 버튼과 Demo 전용 뷰어 연결)
 설정: 기존 키 유지하며 `backend/.env`에 Demo 3개 변수만 추가/갱신. `OCTV_YOLO_MODEL_PATH`는 그대로 보존.
 
@@ -39,3 +39,5 @@ v5 승인 HTML의 1초/80% 시각적 시간 검증은 기존 OCTV Runtime의 3�
 - UI는 기존 CCTV 목록에서 카메라를 선택하여 보여주며 3분할 월(wall)은 구현하지 않음.
 - 기존 정상 CCTV 모델은 미설정이어서 임시 Cycle7 적용; 선택된 완성 운영 모델이 있다면 `OCTV_YOLO_MODEL_PATH`에 명시하고 추론·오탐 검증.
 - 이 패치는 새 실행 진입점이므로 배포 시 명령도 신규 진입점으로 변경해야 함.
+
+최신 실행·제한사항: [배포 전 웹 통합 수정 안내](README_PREDEPLOY_20261025.md)

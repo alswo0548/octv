@@ -1,5 +1,5 @@
 import type { CurrentUserDto } from "@octv/shared";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Background } from "../components/Background";
 import { Brand, type ShowModal } from "../components/Primitives";
 import { go } from "../routing/useRoute";
@@ -35,6 +35,11 @@ export function WebLayout({
   onLogout?: () => void;
   user?: CurrentUserDto | null;
 }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const isAdmin = user?.role === "CONTROL_ADMIN";
 
   const visibleMenu = menu.filter(([id]) => !ADMIN_MENU.has(id) || isAdmin);
@@ -73,7 +78,7 @@ export function WebLayout({
 
         <div className="side-foot">
           <div className="signal">
-            <i /> 서버 상태 미확인
+            <i /> 서버 연결은 데이터 조회 시 확인
           </div>
 
           {user && (
@@ -125,10 +130,10 @@ export function WebLayout({
           </div>
 
           <div className="header-right">
-            <time>사건 시각 KST 기준</time>
+            <time dateTime={now.toISOString()}>현재 KST {new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now)}</time>
 
             <span className="signal">
-              <i /> 미확인
+              <i /> 서버 상태는 각 화면 조회 결과 참조
             </span>
 
             {user && <span className="avatar">{avatar}</span>}

@@ -1,12 +1,14 @@
+import { incidentLabel, contextStatus } from "../incidentLabel";
 /**
  * 후속-03 · 상황실 통합관제의 실제 사건 목록
  * 기존 mock 통계·도로 좌표 SVG를 실제 수치·지도인 것처럼 보여주지 않습니다.
  * 기존 Dashboard API의 카드·사건·외부 상태를 기존 통합관제 배치에 연결합니다.
  */
-import { useState } from "react";
-import { hazardLabel } from "@octv/shared";
+import { useEffect, useState } from "react";
+import { hazardLabel, type IncidentDto } from "@octv/shared";
 import { Panel, Pair, Badge } from "../components/Primitives";
-import { formatSeoulTime, type WebIncidentSession } from "../incidentData";
+import { pollWhileVisible } from "../polling";
+import { formatSeoulTime, listServerIncidents, type WebIncidentSession } from "../incidentData";
 import { LiveMap } from "../components/LiveMap";
 import { useOperations } from "../operationsData";
 import { go } from "../routing/useRoute";
@@ -75,7 +77,14 @@ export function LiveOverviewPage({
     10_000,
   );
 
-  const urgent = data?.incidents;
+  const [mapItems, setMapItems] = useState<IncidentDto[]>([]);
+  const [mapError, setMapError] = useState<string | null>(null);
+  useEffect(() => pollWhileVisible(
+    signal => listServerIncidents(session.version, { page: 1, page_size: 1000000 }, signal),
+    { intervalMs: 10000, onValue: result => { setMapItems(result.items.filter(i => !["RESOLVED", "FALSE_POSITIVE"].includes(i.status))); setMapError(null); },
+      onError: () => { setMapItems([]); setMapError("지도 사건 조회 실패 · 연결을 확인해주세요."); } },
+  ), [session.version, revision]);
+  const urgent = { items: mapItems.slice((page-1)*5, page*5), total: mapItems.length, total_pages: Math.ceil(mapItems.length/5) };
   const first = urgent?.items[0];
 
   const external = useOperations<External>(
@@ -102,7 +111,7 @@ export function LiveOverviewPage({
   ) =>
     value?.status === "OK" && value.value != null
       ? String(value.value)
-      : "미확인";
+      : contextStatus(value?.status);
 
   return (
     <>
@@ -169,20 +178,21 @@ export function LiveOverviewPage({
 
       <div className="two-col overview-layout">
         <Panel title="사건 지도 · 우선순위별 현황">
+          {mapError && <p role="alert">{mapError}</p>}
           <LiveMap
-            markers={(urgent?.items ?? []).map((item) => ({
+            markers={mapItems.map((item) => ({
               id: item.id,
-              label: item.incident_no,
+              label: incidentLabel(item),
               longitude: item.longitude,
               latitude: item.latitude,
-              priority: item.priority,
+              priority: item.priority ?? undefined,
             }))}
             onSelect={openIncident}
           />
 
           <p className="type-caption">
             {urgent?.items.length === 0
-              ? "현재 표시할 P1/P2 사건이 없습니다."
+              ? "현재 표시할 진행 사건이 없습니다."
               : "마커를 선택하면 해당 사건의 상세정보로 이동합니다."}
           </p>
         </Panel>
@@ -200,13 +210,13 @@ export function LiveOverviewPage({
                 onClick={() => openIncident(item.id)}
               >
                 <div className="incident-card-top">
-                  <Badge priority={item.priority} />
+                  <Badge priority={item.priority ?? "분석 대기"} />
 
                   <span className="subtle">{item.status}</span>
                 </div>
 
                 <h3>
-                  {hazardLabel(item.hazard_type)} · {item.incident_no}
+                  {hazardLabel(item.hazard_type)} · {incidentLabel(item)}
                 </h3>
 
                 <p>

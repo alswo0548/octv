@@ -1,3 +1,5 @@
+import { hideIncident, restoreHiddenIncidents } from "../incidentVisibility";
+import { incidentLabel } from "../incidentLabel";
 /**
  * 후속-03 · 관제 웹 실제 사건관리 화면
  * 목록 API → 사건 ID 선택 → 상세/판단 근거 → 관리자 확인 → 기존 기관 전달 모달.
@@ -190,7 +192,7 @@ function RepresentativeImage({
                 setUrl(null);
                 setImageSize(null);
               }}
-              alt={`${incident.incident_no} 사건 대표 JPEG`}
+              alt={`${incidentLabel(incident)} 사건 대표 JPEG`}
             />
 
             {imageSize && detectionBox && (
@@ -353,6 +355,11 @@ export function LiveIncidentsPage({
   }, [session.version, selectedId, refreshKey]);
 
   // PATCH 후 서버를 다시 조회합니다. 충돌(409) 때는 같은 PATCH를 자동 재시도하지 않습니다.
+  const hideSelected = () => {
+    if (!detail || !isAdmin) return;
+    hideIncident(session.version, detail.id);
+    setList(null); onSelect(null); onRefresh();
+  };
   const changeStatus = async (operation: "confirm" | "false-positive") => {
     if (!detail || updating || !isAdmin) {
       return;
@@ -363,6 +370,11 @@ export function LiveIncidentsPage({
 
     try {
       await changeServerIncident(session.version, detail.id, operation);
+      if (operation === "false-positive") show({
+        title: "오탐 처리 완료",
+        body: "오탐 처리된 사건을 이번 로그인 세션의 목록에서 제거하시겠습니까? DB와 전달 이력은 보존됩니다.",
+        confirm: "목록에서 숨김", onConfirm: hideSelected,
+      });
     } catch (error) {
       setDetailError(incidentErrorMessage(error));
     } finally {
@@ -378,7 +390,7 @@ export function LiveIncidentsPage({
 
     show({
       title: operation === "confirm" ? "사건 확인" : "오탐 처리",
-      body: `${detail.incident_no} 사건을 ${
+      body: `${incidentLabel(detail)} 사건을 ${
         operation === "confirm" ? "확인" : "오탐"
       } 처리할까요?`,
       confirm: operation === "confirm" ? "사건 확인" : "오탐 처리",
@@ -404,6 +416,7 @@ export function LiveIncidentsPage({
           </h2>
 
           <span className="subtle">탐지 시각 기준 · 한국시간</span>
+          {isAdmin && <button className="secondary" onClick={() => { restoreHiddenIncidents(session.version); onRefresh(); }}>직접 숨긴 사건 복원</button>}
         </div>
 
         <div className="filters live-filters">
@@ -529,9 +542,9 @@ export function LiveIncidentsPage({
                       onSelect(row.id);
                     }
                   }}
-                  aria-label={`${row.incident_no} 상세 보기`}
+                  aria-label={`${incidentLabel(row)} 상세 보기`}
                 >
-                  <td>{row.incident_no}</td>
+                  <td>{incidentLabel(row)}</td>
                   <td>{hazardLabel(row.hazard_type)}</td>
 
                   <td>
@@ -601,7 +614,7 @@ export function LiveIncidentsPage({
 
           <h2>
             {detail
-              ? `${hazardLabel(detail.hazard_type)} · ${detail.incident_no}`
+              ? `${hazardLabel(detail.hazard_type)} · ${incidentLabel(detail)}`
               : "선택 사건 상세"}
           </h2>
         </div>
@@ -824,6 +837,11 @@ export function LiveIncidentsPage({
                 규칙: {detail.rule_version ?? "분석 결과 없음"}
               </p>
 
+              <p><strong>저장된 결과 요약 · 규칙 기반 안내 (LLM 미사용)</strong></p>
+              <p>{detail.risk_score == null
+                ? "분석 결과가 아직 저장되지 않아 위험도를 설명할 수 없습니다."
+                : `${hazardLabel(detail.hazard_type)} 사건의 저장된 위험도는 ${detail.risk_score}점입니다. ${Array.isArray(detail.risk_breakdown_json?.missing) && detail.risk_breakdown_json.missing.length ? "일부 외부 정보가 누락된 잠정 평가이므로 추가 확인이 필요합니다." : "아래 계산 근거에서 반영된 항목을 확인할 수 있습니다."}`}</p>
+              <p>{detail.priority ? `저장된 우선순위는 ${detail.priority}, 우선순위 점수는 ${detail.priority_score ?? "미저장"}점입니다. 실제 계산에 사용된 상세 근거는 아래에 보존돼 있습니다.` : "우선순위 분석 대기 중입니다."}</p>
               {detail.risk_breakdown_json && (
                 <JsonDetails
                   title="위험도 계산 근거·외부 Context"
@@ -844,6 +862,7 @@ export function LiveIncidentsPage({
             </section>
 
             <IncidentContext incident={detail} />
+            {isAdmin && <button className="secondary" onClick={() => show({ title: "사건 삭제 · 화면 숨김", body: "이번 로그인 세션의 사건 목록에서 숨깁니다. 원본 사건·기관·경로·알림은 삭제하지 않으며, 다시 로그인하거나 복원 버튼으로 볼 수 있습니다.", confirm: "목록에서 숨김", onConfirm: hideSelected })}>사건 삭제 (목록 숨김)</button>}
           </div>
 
           <section className="panel page-section live-delivery">
@@ -864,11 +883,12 @@ export function LiveIncidentsPage({
                 : "우리 기관에 전달된 사건의 저장 경로와 대응 정보를 조회할 수 있습니다."}
             </p>
 
+            {isAdmin && detail.status === "DETECTED" && <p>추천 기관은 지금 조회할 수 있습니다. 실제 전달은 위의 ‘사건 확인’ 처리 후 가능합니다.</p>}
             {isAdmin && (
               <button
                 className="primary"
                 disabled={
-                  updating || !["CONFIRMED", "SENT"].includes(detail.status)
+                  updating
                 }
                 onClick={openPicker}
               >

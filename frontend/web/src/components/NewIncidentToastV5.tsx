@@ -1,100 +1,79 @@
-/**
- * 관제 화면에서 새로 생성되는 Incident를 알려주는 읽기 전용 웹 알림.
- * 현재 로그인 세션과 기존 /api/incidents API만 재사용한다.
- * DB, YOLO, VERIFY, 사건화, FCM 코드 변경 없음.
- */
+/** 기존 사건 API만 조회합니다. FCM/알림 DB와 별개인 로그인 세션별 웹 수신함. */
 import { useEffect, useState } from "react";
-import type { IncidentDto, PageDto } from "@octv/shared";
+import { hazardLabel, type IncidentDto, type PageDto } from "@octv/shared";
 import { requestWebApi, type WebIncidentSession } from "../incidentData";
-import { go } from "../routing/useRoute";
+import { incidentLabel } from "../incidentLabel";
+import { pollWhileVisible } from "../polling";
 
-const HAZARD_LABELS: Record<string, string> = {
-  flood: "침수",
-  fallen_tree: "쓰러진 나무",
-  severe_road_damage: "심각한 도로 파손",
-  road_obstacle: "도로 장애물",
-};
-
-export function NewIncidentToastV5({ session }: { session: WebIncidentSession }) {
-  const [notices, setNotices] = useState<IncidentDto[]>([]);
-
+type Notice = { incident: IncidentDto; read: boolean };
+export function NewIncidentToastV5({ session, openIncident }: {
+  session: WebIncidentSession; openIncident: (id: number) => void;
+}) {
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [toast, setToast] = useState<IncidentDto | null>(null);
+  const [archived, setArchived] = useState<number[]>([]);
+  const [opened, setOpened] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    // 현재 웹 관제 화면에 들어온 이후 새로 탐지된 사건만 표시한다.
-    // 이전 시연에서 남은 DB 사건은 알림으로 재표시하지 않는다.
     const since = new Date().toISOString();
     const seen = new Set<number>();
-    const aborter = new AbortController();
-    let closed = false;
-    let pending = false;
-
-    async function check() {
-      if (closed || pending || document.hidden) return;
-      pending = true;
-      try {
-        const q = `/api/incidents?page=1&page_size=100&start=${encodeURIComponent(since)}`;
-        const result = await requestWebApi<PageDto<IncidentDto>>(
-          session.version, q, { signal: aborter.signal },
-        );
-        if (closed) return;
-        const fresh = result.items.filter((item) => !seen.has(item.id));
-        result.items.forEach((item) => seen.add(item.id));
-        if (fresh.length) {
-          // 최대 3건의 최신 알림만 남기고, 같은 Incident의 갱신은 중복 통지하지 않는다.
-          setNotices((old) => [...old, ...fresh].slice(-3));
-        }
-      } catch {
-        // 인증·네트워크 오류로 관제 화면 전체를 막지 않는다.
-        // 기존 로그인/사건조회 오류 처리는 변경하지 않는다.
-      } finally {
-        pending = false;
+    return pollWhileVisible(async signal => {
+      // 조회 기간 내 모든 페이지를 읽어 우선순위 정렬·100건 제한으로 누락되지 않게 합니다.
+      const items: IncidentDto[] = [];
+      let page = 1;
+      for (;;) {
+        const result = await requestWebApi<PageDto<IncidentDto>>(session.version,
+          `/api/incidents?page=${page}&page_size=100&start=${encodeURIComponent(since)}`, { signal });
+        items.push(...result.items);
+        if (items.length >= result.total || !result.items.length) break;
+        page++;
       }
-    }
-
-    void check();
-    const interval = window.setInterval(() => void check(), 4000);
-    const onVisible = () => { if (!document.hidden) void check(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      closed = true;
-      aborter.abort();
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+      let archivedIds: number[] = [];
+      try {
+        const archive = await requestWebApi<{archived_ids: number[]}>(session.version, "/api/demo/v5/archive-scope", { signal });
+        archivedIds = archive.archived_ids;
+      } catch { /* Standard API without the optional v5 extension. */ }
+      return { items, archivedIds };
+    }, {
+      intervalMs: 4000,
+      onValue: ({items, archivedIds}) => {
+        setArchived(archivedIds);
+        setError(null);
+        const fresh = items.filter(i => !seen.has(i.id) && !archivedIds.includes(i.id)).sort((a,b) => a.id-b.id);
+        items.forEach(i => seen.add(i.id));
+        setNotices(old => {
+          const updated = old.map(n => ({ ...n, incident: items.find(i => i.id === n.incident.id) ?? n.incident }));
+          return [...updated, ...fresh.map(incident => ({ incident, read: false }))].slice(-100);
+        });
+        if (fresh.length) setToast(fresh[fresh.length-1]);
+      },
+      onError: () => setError("신규 사건 조회 실패 · 연결과 로그인 상태를 확인해주세요."),
+    });
   }, [session.version]);
-
-  if (!notices.length) return null;
-
-  return (
-    <aside
-      aria-label="새 재난 사건 알림"
-      aria-live="polite"
-      style={{ position: "fixed", right: 20, bottom: 20, zIndex: 1200,
-        width: "min(370px, calc(100vw - 40px))", display: "grid", gap: 10 }}
-    >
-      {notices.map((item) => (
-        <div key={item.id} role="status"
-          style={{ padding: "14px 16px", border: "1px solid #4e8399",
-            borderRadius: 12, background: "#12232e", color: "#f0f7fc",
-            boxShadow: "0 7px 30px #0008" }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <strong>🚨 새 재난 사건 #{item.id}</strong>
-            <button type="button" aria-label={`사건 ${item.id} 알림 닫기`}
-              onClick={() => setNotices((old) => old.filter((x) => x.id !== item.id))}
-              style={{ color: "inherit", background: "transparent", border: 0, cursor: "pointer" }}
-            >×</button>
-          </div>
-          <p style={{ margin: "8px 0" }}>
-            {HAZARD_LABELS[item.hazard_type] ?? item.hazard_type} · {item.cctv_name}
-          </p>
-          <small>탐지 신뢰도 {(item.confidence * 100).toFixed(1)}%</small>
-          <div style={{ marginTop: 10 }}>
-            <button type="button" className="primary" onClick={() => go("incidents")}>
-              사건관리에서 확인
-            </button>
-          </div>
-        </div>
-      ))}
-    </aside>
-  );
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+  function open(item: IncidentDto) {
+    setNotices(old => old.map(n => n.incident.id === item.id ? { ...n, read: true } : n));
+    setToast(null); setOpened(false); openIncident(item.id);
+  }
+  return <div style={{ position: "fixed", right: 24, top: 88, zIndex: 900 }}>
+    <button className="secondary" aria-label="신규 사건 알림" aria-expanded={opened} onClick={() => setOpened(v => !v)}>
+      알림 {notices.filter(n => !n.read).length}
+    </button>
+    {toast && <div role="status" className="panel" style={{ padding: 16, maxWidth: 420 }}>
+      <button onClick={() => open(toast)}>새 사건 · {incidentLabel(toast)} · {hazardLabel(toast.hazard_type)}</button>
+    </div>}
+    {opened && <section className="panel" aria-label="최근 사건 알림 목록" style={{ padding: 16, width: 360, maxHeight: "65vh", overflowY: "auto" }}>
+      <strong>이번 로그인 이후 신규 사건</strong>
+      <p>최대 100건 · 로그아웃 시 초기화 · 시연 종료 후에도 수신 이력 보존</p>
+      {error && <p role="alert">{error}</p>}
+      {!notices.length && <p>수신한 새 사건이 없습니다.</p>}
+      {[...notices].reverse().map(({incident, read}) => <button key={incident.id} onClick={() => open(incident)} style={{ display: "block", padding: 12, textAlign: "left", width: "100%" }}>
+        {archived.includes(incident.id) ? "종료된 시연 이력" : read ? "읽음" : "새 알림"} · {incidentLabel(incident)}<br/>{hazardLabel(incident.hazard_type)} · {incident.cctv_name}
+      </button>)}
+    </section>}
+  </div>;
 }

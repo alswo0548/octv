@@ -1,3 +1,4 @@
+import { InferencePreview } from "../components/InferencePreview";
 import { useState } from "react";
 
 /** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
@@ -19,7 +20,7 @@ import {
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
 import { DemoV5Video } from "../components/DemoV5Video";
-import { NewIncidentToastV5 } from "../components/NewIncidentToastV5";
+
 import { go } from "../routing/useRoute";
 
 type DemoStartResponse = {
@@ -364,6 +365,7 @@ export function MonitorPage({
             />
           ))}
 
+          {c && <InferencePreview key={c.id} session={session} cctvId={c.id} />}
           {c && (
             <div className="status-grid">
               <dl>
@@ -400,7 +402,7 @@ export function MonitorPage({
                   value="Runtime 기준 · 현재 주기 미제공"
                 />
 
-                <Pair label="위험 후보" value="현재 후보 수 미제공" />
+                <Pair label="위험 후보" value="위 실제 추론 프레임 참조 · 시간 검증 중 후보 수와 별개" />
               </dl>
             </div>
           )}
@@ -412,7 +414,7 @@ export function MonitorPage({
           </div>
         </Panel>
       </div>
-      <NewIncidentToastV5 session={session} />
+
     </>
   );
 }

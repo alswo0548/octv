@@ -1,4 +1,5 @@
 /** 저장된 분석 스냅샷의 관측값·상태만 기존 외부 상황 카드에 표시합니다. 미확인은 0으로 바꾸지 않습니다. */
+import { contextStatus } from "../incidentLabel";
 import { formatSeoulTime, type IncidentDetailDto } from "../incidentData";
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -13,7 +14,7 @@ export function IncidentContext({ incident }: { incident: IncidentDetailDto }) {
     return item.status === "OK" &&
       ["number", "string", "boolean"].includes(typeof item.value)
       ? String(item.value)
-      : "미확인";
+      : contextStatus(item.status);
   };
   return (
     <section className="panel external">
@@ -56,7 +57,7 @@ export function IncidentContext({ incident }: { incident: IncidentDetailDto }) {
         <b>{metric("nearby_hospital_distance_m")} m</b>
       </div>
       <p className="content-footnote">
-        관측 누락·연결 대기는 미확인으로 표시합니다.
+        저장된 수집 상태를 표시합니다. 미수집은 안전 또는 정상 판정을 의미하지 않습니다.
       </p>
     </section>
   );

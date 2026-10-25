@@ -25,11 +25,7 @@ def main() -> None:
 
     model = os.getenv("OCTV_YOLO_MODEL_PATH", "").strip()
     if not model:
-        # Explicit fallback only in this new opt-in runner. No team defaults
-        # or global environment values are permanently modified.
-        model = "demo/videos/_v5/weights/Cycle7.pt"
-        os.environ["OCTV_YOLO_MODEL_PATH"] = model
-        print("[V5] 기존 UTIC 운영 모델이 설정되지 않아 Cycle7 임시 사용. 오탐 검증 필요.")
+        raise RuntimeError("운영 CCTV 모델 미설정: OCTV_YOLO_MODEL_PATH에 기존 승인 운영 모델을 지정해주세요. Demo 모델로 운영 CCTV를 임의 대체하지 않습니다.")
 
     runtime = IncidentAwareCctvDetectionRuntime()
     with get_connection() as conn:
@@ -41,7 +37,10 @@ def main() -> None:
             imgsz=int(os.getenv("OCTV_YOLO_IMGSZ", "640")),
             device=os.getenv("OCTV_YOLO_DEVICE", "cpu"),
         )
-    runtime._yolo_worker.detect_fn = router.detect
+    from ai.demo_v5.session_pipeline import SessionPipeline
+    runtime._incident_pipeline = SessionPipeline(runtime._incident_pipeline, router.routes_by_id)
+    from ai.demo_v5.telemetry import observing_detector
+    runtime._yolo_worker.detect_fn = observing_detector(router.detect)
     print("[V5] 기존 VERIFY/Incident Pipeline 유지, UTIC 3대 + Demo 분기 준비 완료")
 
     def _stop(signum, _frame):

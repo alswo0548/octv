@@ -55,6 +55,7 @@ export function TargetsPage({
     session,
     "/api/cctvs",
     revision,
+    10_000,
   );
 
   const [busy, setBusy] = useState<number | null>(null);
@@ -117,7 +118,7 @@ export function TargetsPage({
         ‹ 시스템 설정으로 돌아가기
       </a>
 
-      <p>대상 CCTV의 수집 연결 상태와 AI 감시 상태를 확인합니다.</p>
+      <p>대상 CCTV의 수집 연결 상태와 AI 감시 상태를 확인합니다. DEMO CCTV는 모니터링 화면의 시연 시작·종료로 일괄 제어합니다.</p>
 
       <Panel title="CCTV 목록">
         <div className="monitor-filter">
@@ -216,7 +217,7 @@ export function TargetsPage({
                       role="switch"
                       aria-label={camera.id + " 감시상태"}
                       checked={camera.is_monitored}
-                      disabled={busy !== null || loading}
+                      disabled={busy !== null || loading || camera.provider === "DEMO"}
                       onChange={() =>
                         show({
                           title: camera.is_monitored

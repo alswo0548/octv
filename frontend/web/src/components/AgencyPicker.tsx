@@ -1,3 +1,4 @@
+import { incidentLabel } from "../incidentLabel";
 /**
  * 기관 선택 창: 연결 전에는 기존 화면을 미리보기로 표시하고 실제 전달을 막습니다.
  * 인증·사건 담당이 delivery.ts에 실제 세션을 연결하면 서버 사건과 추천 기관만 표시합니다.
@@ -323,7 +324,7 @@ function LiveDeliveryPicker({
         <div>
           <span className="eyebrow">실제 전달 대상 · 서버 확인</span>
           <h2>
-            {snapshot ? snapshot.incident.incident_no : "전달 대상 사건 확인"}
+            {snapshot ? incidentLabel(snapshot.incident) : "전달 대상 사건 확인"}
           </h2>
           {snapshot && (
             <p>

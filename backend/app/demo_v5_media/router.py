@@ -106,3 +106,46 @@ def demo_synchronized_start(_admin=Depends(require_control_admin)):
     if issued.tzinfo is None:
         issued = issued.replace(tzinfo=ZoneInfo("Asia/Seoul"))
     return {"active": True, "started_at": issued.isoformat()}
+
+
+@router.get("/archive-scope")
+def demo_archive_scope(_admin=Depends(require_control_admin)):
+    """Presentation archive only: no DELETE/UPDATE and no change to FCM history."""
+    with get_connection() as conn:
+        conn.execute("SET TRANSACTION READ ONLY")
+        rows = conn.execute("""
+            SELECT i.id FROM incidents i JOIN cctvs c ON c.id=i.cctv_id
+            WHERE c.provider='DEMO' AND c.external_cctv_id = ANY(%s)
+              AND NOT EXISTS (
+                SELECT 1 FROM weather_alerts w
+                WHERE w.external_alert_id='DEMO:main_demo:' || c.external_cctv_id
+                  AND w.status='ACTIVE' AND c.is_monitored
+                  AND i.detected_at >= ((w.issued_at AT TIME ZONE 'Asia/Seoul') AT TIME ZONE 'UTC')
+              )
+        """, (list(DEMO_FILES),)).fetchall()
+    return {"archived_ids": [row['id'] for row in rows]}
+
+
+@router.get("/preview/{cctv_id}")
+def inference_preview(cctv_id: int, _admin=Depends(require_control_admin)):
+    import json
+    from ai.demo_v5.telemetry import client
+    with get_connection() as conn:
+        conn.execute("SET TRANSACTION READ ONLY")
+        camera = conn.execute('SELECT is_monitored, provider FROM cctvs WHERE id=%s', (cctv_id,)).fetchone()
+    if camera is None:
+        raise HTTPException(404, 'CCTV 없음')
+    if not camera['is_monitored']:
+        return {'state': 'OFF', 'frame': None}
+    try:
+        value = client().get(f'octv:v5:preview:{cctv_id}')
+    except Exception:
+        raise HTTPException(503, '추론 프레임 조회 연결 실패') from None
+    frame = json.loads(value) if value else None
+    if frame and camera['provider'] == 'DEMO':
+        from datetime import datetime
+        from ai.demo_v5.session_pipeline import active_session
+        started = active_session(cctv_id)
+        if started is None or datetime.fromisoformat(frame['captured_at']) < started:
+            frame = None
+    return {'state': 'READY' if frame else 'NO_RECENT_FRAME', 'frame': frame}

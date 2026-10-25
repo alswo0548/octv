@@ -1,3 +1,4 @@
+import { incidentLabel } from "../incidentLabel";
 /** 기존 경로 비교 레이아웃에 실제 추천 기관·저장 경로를 연결합니다. 경로 재계산·전달 상태 변경은 하지 않습니다. */
 
 import { useState } from "react";
@@ -99,7 +100,7 @@ export function LiveRoutesPage({
         <div>
           <h2>
             {incident.data
-              ? `${incident.data.incident_no} · ${hazardLabel(
+              ? `${incidentLabel(incident.data)} · ${hazardLabel(
                   incident.data.hazard_type,
                 )}`
               : "사건 경로 조회"}{" "}
@@ -133,8 +134,7 @@ export function LiveRoutesPage({
             <button
               className="primary"
               disabled={
-                !incident.data ||
-                !["CONFIRMED", "SENT"].includes(incident.data.status)
+                !incident.data
               }
               onClick={openPicker}
             >
@@ -187,7 +187,7 @@ export function LiveRoutesPage({
             ? [
                 {
                   id: incidentId,
-                  label: incident.data.incident_no,
+                  label: incidentLabel(incident.data),
                   longitude: incident.data.longitude,
                   latitude: incident.data.latitude,
                 },
@@ -195,6 +195,7 @@ export function LiveRoutesPage({
             : []
         }
         onSelect={setSelectedId}
+        onMarkerSelect={() => {}}
       />
 
       {routes.data?.items.some((route) => route.demo_traffic) && (
@@ -266,7 +267,7 @@ export function LiveRoutesPage({
                       ? "시연상 제외"
                       : route.demo_rank_status === "SIMULATED_DELAY"
                         ? "시연상 후순위"
-                        : route.verification_status ?? "미확인"}</td>
+                        : (({ VERIFIED: "검증 완료", NEEDS_REVIEW: "추가 확인 필요", DISQUALIFIED: "제외" } as Record<string, string>)[route.verification_status ?? ""] ?? "평가 대기")}</td>
                 </tr>
               ))}
             </tbody>
