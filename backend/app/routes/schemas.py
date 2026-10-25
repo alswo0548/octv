@@ -9,6 +9,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class DemoTrafficInfo(BaseModel):
+    type: Literal["SIMULATED_FULL_CLOSURE", "SIMULATED_DELAY"]
+    label: str
+    reason: str
+    simulated: bool = True
+
+
 class RouteCandidateResponse(BaseModel):
     id: int
     route_name: str
@@ -23,6 +30,8 @@ class RouteCandidateResponse(BaseModel):
     # 통제 정보 미확인은 안전 확인을 뜻하지 않습니다. NEEDS_REVIEW는 별도 안내가 필요합니다.
     requires_review: bool
     navigation_available: bool
+    demo_traffic: DemoTrafficInfo | None = None
+    demo_rank_status: Literal["EXCLUDED", "DEPRIORITIZED", "UNCHANGED"] | None = None
 
 
 class RouteCandidatesResponse(BaseModel):
