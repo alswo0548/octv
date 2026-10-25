@@ -14,6 +14,8 @@ class DemoTrafficInfo(BaseModel):
     label: str
     reason: str
     simulated: bool = True
+    point: list[float] | None = None
+    delay_sec: int = 0
 
 
 class RouteCandidateResponse(BaseModel):
@@ -31,7 +33,9 @@ class RouteCandidateResponse(BaseModel):
     requires_review: bool
     navigation_available: bool
     demo_traffic: DemoTrafficInfo | None = None
-    demo_rank_status: Literal["EXCLUDED", "DEPRIORITIZED", "UNCHANGED"] | None = None
+    demo_rank_status: Literal["SIMULATED_EXCLUDED", "SIMULATED_DELAY", "ALTERNATIVE"] | None = None
+    demo_total_score: float | None = None
+    demo_duration_sec: int | None = None
 
 
 class RouteCandidatesResponse(BaseModel):
