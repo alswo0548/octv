@@ -13,6 +13,9 @@ import {
 
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { LiveCamera } from "../components/LiveCamera";
+import { DemoV5Controls } from "../components/DemoV5Controls";
+import { DemoV5Video } from "../components/DemoV5Video";
+import { NewIncidentToastV5 } from "../components/NewIncidentToastV5";
 import { go } from "../routing/useRoute";
 
 /**
@@ -58,7 +61,35 @@ export function MonitorPage({
     10_000,
   );
 
-  const rows = (data ?? []).filter(
+  // 시연 시작은 가상 특보와 DEMO CCTV 활성화를 같은 DB 트랜잭션에서 처리한다.
+  // 일반 UTIC는 언제나 보이지만, DEMO 목록은 특보 ACTIVE + 감시 ON일 때만 표시한다.
+  const demoStatus = useOperations<{ active_alert_count: number }>(
+    session,
+    "/api/demo/status",
+    revision,
+    5_000,
+  );
+  // Runtime/video playback is synchronized with the *same* scenario's issued_at.
+  const demoSync = useOperations<{ active: boolean; started_at: string | null }>(
+    session,
+    "/api/demo/v5/sync",
+    revision,
+    5_000,
+  );
+  const activeDemoAlert = (demoStatus.data?.active_alert_count ?? 0) > 0;
+  const startedAt = demoSync.data?.active ? demoSync.data.started_at : null;
+  const visibleCctvs = (data ?? []).filter(
+    (camera) =>
+      camera.provider.toUpperCase() !== "DEMO" ||
+      (activeDemoAlert && camera.is_monitored),
+  ).sort((a, b) => {
+    // Active alerts first; ordinary UTIC selection/order stays untouched.
+    const aAlert = a.provider.toUpperCase() === "DEMO" && a.is_monitored;
+    const bAlert = b.provider.toUpperCase() === "DEMO" && b.is_monitored;
+    return Number(bAlert) - Number(aAlert);
+  });
+
+  const rows = visibleCctvs.filter(
     (camera) =>
       (!errorsOnly || camera.connection_status !== "CONNECTED") &&
       `${camera.external_cctv_id} ${camera.name} ${camera.address ?? ""}`
@@ -72,17 +103,17 @@ export function MonitorPage({
     ) ?? rows[0];
 
   const cards: [string, number | string][] = [
-    ["전체 CCTV", data?.length ?? "–"],
-    ["감시 중", data?.filter((camera) => camera.is_monitored).length ?? "–"],
+    ["전체 CCTV", data ? visibleCctvs.length : "–"],
+    ["감시 중", data ? visibleCctvs.filter((camera) => camera.is_monitored).length : "–"],
     [
       "수집 연결됨",
-      data?.filter((camera) => camera.connection_status === "CONNECTED")
-        .length ?? "–",
+      data ? visibleCctvs.filter((camera) => camera.connection_status === "CONNECTED")
+        .length : "–",
     ],
     [
       "수집 연결 확인 필요",
-      data?.filter((camera) => camera.connection_status !== "CONNECTED")
-        .length ?? "–",
+      data ? visibleCctvs.filter((camera) => camera.connection_status !== "CONNECTED")
+        .length : "–",
     ],
   ];
 
@@ -135,6 +166,17 @@ export function MonitorPage({
         현재 상태 새로고침
       </button>
 
+      {activeDemoAlert && visibleCctvs.some((camera) =>
+        camera.provider.toUpperCase() === "DEMO" && camera.is_monitored &&
+        camera.analysis_status !== "RUNNING"
+      ) && (
+        <p role="alert" style={{ marginBottom: 12 }}>
+          주의: 시연 영상 표시와 YOLO 분석은 별개입니다. 현재 Demo CCTV 중
+          YOLO가 RUNNING이 아닌 기기가 있습니다. v5 CCTV Runtime 창에서
+          [RUNTIME SYNC] started 및 [YOLO WORKER] cctv=4/5/6 로그를 확인해주세요.
+        </p>
+      )}
+
       <div className="monitor-layout">
         <Panel title="CCTV 목록" className="monitor-list-panel">
           <div className="camera-list">
@@ -186,11 +228,20 @@ export function MonitorPage({
           )}
 
           {c && (
-            <LiveCamera
-              key={`${session.version}:${c.id}:${c.is_monitored}`}
-              session={session}
-              camera={c}
-            />
+            c.provider.toUpperCase() === "DEMO" ? (
+              <DemoV5Video
+                key={`${session.version}:${c.id}:${c.is_monitored}`}
+                session={session}
+                camera={c}
+                startedAt={startedAt}
+              />
+            ) : (
+              <LiveCamera
+                key={`${session.version}:${c.id}:${c.is_monitored}`}
+                session={session}
+                camera={c}
+              />
+            )
           )}
 
           {c && (
@@ -241,6 +292,14 @@ export function MonitorPage({
           </div>
         </Panel>
       </div>
+
+      <NewIncidentToastV5 session={session} />
+
+      {/* 기존 CCTV 모니터링을 방해하지 않도록 시연 제어는 맨 아래에 둔다. */}
+      <DemoV5Controls
+        session={session}
+        onChanged={() => setRevision((value) => value + 1)}
+      />
     </>
   );
 }

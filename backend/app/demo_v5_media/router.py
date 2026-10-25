@@ -1,0 +1,108 @@
+"""Demo MP4 playback only; does NOT create or simulate detections or incidents.
+
+A short-lived bearer capability lets a native HTML <video> use HTTP Range
+without putting a login JWT into the video URL. Use only on trusted demo LAN.
+"""
+from __future__ import annotations
+
+import os
+import secrets
+import time
+from pathlib import Path
+from threading import Lock
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
+
+from backend.app.db.session import get_connection
+from backend.app.dependencies import require_control_admin
+
+router = APIRouter(prefix="/api/demo/v5", tags=["Demo v5 playback"])
+ROOT = Path(__file__).resolve().parents[3]
+DEMO_FILES = {
+    "DEMO-N001": "N001_demo.mp4",
+    "DEMO-N002": "N002_demo.mp4",
+    "DEMO-N003": "N003_demo.mp4",
+}
+TOKEN_TTL_SEC = 900
+_tickets: dict[str, tuple[int, float]] = {}
+_lock = Lock()
+
+
+def _file_for_active_demo(cctv_id: int) -> Path:
+    with get_connection() as conn:
+        conn.execute("SET TRANSACTION READ ONLY")
+        row = conn.execute(
+            "SELECT provider, external_cctv_id, stream_url, is_monitored "
+            "FROM cctvs WHERE id=%s", (cctv_id,),
+        ).fetchone()
+    if row is None or row["provider"] != "DEMO":
+        raise HTTPException(404, "Demo CCTV를 찾지 못했습니다.")
+    expected = DEMO_FILES.get(str(row["external_cctv_id"]))
+    if not expected:
+        raise HTTPException(404, "지원하지 않는 Demo CCTV입니다.")
+    if not row["is_monitored"] or row["stream_url"] != expected:
+        raise HTTPException(409, "해당 Demo CCTV가 시작되지 않았습니다.")
+    video_dir = Path(os.getenv("OCTV_DEMO_VIDEO_DIR", "demo/videos"))
+    if not video_dir.is_absolute():
+        video_dir = ROOT / video_dir
+    video_dir = video_dir.resolve()
+    target = (video_dir / expected).resolve()
+    if not target.is_relative_to(video_dir) or not target.is_file():
+        raise HTTPException(404, "Demo 영상이 없습니다.")
+    return target
+
+
+@router.post("/playback/{cctv_id}")
+def grant_playback(cctv_id: int, request: Request, _admin=Depends(require_control_admin)):
+    _file_for_active_demo(cctv_id)
+    now = time.monotonic()
+    token = secrets.token_urlsafe(32)
+    with _lock:
+        stale = [k for k, (_, exp) in _tickets.items() if exp < now]
+        for key in stale:
+            _tickets.pop(key, None)
+        _tickets[token] = (cctv_id, now + TOKEN_TTL_SEC)
+    url = request.url_for("watch_demo_video", cctv_id=cctv_id)
+    return {"url": f"{url}?token={token}", "expires_in": TOKEN_TTL_SEC}
+
+
+@router.get("/watch/{cctv_id}", name="watch_demo_video")
+def watch_demo_video(cctv_id: int, token: str):
+    with _lock:
+        ticket = _tickets.get(token)
+    if ticket is None or ticket[0] != cctv_id or time.monotonic() >= ticket[1]:
+        raise HTTPException(403, "재생 권한이 만료됐습니다. 다시 연결해주세요.")
+    target = _file_for_active_demo(cctv_id)
+    return FileResponse(target, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/sync")
+def demo_synchronized_start(_admin=Depends(require_control_admin)):
+    """Shared scenario timeline for three independent authenticated MP4 players.
+
+    Demo start stores a KST-naive weather_alerts.issued_at in the DB. We attach
+    Asia/Seoul here, so all browser players use one absolute timestamp and late
+    selections jump to the correct playback offset. Read only; no fake events.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from backend.app.demo.service import get_demo_status
+
+    status = get_demo_status()
+    if not status.active:
+        return {"active": False, "started_at": None}
+    with get_connection() as conn:
+        conn.execute("SET TRANSACTION READ ONLY")
+        row = conn.execute(
+            "SELECT MIN(issued_at) AS issued_at, COUNT(*) AS count "
+            "FROM weather_alerts WHERE status='ACTIVE' "
+            "AND external_alert_id LIKE %s",
+            ("DEMO:main_demo:%",),
+        ).fetchone()
+    if not row or row["count"] != 3 or not isinstance(row["issued_at"], datetime):
+        return {"active": False, "started_at": None}
+    issued = row["issued_at"]
+    if issued.tzinfo is None:
+        issued = issued.replace(tzinfo=ZoneInfo("Asia/Seoul"))
+    return {"active": True, "started_at": issued.isoformat()}
