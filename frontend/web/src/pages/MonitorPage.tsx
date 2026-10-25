@@ -164,6 +164,21 @@ export function MonitorPage({
     setDemoMessage(null);
 
     try {
+      // Prepare actual coordinate-based external mappings before starting Demo.
+      // This is a backend operation, not a UI/test fixture or a Risk score override.
+      // External data may still be unavailable when official matching is unverified.
+      try {
+        await requestWebApi(
+          session.version,
+          "/api/demo/v5/prepare-mapping",
+          { method: "POST" },
+        );
+      } catch {
+        // Do not prevent the original Demo start when a provider is unavailable.
+        // Missing measurements remain unverified in existing Context/Rule.
+        console.warn("[OCTV Demo] 외부 데이터 매핑 사전 준비 실패");
+      }
+
       const result = await requestWebApi<DemoStartResponse>(
         session.version,
         "/api/demo/start",

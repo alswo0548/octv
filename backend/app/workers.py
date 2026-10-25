@@ -211,10 +211,12 @@ def analyze_incident(
     )
 
     try:
-        result = run_pipeline(
-            incident_id,
-            get_runtime_config(),
-        )
+        config = get_runtime_config()
+        if os.getenv('OCTV_DEMO_SCENARIO_RISK_ENABLED', '0').strip() == '1':
+            # Only explicit opt-in, approved DEMO v5 sessions; UTIC uses original Rule.
+            from backend.app.demo_v5_media.scenario_risk import scenario_assessor
+            config = {**config, 'risk_assessor': scenario_assessor}
+        result = run_pipeline(incident_id, config)
 
     except (
         httpx.HTTPError,

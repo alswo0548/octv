@@ -176,13 +176,13 @@ export default function App() {
 
   return (
     <>
-      {session && isAdmin && <NewIncidentToastV5 key={session.version} session={session} openIncident={openIncident} />}
       <WebLayout
         page={page}
         title={titles[page]}
         show={setModal}
         onLogout={logout}
         user={session?.user ?? null}
+        notifications={session && isAdmin ? <NewIncidentToastV5 key={session.version} session={session} openIncident={openIncident} /> : null}
       >
         {!canAccessPage ? null : page === "login" || page === "signup" ? (
           <AuthPage key={page} signup={page === "signup"} show={setModal} />

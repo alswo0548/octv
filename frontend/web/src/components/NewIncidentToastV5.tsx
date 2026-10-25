@@ -59,14 +59,14 @@ export function NewIncidentToastV5({ session, openIncident }: {
     setNotices(old => old.map(n => n.incident.id === item.id ? { ...n, read: true } : n));
     setToast(null); setOpened(false); openIncident(item.id);
   }
-  return <div style={{ position: "fixed", right: 24, top: 88, zIndex: 900 }}>
+  return <div className="new-incident-notice">
     <button className="secondary" aria-label="신규 사건 알림" aria-expanded={opened} onClick={() => setOpened(v => !v)}>
       알림 {notices.filter(n => !n.read).length}
     </button>
-    {toast && <div role="status" className="panel" style={{ padding: 16, maxWidth: 420 }}>
+    {toast && <div role="status" className="panel incident-notice-popup" style={{ padding: 16, maxWidth: 420 }}>
       <button onClick={() => open(toast)}>새 사건 · {incidentLabel(toast)} · {hazardLabel(toast.hazard_type)}</button>
     </div>}
-    {opened && <section className="panel" aria-label="최근 사건 알림 목록" style={{ padding: 16, width: 360, maxHeight: "65vh", overflowY: "auto" }}>
+    {opened && <section className="panel incident-notice-dropdown" aria-label="최근 사건 알림 목록" style={{ padding: 16, width: 360, maxHeight: "65vh", overflowY: "auto" }}>
       <strong>이번 로그인 이후 신규 사건</strong>
       <p>최대 100건 · 로그아웃 시 초기화 · 시연 종료 후에도 수신 이력 보존</p>
       {error && <p role="alert">{error}</p>}

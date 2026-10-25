@@ -27,6 +27,7 @@ export function WebLayout({
   show,
   onLogout,
   user,
+  notifications,
 }: {
   page: string;
   title: string;
@@ -34,6 +35,7 @@ export function WebLayout({
   show: ShowModal;
   onLogout?: () => void;
   user?: CurrentUserDto | null;
+  notifications?: ReactNode;
 }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -120,7 +122,7 @@ export function WebLayout({
       </aside>
 
       <main>
-        <header>
+        <header className="octv-global-header">
           <div>
             <div className="eyebrow">
               OCTV <span>/</span> {page.toUpperCase()}
@@ -137,6 +139,7 @@ export function WebLayout({
             </span>
 
             {user && <span className="avatar">{avatar}</span>}
+            {notifications}
           </div>
         </header>
 

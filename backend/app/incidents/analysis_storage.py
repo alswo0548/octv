@@ -104,6 +104,15 @@ def _save_context(connection, state):
         raise ValueError('Context 시각에는 시간대가 필요합니다.')
     measurements = snapshot.measurements
     facility, distance = _facility(state['assessment'])
+    if state['assessment']['risk_breakdown'].get('demo_simulation', {}).get('enabled'):
+        # Demo risk is simulated, but incident_contexts must contain real API data.
+        # Never store a hypothetical distance as a measured facility distance.
+        facility, distance = None, None
+        for field, kind in (('nearby_hospital_distance_m', 'HOSPITAL'),
+                            ('nearby_school_distance_m', 'SCHOOL')):
+            real = _number(snapshot.measurements, field, 100000.0)
+            if real is not None and (distance is None or real < distance):
+                facility, distance = kind, round(real)
     traffic = measurements.get('traffic_level', {})
     road = measurements.get('road_type', {})
     params = {

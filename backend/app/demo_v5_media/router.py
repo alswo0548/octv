@@ -108,6 +108,30 @@ def demo_synchronized_start(_admin=Depends(require_control_admin)):
     return {"active": True, "started_at": issued.isoformat()}
 
 
+@router.get("/mapping-status")
+def demo_mapping_status(_admin=Depends(require_control_admin)):
+    """Inspect safe cached mapping reasons; no network/provider calls or DB changes."""
+    from .mapping import mapping_status
+    try:
+        return mapping_status()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
+@router.post("/prepare-mapping")
+def demo_prepare_mapping(_admin=Depends(require_control_admin)):
+    """Prewarm only approved DEMO mapping into Redis before demo/start.
+
+    Failure never changes the original start endpoint or reinterprets absent
+    water/traffic mappings as valid real-world measurements.
+    """
+    from .mapping import prepare_mapping
+    try:
+        return prepare_mapping()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+
+
 @router.get("/archive-scope")
 def demo_archive_scope(_admin=Depends(require_control_admin)):
     """Presentation archive only: no DELETE/UPDATE and no change to FCM history."""
@@ -149,3 +173,16 @@ def inference_preview(cctv_id: int, _admin=Depends(require_control_admin)):
         if started is None or datetime.fromisoformat(frame['captured_at']) < started:
             frame = None
     return {'state': 'READY' if frame else 'NO_RECENT_FRAME', 'frame': frame}
+
+
+@router.post("/incidents/{incident_id}/explain")
+def explain_incident_v5(incident_id: int, _admin=Depends(require_control_admin)):
+    """LLM is opt-in per click, does not change incidents or make decisions."""
+    from backend.app.incidents.repository import find_detail
+    from .llm_explanation import explain
+    with get_connection() as conn:
+        conn.execute("SET TRANSACTION READ ONLY")
+        incident = find_detail(conn, incident_id)
+    if incident is None:
+        raise HTTPException(404, '사건이 없습니다.')
+    return explain(incident)
