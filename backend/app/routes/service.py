@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 from ..db.session import get_connection
 from . import repository, schemas
+from ..demo.traffic_overlay import overlay_candidates
 
 
 def _valid_path(path: Any) -> bool:
@@ -104,6 +105,19 @@ def list_candidates(
                 result_status = "AVAILABLE"
             else:
                 result_status = "NEEDS_REVIEW"
+
+    # Admin-only presentation overlay. Original scores and DB records are untouched.
+    if is_admin and candidates and incident_id in (4, 5, 19):
+        try:
+            from ..demo.service import get_demo_status
+            from os import getenv
+            if getenv("OCTV_DEMO_ENABLED", "0") == "1" and get_demo_status().active:
+                candidates = [
+                    schemas.RouteCandidateResponse.model_validate(item)
+                    for item in overlay_candidates(incident_id, candidates)
+                ]
+        except (RuntimeError, FileNotFoundError, LookupError):
+            pass
 
     return schemas.RouteCandidatesResponse.model_validate({
         "incident_id": incident_id,
