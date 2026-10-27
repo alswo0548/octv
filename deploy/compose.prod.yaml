@@ -1,0 +1,197 @@
+name: octv-prod
+
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  image: octv-app:${OCTV_RELEASE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.app
+  env_file:
+    - ${OCTV_SECRETS_FILE:-/etc/octv/production.env}
+  restart: unless-stopped
+  working_dir: /app
+  logging: *logs
+  volumes:
+    - type: bind
+      source: ${OCTV_DEMO_ASSETS_DIR:-/srv/octv-assets/demo/videos}
+      target: /app/demo/videos
+      read_only: true
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${OCTV_MODELS_DIR:-/srv/octv-assets/models}
+      target: /app/models
+      read_only: true
+      bind:
+        create_host_path: false
+    # Effective local LangGraph config. Kept outside Git and the Docker build.
+    - type: bind
+      source: ${OCTV_RUNTIME_CONFIG_FILE:-/etc/octv/runtime-config.json}
+      target: /run/octv/runtime-config.json
+      read_only: true
+      bind:
+        create_host_path: false
+
+services:
+  db:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    restart: unless-stopped
+    logging: *logs
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    logging: *logs
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  mediamtx:
+    image: bluenviron/mediamtx:1
+    restart: unless-stopped
+    logging: *logs
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${OCTV_WEBRTC_PUBLIC_IP:?Set OCTV_WEBRTC_PUBLIC_IP}
+      MTX_WEBRTCALLOWORIGINS: https://${OCTV_PUBLIC_HOST:?Set OCTV_PUBLIC_HOST}
+    volumes:
+      - type: bind
+        source: ../mediamtx.yml
+        target: /mediamtx.yml
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      # Loopback only by default; opening public UDP needs explicit approval.
+      - "${OCTV_WEBRTC_UDP_BIND:-127.0.0.1}:8189:8189/udp"
+
+  api:
+    <<: *app
+    environment:
+      # Trust Docker bridge proxy headers from Caddy for HTTPS playback URLs.
+      FORWARDED_ALLOW_IPS: "172.16.0.0/12"
+    command: ["python", "-m", "scripts.run_demo_api_v5", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      mediamtx: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  analysis:
+    <<: *app
+    command: ["python", "-m", "celery", "-A", "backend.app.workers:celery_app", "worker", "-Q", "analysis", "--concurrency=2", "--loglevel=info"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  notifications:
+    <<: *app
+    profiles: ["push"] # opt-in after recipient, JSON credentials and token checks
+    command: ["python", "-m", "celery", "-A", "backend.app.workers:celery_app", "worker", "-Q", "notifications", "--concurrency=1", "--loglevel=info"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    # Overriding x-app.volumes replaces the entire list, so keep all shared
+    # read-only asset/config binds when adding the optional Firebase secret.
+    volumes:
+      - type: bind
+        source: ${OCTV_DEMO_ASSETS_DIR:-/srv/octv-assets/demo/videos}
+        target: /app/demo/videos
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OCTV_MODELS_DIR:-/srv/octv-assets/models}
+        target: /app/models
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OCTV_RUNTIME_CONFIG_FILE:-/etc/octv/runtime-config.json}
+        target: /run/octv/runtime-config.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${OCTV_FIREBASE_ADMIN_FILE:-/etc/octv/firebase-admin.json}
+        target: /run/secrets/firebase-admin.json
+        read_only: true
+        bind:
+          create_host_path: false
+
+  beat:
+    <<: *app
+    profiles: ["push-recovery"] # opt-in only with push recovery enabled
+    command: ["python", "-m", "celery", "-A", "backend.app.workers:celery_app", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+    depends_on:
+      redis: {condition: service_healthy}
+
+  cctv:
+    <<: *app
+    profiles: ["cctv-runtime"] # never auto-start incidentization during stack bring-up
+    command: ["python", "-m", "scripts.run_cctv_runtime_v5"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    image: octv-web:${OCTV_RELEASE_TAG:-local}
+    restart: unless-stopped
+    logging: *logs
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logs
+    environment:
+      OCTV_PUBLIC_HOST: ${OCTV_PUBLIC_HOST:?Set OCTV_PUBLIC_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_started}
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

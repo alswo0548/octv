@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily OCTV PostgreSQL logical backup
+
+[Timer]
+OnCalendar=*-*-* 03:10:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=octv-db-backup.service
+
+[Install]
+WantedBy=timers.target
