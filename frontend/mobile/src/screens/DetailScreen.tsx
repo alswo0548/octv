@@ -4,7 +4,9 @@
  * 주요 기능: 실제 재난·위치·위험도·시각 표시, 미분석 값 구분, 알림 목록 복귀.
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image, ActivityIndicator } from "react-native";
+import { File, Paths } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 import {
   hazardLabel,
   mock,
@@ -57,11 +59,27 @@ type CompletionResponse = {
   incident_status: IncidentDto["status"];
 };
 
+// 모바일 DEMO 3개 모두 서버의 H.264 Main/yuv420p 호환 영상을 우선 사용합니다.
+// 사용자 인증은 기존 JWT 헤더로 유지하고 재생 실패도 명시적으로 표시합니다.
 function DemoIncidentVideo({ source }: { source: VideoSource }) {
-  const player = useVideoPlayer(source, (player) => {
-    player.loop = true;
-    player.play();
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const player = useVideoPlayer(source, (instance) => {
+    instance.loop = true;
+    instance.play();
   });
+  useEffect(() => {
+    const subscription = player.addListener("statusChange", ({ status }) => {
+      if (status === "readyToPlay") {
+        setVideoLoading(false);
+        setVideoError(null);
+      } else if (status === "error") {
+        setVideoLoading(false);
+        setVideoError("영상을 재생할 수 없습니다. 모바일 호환 영상·네트워크 연결을 확인해주세요.");
+      }
+    });
+    return () => subscription.remove();
+  }, [player]);
 
   return (
     <Panel title="CCTV 영상">
@@ -69,15 +87,70 @@ function DemoIncidentVideo({ source }: { source: VideoSource }) {
         player={player}
         nativeControls
         contentFit="contain"
-        style={{
-          width: "100%",
-          aspectRatio: 16 / 9,
-          backgroundColor: "#000",
-        }}
+        style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" }}
       />
-
-      <T muted>이 사건의 DEMO CCTV 원본 영상입니다. 종료된 시연이나 서버 파일 부재 시 재생할 수 없습니다.</T>
+      {videoLoading && <ActivityIndicator color={color.cyan} />}
+      {videoError && <T muted>{videoError}</T>}
+      <T muted>이 기관에 전달된 사건의 원본 촬영 영상을 모바일 재생에 맞게 제공한 화면입니다.</T>
     </Panel>
+  );
+}
+
+// 인증 URL을 Android Image에 직접 전달하면 기기별로 헤더 처리 오류가 날 수 있습니다.
+// JWT를 유지한 채 이미지 바이트를 가져와 앱 전용 캐시에 잠시 저장하고, 화면 이탈 시 지웁니다.
+function AuthorizedIncidentImage({
+  source,
+}: {
+  source: NonNullable<ReturnType<typeof mobileSession.incidentImageSource>>;
+}) {
+  const [localUri, setLocalUri] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const uri = source.uri;
+  const authorization = source.headers.Authorization;
+  useEffect(() => {
+    let stopped = false;
+    const cache = new File(
+      Paths.cache,
+      `octv-incident-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`,
+    );
+    setLocalUri(null);
+    setError(null);
+    void (async () => {
+      try {
+        const response = await expoFetch(uri, {
+          headers: { Authorization: authorization },
+        });
+        if (!response.ok) throw new Error(`IMAGE_HTTP_${response.status}`);
+        const bytes = await response.bytes();
+        if (bytes.length < 4 || bytes[0] !== 255 || bytes[1] !== 216) {
+          throw new Error("NOT_JPEG");
+        }
+        if (stopped) return;
+        cache.write(bytes);
+        if (!stopped) setLocalUri(cache.uri);
+      } catch {
+        if (!stopped) setError("대표 이미지를 표시하지 못했습니다. 연결 상태를 확인해주세요.");
+      }
+    })();
+    return () => {
+      stopped = true;
+      try {
+        if (cache.exists) cache.delete();
+      } catch {
+        // 앱의 캐시 파일은 운영체제가 정리할 수 있습니다.
+      }
+    };
+  }, [uri, authorization]);
+
+  if (error) return <T muted>{error}</T>;
+  if (!localUri) return <ActivityIndicator color={color.cyan} />;
+  return (
+    <Image
+      source={{ uri: localUri }}
+      resizeMode="contain"
+      onError={() => setError("이미지 디코딩에 실패했습니다.")}
+      style={{ width: "100%", height: 200 }}
+    />
   );
 }
 
@@ -114,8 +187,6 @@ function DeliveredIncidentDetail({
   const [completionMessage, setCompletionMessage] = useState<string | null>(
     null,
   );
-  const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [incident.id, incident.representative_image_updated_at]);
 
   const api = session.status === "ready" ? session.api : null;
 
@@ -281,16 +352,10 @@ function DeliveredIncidentDetail({
 
       {incident.representative_image_updated_at && imageSource ? (
         <Panel title="대표 탐지 이미지">
-          {imageFailed ? (
-            <T muted>서버에서 사건 대표 이미지를 불러오지 못했습니다. API /api/incidents/{incident.id}/image 및 저장 여부를 확인해주세요.</T>
-          ) : (
-            <Image
-              source={imageSource}
-              resizeMode="contain"
-              onError={() => setImageFailed(true)}
-              style={{ width: "100%", height: 200 }}
-            />
-          )}
+          <AuthorizedIncidentImage
+            key={`${incident.id}-${incident.representative_image_updated_at}`}
+            source={imageSource}
+          />
         </Panel>
       ) : (
         <Panel title="대표 탐지 이미지">

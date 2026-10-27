@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
 )
 
 from fastapi.responses import FileResponse
@@ -27,6 +28,7 @@ router = APIRouter(
 def get_demo_cctv_video(
     cctv_id: int,
     _user=Depends(get_current_user),
+    mobile_compatible: bool = Query(False),
 ):
     """
     활성화된 Demo CCTV의 MP4 영상을 반환한다.
@@ -56,6 +58,13 @@ def get_demo_cctv_video(
             status_code=500,
             detail=str(exc),
         ) from exc
+
+    # 모바일용 재인코딩 파일이 있을 때만 대체합니다. 원본/Yolo 입력은 보존합니다.
+    # 인증은 동일한 get_current_user()를 거치며 무관한 파일 경로를 열지 않습니다.
+    if mobile_compatible:
+        variant = video_path.with_name(f"{video_path.stem}_mobile{video_path.suffix}")
+        if variant.is_file():
+            video_path = variant
 
     return FileResponse(
         path=video_path,
