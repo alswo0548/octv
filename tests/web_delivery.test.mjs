@@ -463,6 +463,28 @@ describe("WEB 실제 기관 전달 연결", { concurrency: false }, () => {
     assert.equal(posts().length, 1); // 이미 서버로 보낸 POST를 취소했다고 DB rollback으로 해석하지 않습니다.
   });
 
+  it("추천기관 서버 조회 실패는 단계별 메시지로 구분하고 전달 POST는 하지 않는다", async (t) => {
+    const { calls, posts } = connect(t, ({ path }) =>
+      path.endsWith("/recommendations")
+        ? Response.json({ detail: "provider unavailable" }, { status: 503 })
+        : undefined,
+    );
+    await assert.rejects(loadDeliverySnapshot(), hasCode("RECOMMENDATION_LOAD_FAILED"));
+    assert.equal(calls.at(-1).path, "/api/agencies/incidents/42/recommendations");
+    assert.equal(posts().length, 0);
+  });
+
+  it("사건 API 조회 실패 시 추천기관 조회·전달을 진행하지 않는다", async (t) => {
+    const { calls, posts } = connect(t, ({ path }) =>
+      path === "/api/incidents/42"
+        ? Response.json({ detail: "server busy" }, { status: 500 })
+        : undefined,
+    );
+    await assert.rejects(loadDeliverySnapshot(), hasCode("INCIDENT_LOAD_FAILED"));
+    assert.deepEqual(calls.map(c => c.path), ["/api/auth/me", "/api/incidents/42"]);
+    assert.equal(posts().length, 0);
+  });
+
   it("연결 변경을 구독하고 이전 화면 버전의 조회·선택을 거부한다", async (t) => {
     const { api, calls } = connect(t);
     const oldContext = getDeliveryContext();

@@ -100,6 +100,7 @@ def get_dashboard_overview_external_status(
 )
 def get_dashboard_external_status(
     incident_id: int,
+    live: bool = False,
     user=Depends(
         get_current_user
     ),
@@ -116,6 +117,7 @@ def get_dashboard_external_status(
             service.get_external_status(
                 incident_id,
                 user=user,
+                live=live,
             )
         )
 
@@ -130,3 +132,8 @@ def get_dashboard_external_status(
                 "사건을 찾을 수 없습니다."
             ),
         ) from None
+
+@router.get("/integration-evidence")
+def integration_evidence(user=Depends(get_current_user)):
+    """Administrator-only, read-only DB evidence; no external service calls."""
+    return service.get_integration_evidence(user)

@@ -79,9 +79,12 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
     process.env.OCTV_ANDROID_GOOGLE_SERVICES_FILE?.trim() ||
     "./google-services.json";
   const easProjectId = process.env.OCTV_EAS_PROJECT_ID?.trim();
+  // 공개 Native App Key: Kakao Developers 등록 앱과 Android package가 일치해야 합니다.
+  // Expo 네이티브 빌드에서 설정하지 않으면 기존의 안전한 '설정 대기' 안내를 유지합니다.
+  const kakaoNativeAppKey = process.env.OCTV_KAKAO_NATIVE_APP_KEY?.trim();
   const plugins = (config.plugins ?? []).filter((plugin) => {
     const name = typeof plugin === "string" ? plugin : plugin[0];
-    return name !== "expo-notifications" && name !== "expo-secure-store";
+    return name !== "expo-notifications" && name !== "expo-secure-store" && name !== "@react-native-kakao/core";
   });
   let next: ExpoConfig = {
     ...config,
@@ -90,11 +93,23 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
     android: { ...config.android, package: packageName, googleServicesFile },
     plugins: [
       ...plugins,
+      [
+        "expo-build-properties",
+        {
+          android: {
+            extraMavenRepos: [
+              "https://devrepo.kakao.com/nexus/content/groups/public/",
+            ],
+          },
+        },
+      ],
       ["expo-notifications", { defaultChannel: CHANNEL_ID, color: "#82f8fa" }],
       "expo-secure-store",
+      ...(kakaoNativeAppKey ? [["@react-native-kakao/core", { nativeAppKey: kakaoNativeAppKey }] as [string, { nativeAppKey: string }]] : []),
     ],
     extra: {
       ...config.extra,
+      octvKakaoNaviConfigured: !!kakaoNativeAppKey,
       ...(easProjectId
         ? { eas: { ...config.extra?.eas, projectId: easProjectId } }
         : {}),

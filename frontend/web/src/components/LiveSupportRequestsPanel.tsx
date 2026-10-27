@@ -13,6 +13,7 @@ import {
   type WebIncidentSession,
 } from "../incidentData";
 import { pollWhileVisible } from "../polling";
+import { statusLabel } from "../operationsData";
 
 type SupportType = "PERSONNEL" | "EQUIPMENT" | "TRAFFIC_CONTROL" | "OTHER";
 
@@ -227,7 +228,7 @@ export function LiveSupportRequestsPanel({
 
                   <td>{agency.agency_name}</td>
 
-                  <td>{agency.recommendation_status}</td>
+                  <td>{statusLabel(agency.recommendation_status)}</td>
                 </tr>
               ))}
             </tbody>

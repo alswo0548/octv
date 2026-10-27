@@ -29,6 +29,7 @@ import {
   parseNotificationTime,
 } from "../notifications";
 import { VideoView, useVideoPlayer, type VideoSource } from "expo-video";
+import { incidentDisplayNo, incidentStatusLabel, agencyDeliveryStatusLabel } from "../incidentLabel";
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
 function incidentTime(value: string) {
@@ -63,7 +64,7 @@ function DemoIncidentVideo({ source }: { source: VideoSource }) {
   });
 
   return (
-    <Panel title="시연 CCTV 영상">
+    <Panel title="CCTV 영상">
       <VideoView
         player={player}
         nativeControls
@@ -75,7 +76,7 @@ function DemoIncidentVideo({ source }: { source: VideoSource }) {
         }}
       />
 
-      <T muted>DEMO CCTV 시연 영상입니다.</T>
+      <T muted>이 사건의 DEMO CCTV 원본 영상입니다. 종료된 시연이나 서버 파일 부재 시 재생할 수 없습니다.</T>
     </Panel>
   );
 }
@@ -113,6 +114,8 @@ function DeliveredIncidentDetail({
   const [completionMessage, setCompletionMessage] = useState<string | null>(
     null,
   );
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [incident.id, incident.representative_image_updated_at]);
 
   const api = session.status === "ready" ? session.api : null;
 
@@ -258,7 +261,7 @@ function DeliveredIncidentDetail({
       <Badge priority={incident.priority ?? "평가 대기"} />
 
       <Text style={[s.title, { marginTop: 13 }]}>
-        {hazardLabel(incident.hazard_type)} · {incident.incident_no}
+        {hazardLabel(incident.hazard_type)} · {incidentDisplayNo(incident)}
       </Text>
 
       <T muted>{incident.cctv_name}</T>
@@ -276,23 +279,29 @@ function DeliveredIncidentDetail({
         <DemoIncidentVideo key={incident.id} source={demoVideoSource} />
       )}
 
-      {incident.representative_image_updated_at && imageSource && (
+      {incident.representative_image_updated_at && imageSource ? (
         <Panel title="대표 탐지 이미지">
-          <Image
-            source={imageSource}
-            resizeMode="contain"
-            style={{
-              width: "100%",
-              height: 200,
-            }}
-          />
+          {imageFailed ? (
+            <T muted>서버에서 사건 대표 이미지를 불러오지 못했습니다. API /api/incidents/{incident.id}/image 및 저장 여부를 확인해주세요.</T>
+          ) : (
+            <Image
+              source={imageSource}
+              resizeMode="contain"
+              onError={() => setImageFailed(true)}
+              style={{ width: "100%", height: 200 }}
+            />
+          )}
+        </Panel>
+      ) : (
+        <Panel title="대표 탐지 이미지">
+          <T muted>이 사건에 저장된 대표 탐지 이미지가 없습니다.</T>
         </Panel>
       )}
 
       <Panel title="사건 정보">
-        <Pair label="사건 번호" value={incident.incident_no} />
+        <Pair label="사건 번호" value={incidentDisplayNo(incident)} />
 
-        <Pair label="상태" value={incident.status} />
+        <Pair label="상태" value={incidentStatusLabel(incident.status)} />
 
         <Pair label="CCTV" value={incident.cctv_name} />
 
@@ -338,7 +347,7 @@ function DeliveredIncidentDetail({
 
       {isResponder && (
         <Panel title="현장 대응">
-          <Pair label="우리 기관 상태" value={agencyStatus ?? "확인 중"} />
+          <Pair label="우리 기관 상태" value={agencyStatus ? agencyDeliveryStatusLabel(agencyStatus) : "확인 중"} />
 
           {completionMessage && <T muted>{completionMessage}</T>}
 

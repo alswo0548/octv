@@ -457,6 +457,9 @@ def get_external_status_incident(
             c.region_code,
             c.latitude,
             c.longitude,
+            c.provider,
+            c.address,
+            assessment.risk_breakdown_json,
 
             CONCAT_WS(
                 ' ',
@@ -471,6 +474,14 @@ def get_external_status_incident(
 
         LEFT JOIN region AS r
           ON r.region_code = c.region_code
+
+        LEFT JOIN LATERAL (
+            SELECT a.risk_breakdown_json
+            FROM incident_assessments AS a
+            WHERE a.incident_id = i.id
+            ORDER BY a.id DESC
+            LIMIT 1
+        ) AS assessment ON TRUE
 
         WHERE i.id = %s
           AND (
@@ -503,6 +514,10 @@ def get_external_status_incident(
 
         "cctv_id":
             row["cctv_id"],
+
+        "provider": row["provider"],
+        "address": row["address"],
+        "risk_breakdown_json": row["risk_breakdown_json"],
 
         "cctv_name":
             row["cctv_name"],

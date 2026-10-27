@@ -7,6 +7,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Link, T, Button, type ShowDialog } from "../components/UI";
 import { s, color } from "../styles/theme";
+import { mobileSession } from "../mobileSession";
+import { hazardLabel, type IncidentDto } from "@octv/shared";
 import type { Navigate } from "../navigation/types";
 import {
   notificationController,
@@ -41,6 +43,8 @@ export function NotificationScreen({
   );
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [marking, setMarking] = useState(false);
+  const session = useSyncExternalStore(mobileSession.subscribe, mobileSession.getSnapshot, mobileSession.getSnapshot);
+  const [incidentNames, setIncidentNames] = useState<Record<number,string>>({});
   const ready = state.status === "ready" && !!state.user;
   const displayed = state.notifications.filter(
     (item) => !unreadOnly || item.read_at === null,
@@ -51,6 +55,32 @@ export function NotificationScreen({
     setUnreadOnly(false);
     if (ready) void notificationController.listNotifications();
   }, [ready, state.user?.id]);
+
+  // 알림 API에는 사건 유형이 없으므로 본인에게 허용된 사건 상세만 읽기 전용으로 조회합니다.
+  // 최대 4개 동시 조회, 계정이 바뀌면 늦게 도착한 응답을 버립니다. 임의 사건명은 만들지 않습니다.
+  useEffect(() => {
+    const api = session.status === "ready" ? session.api : null;
+    const ids = [...new Set(state.notifications.map((row) => row.incident_id))];
+    setIncidentNames({});
+    if (!api || !ready || state.user?.id !== session.user?.id || ids.length === 0) return;
+    let active = true;
+    let cursor = 0;
+    async function worker() {
+      while (active && cursor < ids.length) {
+        const id = ids[cursor++];
+        try {
+          const incident = await api!<IncidentDto>(`/api/incidents/${id}`);
+          if (active && mobileSession.getSnapshot().api === api && incident.id === id) {
+            setIncidentNames((old) => ({ ...old, [id]: `${hazardLabel(incident.hazard_type)} (사건 ID ${id})` }));
+          }
+        } catch {
+          // 조회 권한이 없거나 서버 장애 시 이름을 지어내지 않고 사건 ID만 남깁니다.
+        }
+      }
+    }
+    void Promise.all(Array.from({ length: Math.min(4, ids.length) }, () => worker()));
+    return () => { active = false; };
+  }, [session.api, session.status, session.user?.id, state.user?.id, state.notifications, ready]);
 
   // 전체 DB가 아니라 현재 화면의 미읽음 알림만 기존 개별 PATCH로 처리합니다.
   async function markDisplayedRead() {
@@ -132,7 +162,7 @@ export function NotificationScreen({
         <Pressable
           key={String(item.id)}
           accessibilityRole="button"
-          accessibilityLabel={`사건 ${item.incident_id} 알림 ${item.read_at ? "읽음" : "미읽음"}`}
+          accessibilityLabel={`${incidentNames[item.incident_id] ?? `사건 ID ${item.incident_id}`} 알림 ${item.read_at ? "읽음" : "미읽음"}`}
           disabled={marking}
           onPress={() => {
             const current = notificationController.getSnapshot();
@@ -147,7 +177,7 @@ export function NotificationScreen({
             <T muted>{item.read_at ? "읽음" : "미읽음"}</T>
           </View>
           <Text style={[s.h2, { marginTop: 12 }]}>
-            사건 ID {item.incident_id}
+            {incidentNames[item.incident_id] ?? `사건 ID ${item.incident_id} · 유형 조회 중`}
           </Text>
           <T muted>{displayTime(item.created_at)}</T>
           <T muted>눌러서 전달된 사건을 확인하세요.</T>

@@ -11,6 +11,7 @@ import {
 } from "../operationsData";
 import { Panel, Pair } from "../components/Primitives";
 import { go } from "../routing/useRoute";
+import { isTestCamera } from "../cameraVisibility";
 export function StatsPage({ session }: { session: WebIncidentSession }) {
   const [start, setStart] = useState(() =>
     seoulDate(new Date(Date.now() - 29 * 86400000)),
@@ -116,7 +117,7 @@ export function StatsPage({ session }: { session: WebIncidentSession }) {
             {Array.from(
               new Map(
                 (cameras.data ?? [])
-                  .filter((c) => c.region_code)
+                  .filter((c) => !isTestCamera(c) && c.region_code)
                   .map((c) => [
                     c.region_code!,
                     `${c.sido_name ?? ""} ${c.sigungu_name ?? c.region_code}`,
@@ -138,7 +139,7 @@ export function StatsPage({ session }: { session: WebIncidentSession }) {
           >
             <option value="">전체 CCTV</option>
             {cameras.data
-              ?.filter((c) => !region || c.region_code === region)
+              ?.filter((c) => !isTestCamera(c) && (!region || c.region_code === region))
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}

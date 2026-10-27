@@ -1,4 +1,6 @@
 import { incidentLabel } from "../incidentLabel";
+import { statusLabel } from "../operationsData";
+import { changeServerIncident, getWebIncidentSession } from "../incidentData";
 /**
  * 기관 선택 창: 연결 전에는 기존 화면을 미리보기로 표시하고 실제 전달을 막습니다.
  * 인증·사건 담당이 delivery.ts에 실제 세션을 연결하면 서버 사건과 추천 기관만 표시합니다.
@@ -230,6 +232,7 @@ function LiveDeliveryPicker({
   const [checked, setChecked] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DeliveryResult | null>(null);
@@ -317,6 +320,24 @@ function LiveDeliveryPicker({
   };
   const canDeliver =
     snapshot && ["CONFIRMED", "SENT"].includes(snapshot.incident.status);
+  const confirmIncident = async () => {
+    if (!snapshot || snapshot.incident.status !== "DETECTED" || confirming || sending) return;
+    setConfirming(true);
+    setError(null);
+    try {
+      // Incident API uses the WEB session version, NOT the modal delivery-context
+      // version. Mixing these caused valid administrator confirmation to fail.
+      const webSession = getWebIncidentSession();
+      if (!webSession || webSession.user.id !== context.userId ||
+          webSession.user.role !== "CONTROL_ADMIN" ||
+          getDeliveryContext()?.version !== context.version) {
+        throw new Error("로그인 또는 사건 선택이 변경됐습니다.");
+      }
+      await changeServerIncident(webSession.version, snapshot.incident.id, "confirm");
+      await reload();
+    } catch (failure) { setError(deliveryErrorMessage(failure)); }
+    finally { setConfirming(false); }
+  };
 
   return (
     <>
@@ -329,7 +350,7 @@ function LiveDeliveryPicker({
           {snapshot && (
             <p>
               {snapshot.incident.cctv_name} · {snapshot.incident.hazard_type} ·{" "}
-              {result?.incident_status ?? snapshot.incident.status}
+              {statusLabel(result?.incident_status ?? snapshot.incident.status)}
             </p>
           )}
         </div>
@@ -347,12 +368,16 @@ function LiveDeliveryPicker({
         </p>
       )}
       {error && <p role="alert">{error}</p>}
-      {snapshot && !canDeliver && (
-        <p role="status">
-          확인된 사건만 전달할 수 있습니다. 기존 사건 확인 절차를 먼저 진행해
-          주세요.
-        </p>
+      {snapshot && snapshot.incident.status === "DETECTED" && (
+        <div className="octv-delivery-confirm" role="status">
+          <p>전달 전 관리자의 사건 확인이 필요합니다. 확인 후 기관 선택이 활성화됩니다.</p>
+          <button className="primary" disabled={confirming || sending} onClick={() => void confirmIncident()}>
+            {confirming ? "사건 확인 처리 중…" : "이 사건 확인하고 전달 준비"}
+          </button>
+        </div>
       )}
+      {snapshot && !canDeliver && snapshot.incident.status !== "DETECTED" &&
+        <p role="status">현재 사건 상태에서는 전달할 수 없습니다.</p>}
       {snapshot && !snapshot.candidates.length && (
         <p>저장된 추천 기관이 없습니다.</p>
       )}
@@ -441,7 +466,7 @@ function LiveDeliveryPicker({
               : "이미 처리된 기관의 상태를 확인했습니다."}
           </h3>
           <p>
-            서버 사건 상태: {result.incident_status} · 앱 내 새 알림{" "}
+            서버 사건 상태: {statusLabel(result.incident_status)} · 앱 내 새 알림{" "}
             {result.created_notification_count}건
           </p>
           <ul>

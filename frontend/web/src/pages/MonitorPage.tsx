@@ -1,4 +1,3 @@
-import { InferencePreview } from "../components/InferencePreview";
 import { useState } from "react";
 
 /** CCTV 목록·상태와 인증된 스트림 준비 API를 기존 모니터링 레이아웃에 연결합니다. */
@@ -22,6 +21,7 @@ import { LiveCamera } from "../components/LiveCamera";
 import { DemoV5Video } from "../components/DemoV5Video";
 
 import { go } from "../routing/useRoute";
+import { isTestCamera } from "../cameraVisibility";
 
 type DemoStartResponse = {
   scenario: string;
@@ -83,6 +83,7 @@ export function MonitorPage({
   const [query, setQuery] = useState("");
   const [errorsOnly, setErrorsOnly] = useState(false);
 
+  const monitoring = useOperations<{base_analysis_interval_sec:number;alert_analysis_interval_sec:number;verify_analysis_interval_sec:number}>(session, "/api/settings/monitoring", revision, 30_000);
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoActive, setDemoActive] = useState(false);
   const [demoMessage, setDemoMessage] = useState<string | null>(null);
@@ -108,9 +109,9 @@ export function MonitorPage({
   const isDemoActive = demoStatus.data?.active ?? demoActive;
   const startedAt = demoSync.data?.active ? demoSync.data.started_at : null;
   const visibleData = (data ?? []).filter(
-    (camera) =>
+    (camera) => !isTestCamera(camera) && (
       camera.provider.trim().toUpperCase() !== "DEMO" ||
-      (activeDemoAlert && camera.is_monitored),
+      (activeDemoAlert && camera.is_monitored)),
   ).sort((a, b) => {
     // Demo cameras first during the scenario; preserve original UTIC order.
     const isActiveDemo = (camera: Cctv) =>
@@ -380,7 +381,6 @@ export function MonitorPage({
             />
           ))}
 
-          {c && <InferencePreview key={c.id} session={session} cctvId={c.id} />}
           {c && (
             <div className="status-grid">
               <dl>
@@ -414,10 +414,9 @@ export function MonitorPage({
 
                 <Pair
                   label="현재 분석 주기"
-                  value="Runtime 기준 · 현재 주기 미제공"
+                  value={monitoring.data ? `${c.monitored_mode === "VERIFY" ? monitoring.data.verify_analysis_interval_sec : c.monitored_mode === "ALERT" ? monitoring.data.alert_analysis_interval_sec : monitoring.data.base_analysis_interval_sec}초 (설정 기준)` : "설정 조회 대기"}
                 />
 
-                <Pair label="위험 후보" value="위 실제 추론 프레임 참조 · 시간 검증 중 후보 수와 별개" />
               </dl>
             </div>
           )}

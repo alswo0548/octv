@@ -1,12 +1,12 @@
 import { hazardLabel } from "@octv/shared";
-import { formatSeoulTime, type WebIncidentSession } from "../incidentData";
-import { useOperations } from "../operationsData";
-type Preview = { state: string; frame: null | {
+import { formatSeoulTime } from "../incidentData";
+
+export type Preview = { state: string; frame: null | {
   captured_at: string; width: number; height: number; image: string;
   detections: { hazard_type: string; confidence: number; bbox: number[]; model_version: string }[];
 } };
-export function InferencePreview({ session, cctvId }: { session: WebIncidentSession; cctvId: number }) {
-  const result = useOperations<Preview>(session, `/api/demo/v5/preview/${cctvId}`, 0, 2000);
+export function InferencePreview({ data, error }: { data: Preview | null; error: string | null }) {
+  const result = {data, error};
   const frame = result.data?.frame;
   return <section className="panel" style={{ padding: 16 }}>
     <h3>실제 YOLO 추론 프레임</h3>

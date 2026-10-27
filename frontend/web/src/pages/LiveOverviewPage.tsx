@@ -1,4 +1,5 @@
 import { incidentLabel, contextStatus } from "../incidentLabel";
+import { mappingStatus } from "../externalDisplay";
 /**
  * 후속-03 · 상황실 통합관제의 실제 사건 목록
  * 기존 mock 통계·도로 좌표 SVG를 실제 수치·지도인 것처럼 보여주지 않습니다.
@@ -7,6 +8,7 @@ import { incidentLabel, contextStatus } from "../incidentLabel";
 import { useEffect, useState } from "react";
 import { hazardLabel, type IncidentDto } from "@octv/shared";
 import { Panel, Pair, Badge } from "../components/Primitives";
+import { statusLabel } from "../operationsData";
 import { pollWhileVisible } from "../polling";
 import { formatSeoulTime, listServerIncidents, type WebIncidentSession } from "../incidentData";
 import { LiveMap } from "../components/LiveMap";
@@ -55,7 +57,12 @@ type External = {
     value: number | null;
   };
   focused_monitoring_cctv_count: number;
+  blocked_lane_count?: { status: string; value: number | null } | null;
+  mapping_state?: Record<string, string>;
   last_received_at: string | null;
+  external_data_source?: "LIVE_MCP" | "SAVED_SNAPSHOT" | "SAVED_FALLBACK";
+  live_checked_at?: string | null;
+  nearby_traffic_event_count?: number | null;
 };
 
 export function LiveOverviewPage({
@@ -67,6 +74,7 @@ export function LiveOverviewPage({
 }) {
   const [revision, setRevision] = useState(0);
   const [page, setPage] = useState(1);
+  const [mapReset, setMapReset] = useState(0);
 
   const isAdmin = session.user.role === "CONTROL_ADMIN";
 
@@ -84,12 +92,19 @@ export function LiveOverviewPage({
     { intervalMs: 10000, onValue: result => { setMapItems(result.items.filter(i => !["RESOLVED", "FALSE_POSITIVE"].includes(i.status))); setMapError(null); },
       onError: () => { setMapItems([]); setMapError("지도 사건 조회 실패 · 연결을 확인해주세요."); } },
   ), [session.version, revision]);
-  const urgent = { items: mapItems.slice((page-1)*5, page*5), total: mapItems.length, total_pages: Math.ceil(mapItems.length/5) };
-  const first = urgent?.items[0];
+  const ordered = [...mapItems].sort((a, b) => {
+    const weights: Record<string, number> = { P1: 0, P2: 1, P3: 2 };
+    const weight = (priority: string | null | undefined) => weights[priority ?? ""] ?? 3;
+    return weight(a.priority) - weight(b.priority) ||
+      (Number(b.risk_score ?? -1) - Number(a.risk_score ?? -1)) ||
+      Date.parse(b.detected_at) - Date.parse(a.detected_at);
+  });
+  const urgent = { items: ordered.slice((page-1)*5, page*5), total: ordered.length, total_pages: Math.ceil(ordered.length/5) };
+  const first = ordered[0];
 
   const external = useOperations<External>(
     session,
-    first ? `/api/dashboard/incidents/${first.id}/external-status` : null,
+    first ? `/api/dashboard/incidents/${first.id}/external-status?live=true` : null,
     revision,
     60_000,
   );
@@ -177,9 +192,18 @@ export function LiveOverviewPage({
       </div>
 
       <div className="two-col overview-layout">
-        <Panel title="사건 지도 · 우선순위별 현황">
+        <Panel
+          title="사건 지도 · 우선순위별 현황"
+          action={
+            <button className="secondary" onClick={() => setMapReset(n => n + 1)}>
+              전체보기
+            </button>
+          }
+        >
           {mapError && <p role="alert">{mapError}</p>}
           <LiveMap
+            showResetButton={false}
+            resetSignal={mapReset}
             markers={mapItems.map((item) => ({
               id: item.id,
               label: incidentLabel(item),
@@ -212,7 +236,7 @@ export function LiveOverviewPage({
                 <div className="incident-card-top">
                   <Badge priority={item.priority ?? "분석 대기"} />
 
-                  <span className="subtle">{item.status}</span>
+                  <span className="subtle">{statusLabel(item.status)}</span>
                 </div>
 
                 <h3>
@@ -251,8 +275,9 @@ export function LiveOverviewPage({
         </Panel>
       </div>
 
-      <Panel title="외부 상황">
+      <Panel title={first ? `외부 상황 · 최우선 사건 ${incidentLabel(first)}` : "외부 상황"}>
         {external.error && <p role="alert">{external.error}</p>}
+        {first && <p className="content-footnote">{first.priority ?? "우선순위 대기"} · 위험도 {first.risk_score ?? "분석 대기"} · 진행 중인 최우선 사건 1건의 정보만 표시합니다.</p>}
 
         <div className="weather-alert info-strip">
           <span>☂</span>
@@ -281,16 +306,32 @@ export function LiveOverviewPage({
 
           <Pair
             label="도로 통제"
-            value={metric(external.data?.road_control_count)}
+            value={external.data?.road_control_count?.status === "NO_MAPPING" &&
+              external.data?.mapping_state?.traffic === "NEEDS_ROAD_DIRECTION_VERIFICATION"
+                ? "촬영 도로·방향 미검증 · 통제 미확정"
+                : metric(external.data?.road_control_count)}
           />
 
           <Pair
-            label="집중 감시 CCTV"
+            label="주변 교통 돌발 · 참고"
+            value={external.data?.nearby_traffic_event_count == null
+              ? "참고정보 확인 불가"
+              : `${external.data.nearby_traffic_event_count}건 · 해당 도로 통제 여부는 미확정`}
+          />
+          <Pair
+            label="차단 차로 수 · 검증된 관측값"
+            value={external.data?.blocked_lane_count?.status === "NO_MAPPING" &&
+              external.data?.mapping_state?.traffic === "NEEDS_ROAD_DIRECTION_VERIFICATION"
+                ? "도로 링크·차로 수 검증 필요"
+                : metric(external.data?.blocked_lane_count ?? undefined)}
+          />
+          <Pair
+            label="특보 집중감시 CCTV"
             value={external.data?.focused_monitoring_cctv_count ?? "미확인"}
           />
 
           <Pair
-            label="최근 수집"
+            label={external.data?.external_data_source === "LIVE_MCP" ? "MCP 최신 조회 시각" : "외부 분석 저장 시각"}
             value={
               external.data?.last_received_at
                 ? formatSeoulTime(external.data.last_received_at)
@@ -299,6 +340,16 @@ export function LiveOverviewPage({
           />
         </dl>
 
+        {first && <p className="content-footnote">
+          자동 매핑 · 기상 {mappingStatus(external.data?.mapping_state?.weather)} / 수위 {mappingStatus(external.data?.mapping_state?.water)} / 교통 {mappingStatus(external.data?.mapping_state?.traffic)}
+          <br />{external.data?.external_data_source === "LIVE_MCP"
+            ? `MCP 최신 조회 성공 · ${external.data.live_checked_at ? formatSeoulTime(external.data.live_checked_at) : "조회 시각 미확인"} (최대 약 3분간 결과 재사용)`
+            : external.data?.external_data_source === "SAVED_FALLBACK"
+              ? "MCP 최신 조회 실패 · 아래 값은 과거 LangGraph 분석에 저장된 관측값입니다."
+              : "LangGraph 저장 관측값 · MCP 최신 조회 대기"}
+          <br />표시 수치는 각 외부기관의 실제 관측 시각을 따르며, 새 조회 자체가 새 관측값을 보장하지 않습니다. 특보 집중감시 수는 ALERT 모드 CCTV만 셉니다.
+          <br />검증되지 않은 도로통제·차단 차로는 숫자를 추정하지 않습니다.
+        </p>}
         {isAdmin && (
           <div className="quick-links">
             <button className="secondary" onClick={() => go("monitor")}>

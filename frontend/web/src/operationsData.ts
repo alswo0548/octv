@@ -130,9 +130,26 @@ export const stateLabels: Record<string, string> = {
   MEDIUM: "보통",
   LOW_RISK: "낮음",
   UNASSESSED: "분석 대기",
+  PENDING: "분석 대기",
+  READY: "분석 완료",
+  PROCESSING: "처리 중",
+  NEEDS_REVIEW: "추가 확인 필요",
+  RECOMMENDED: "추천됨",
+  DELIVERED: "전달됨",
+  COMPLETED: "대응 완료",
+  OFF: "중지",
+  IDLE: "대기",
+  QUEUED: "작업 등록",
+  VERIFIED: "검증 완료",
+  DISQUALIFIED: "제외",
+  PARTIAL: "부분 완료",
+  NO_ROUTES: "경로 없음",
+  NO_CANDIDATES: "후보 없음",
+  NOT_FOUND: "조회 결과 없음",
+  UNKNOWN: "상태 미확인",
 };
 export function statusLabel(value: string | null) {
-  return value ? (stateLabels[value] ?? value) : "미확인";
+  return value ? (stateLabels[value] ?? (/^[A-Z][A-Z0-9_]*$/.test(value) ? "확인 필요" : value)) : "미확인";
 }
 export function seoulDate(value = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

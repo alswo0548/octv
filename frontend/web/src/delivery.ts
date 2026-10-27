@@ -91,6 +91,9 @@ const messages = {
   INVALID_RESPONSE: "서버 응답을 확인할 수 없습니다. 다시 조회해 주세요.",
   LOAD_FAILED:
     "서버 정보를 불러오지 못했습니다. 연결을 확인하고 다시 조회해 주세요.",
+  AUTH_CHECK_FAILED: "사용자 권한 재확인 API 오류 · /api/auth/me 응답을 확인해주세요.",
+  INCIDENT_LOAD_FAILED: "사건 상세 조회 실패 · /api/incidents/{id} 응답을 확인해주세요.",
+  RECOMMENDATION_LOAD_FAILED: "추천 기관 조회 실패 · /api/agencies/incidents/{id}/recommendations 응답을 확인해주세요.",
   DELIVERY_UNCONFIRMED:
     "전달 결과 확인이 필요합니다. 기관 전달 상태를 다시 조회해 주세요.",
 } as const;
@@ -328,16 +331,30 @@ export async function loadDeliverySnapshot(
   ) {
     throw new DeliveryError("SESSION_CHANGED");
   }
+  // Each GET is verified independently. A failed read does not POST, confirm,
+  // create notifications or retry. The UI reports which authorized read failed.
   try {
-    await verifyAdmin(session);
+    try {
+      await verifyAdmin(session);
+    } catch (failure) {
+      const known = asDeliveryError(failure);
+      throw known.code === "LOAD_FAILED" ? new DeliveryError("AUTH_CHECK_FAILED") : known;
+    }
     const id = session.context.incidentId;
-    const [incident, candidates] = await Promise.all([
-      request<unknown>(session, `/api/incidents/${id}`),
-      request<unknown>(
-        session,
-        `/api/agencies/incidents/${id}/recommendations`,
-      ),
-    ]);
+    let incident: unknown;
+    try {
+      incident = await request<unknown>(session, `/api/incidents/${id}`);
+    } catch (failure) {
+      const known = asDeliveryError(failure);
+      throw known.code === "LOAD_FAILED" ? new DeliveryError("INCIDENT_LOAD_FAILED") : known;
+    }
+    let candidates: unknown;
+    try {
+      candidates = await request<unknown>(session, `/api/agencies/incidents/${id}/recommendations`);
+    } catch (failure) {
+      const known = asDeliveryError(failure);
+      throw known.code === "LOAD_FAILED" ? new DeliveryError("RECOMMENDATION_LOAD_FAILED") : known;
+    }
     assertCurrent(session);
     const snapshot = parseSnapshot(incident, candidates, id);
     snapshots.set(snapshot, { session, attempted: false });

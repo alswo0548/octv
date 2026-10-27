@@ -12,6 +12,7 @@ import { mobileSession } from "../mobileSession";
 import type { Navigate } from "../navigation/types";
 import { Badge, T, Link, Button } from "../components/UI";
 import { s, color } from "../styles/theme";
+import { incidentDisplayNo } from "../incidentLabel";
 
 type ListData = {
   ownerApi: NonNullable<ReturnType<typeof mobileSession.getSnapshot>["api"]>;
@@ -42,7 +43,7 @@ function LiveIncidentCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${incident.incident_no} 사건 상세`}
+      accessibilityLabel={`${incidentDisplayNo(incident)} 사건 상세`}
       onPress={open}
       style={({ pressed }) => [
         s.panel,
@@ -58,7 +59,7 @@ function LiveIncidentCard({
         <Text style={[s.muted, { color: "#b9d1df" }]}>● 전달받은 사건</Text>
       </View>
       <Text style={[s.h2, { marginTop: 15, marginBottom: 4 }]}>
-        {hazardLabel(incident.hazard_type)} · {incident.incident_no}
+        {hazardLabel(incident.hazard_type)} · {incidentDisplayNo(incident)}
       </Text>
       <T muted>{incident.cctv_name}</T>
       <View
