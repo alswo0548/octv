@@ -3,7 +3,7 @@
     encode zstd gzip
     # Demo playback tickets are URL bearer tokens; do not send them as Referer.
     header {
-        Referrer-Policy "no-referrer"
+        Referrer-Policy "origin"
         X-Content-Type-Options "nosniff"
     }
     handle /api/* {
