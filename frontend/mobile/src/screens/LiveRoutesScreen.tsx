@@ -20,6 +20,7 @@ import {
 import { LiveRouteMap } from "../components/LiveRouteMap";
 import { openKakaoNavi } from "../kakaoNavi";
 import type { Navigate } from "../navigation/types";
+import { incidentDisplayNo } from "../incidentLabel";
 
 function resultMessage(status: RouteResponse["result_status"]): string {
   switch (status) {
@@ -128,7 +129,7 @@ export function LiveRoutesScreen({
       route.verification_status !== "VERIFIED" || route.requires_review;
     show({
       title: needsReview ? "도로 통제·안전 확인 필요" : "카카오내비 안내",
-      body: `${needsReview ? "선택 경로는 추가 확인이 필요합니다. " : ""}카카오내비는 현 위치에서 목적지로 새 경로를 탐색할 수 있으며 OCTV 후보와 동일 경로를 보장하지 않습니다. 안내를 열까요?`,
+      body: `${needsReview ? "선택 경로는 도로 통제·안전 확인이 필요합니다. " : ""}카카오내비로 연동하시겠습니까?`,
       confirm: "카카오내비 열기",
       onConfirm: () => {
         setBusy(true);
@@ -173,7 +174,7 @@ export function LiveRoutesScreen({
     <>
       <View style={s.info}>
         <T>
-          사건 {incident.incident_no} · {incident.cctv_name}
+          사건 {incidentDisplayNo(incident)} · {incident.cctv_name}
         </T>
         <T muted>
           현재 기관: {session.user?.agency_name ?? "소속기관 확인 필요"}
@@ -255,12 +256,9 @@ export function LiveRoutesScreen({
           <Button disabled={!!blocked || busy} onPress={confirmNavi}>
             {busy
               ? "카카오내비 연결 중…"
-              : "선택 경로 목적지 카카오내비로 안내받기 ↗"}
+              : "카카오내비로 연동하기 ↗"}
           </Button>
-          <T muted>
-            카카오내비는 현재 위치에서 목적지까지 자체 경로를 계산합니다. OCTV
-            후보 경로를 강제로 적용하지 않습니다.
-          </T>
+
         </>
       )}
       <Button secondary onPress={() => go("detail")}>

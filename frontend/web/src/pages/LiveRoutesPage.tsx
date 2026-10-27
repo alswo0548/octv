@@ -1,4 +1,5 @@
 import { incidentLabel } from "../incidentLabel";
+import { statusLabel } from "../operationsData";
 /** 기존 경로 비교 레이아웃에 실제 추천 기관·저장 경로를 연결합니다. 경로 재계산·전달 상태 변경은 하지 않습니다. */
 
 import { useState } from "react";
@@ -87,6 +88,15 @@ export function LiveRoutesPage({
   const lines = (routes.data?.items ?? []).flatMap((route) =>
     geometryLines(route.id, route.route_path_json),
   );
+  // Stored path endpoints only: choose the endpoint farther from the incident
+  // for the agency marker. Never invent an unprovided coordinate.
+  const activeLine = lines.find(line => line.id === active?.id);
+  const endpoints = activeLine?.coords.length ? [activeLine.coords[0], activeLine.coords[activeLine.coords.length-1]] : [];
+  const agencyEndpoint = incident.data && endpoints.length === 2
+    ? [...endpoints].sort((a, b) =>
+        Math.hypot(b[0] - incident.data!.longitude, b[1] - incident.data!.latitude) -
+        Math.hypot(a[0] - incident.data!.longitude, a[1] - incident.data!.latitude))[0]
+    : null;
 
   const error = incident.error ?? agencies.error ?? routes.error;
 
@@ -119,6 +129,7 @@ export function LiveRoutesPage({
         <p role="status">저장된 경로 조회 중</p>
       )}
 
+      <section className="panel page-section octv-route-heading">
       <div className="section-title">
         <h2>{isAdmin ? "기관별 추천경로" : "우리 기관 경로"}</h2>
 
@@ -143,7 +154,6 @@ export function LiveRoutesPage({
           )}
         </div>
       </div>
-
       <div
         className="agency-tabs"
         role="tablist"
@@ -163,8 +173,8 @@ export function LiveRoutesPage({
 
             <small>
               {isAdmin
-                ? `추천 ${item.recommendation_rank}순위 · ${item.recommendation_status}`
-                : item.recommendation_status}
+                ? `추천 ${item.recommendation_rank}순위 · ${statusLabel(item.recommendation_status)}`
+                : statusLabel(item.recommendation_status)}
             </small>
           </button>
         ))}
@@ -178,8 +188,11 @@ export function LiveRoutesPage({
         현재 조회: <strong>{agency?.agency_name ?? "미선택"}</strong> →{" "}
         {incident.data?.cctv_name ?? "사건 위치"}
       </p>
+      </section>
 
       <LiveMap
+        controls={false}
+        emphasizeRoutes
         lines={lines}
         selectedId={active?.id}
         markers={
@@ -190,7 +203,15 @@ export function LiveRoutesPage({
                   label: incidentLabel(incident.data),
                   longitude: incident.data.longitude,
                   latitude: incident.data.latitude,
+                  kind: "incident" as const,
                 },
+                ...(agencyEndpoint && agency ? [{
+                  id: 1000000 + agency.agency_id,
+                  label: `${agency.agency_name} · 저장 경로 시작점`,
+                  longitude: agencyEndpoint[0],
+                  latitude: agencyEndpoint[1],
+                  kind: "agency" as const,
+                }] : []),
               ]
             : []
         }
@@ -216,7 +237,6 @@ export function LiveRoutesPage({
                   "후보",
                   "거리 / 시간",
                   "총점",
-                  "추천 근거 및 확인 정보",
                   "판정",
                 ].map((text) => (
                   <th key={text}>{text}</th>
@@ -242,7 +262,7 @@ export function LiveRoutesPage({
                     }
                   }}
                 >
-                  <td>{route.route_name}</td>
+                  <td>{(routes.data?.items ?? []).findIndex(item => item.id === route.id) + 1}</td>
 
                   <td>
                     {(route.distance_m / 1000).toFixed(1)} km /{" "}
@@ -256,12 +276,6 @@ export function LiveRoutesPage({
                     )}
                   </td>
 
-                  <td>
-                    {route.demo_traffic?.reason ?? route.disqualify_reason ??
-                      (route.requires_review
-                        ? "통제 정보 추가 확인 필요"
-                        : "저장된 경로 평가")}
-                  </td>
 
                   <td>{route.demo_rank_status === "SIMULATED_EXCLUDED"
                       ? "시연상 제외"
@@ -275,7 +289,7 @@ export function LiveRoutesPage({
         </div>
 
         {routes.data?.items.length === 0 && (
-          <p>저장된 경로가 없습니다. ({routes.data.result_status})</p>
+          <p>저장된 경로가 없습니다. ({statusLabel(routes.data.result_status)})</p>
         )}
 
         {active && (

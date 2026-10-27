@@ -1,12 +1,16 @@
 /** 저장된 분석 스냅샷의 관측값·상태만 기존 외부 상황 카드에 표시합니다. 미확인은 0으로 바꾸지 않습니다. */
 import { contextStatus } from "../incidentLabel";
-import { formatSeoulTime, type IncidentDetailDto } from "../incidentData";
+import { mappingStatus } from "../externalDisplay";
+import { useOperations } from "../operationsData";
+import { formatSeoulTime, type IncidentDetailDto, type WebIncidentSession } from "../incidentData";
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-export function IncidentContext({ incident }: { incident: IncidentDetailDto }) {
+type ExternalMapStatus = { mapping_state?: Record<string, string>; last_received_at: string | null };
+export function IncidentContext({ incident, session }: { incident: IncidentDetailDto; session: WebIncidentSession }) {
+  const mapped = useOperations<ExternalMapStatus>(session, `/api/dashboard/incidents/${incident.id}/external-status`, 0, 30_000);
   const snapshot = record(incident.risk_breakdown_json?.context_snapshot);
   const measurements = record(snapshot.measurements);
   const metric = (key: string) => {
@@ -57,8 +61,14 @@ export function IncidentContext({ incident }: { incident: IncidentDetailDto }) {
         <b>{metric("nearby_hospital_distance_m")} m</b>
       </div>
       <p className="content-footnote">
-        저장된 수집 상태를 표시합니다. 미수집은 안전 또는 정상 판정을 의미하지 않습니다.
+        저장된 분석 시점의 수집 상태입니다. 미수집은 안전 또는 정상 판정이 아닙니다.
       </p>
+      {mapped.error ? <p role="alert">사건별 매핑 조회 실패 · {mapped.error}</p> : (
+        <p className="content-footnote">
+          자동 매핑 확인 · 기상: {mappingStatus(mapped.data?.mapping_state?.weather)} / 수위: {mappingStatus(mapped.data?.mapping_state?.water)} / 교통: {mappingStatus(mapped.data?.mapping_state?.traffic)}
+          <br/>외부 API 실제 수집은 사건 분석 Worker와 별도로 검증해야 합니다.
+        </p>
+      )}
     </section>
   );
 }

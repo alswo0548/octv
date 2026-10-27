@@ -48,7 +48,8 @@ export function WebLayout({
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : "";
   const profileName = user?.name ?? "";
-  const avatar = profileName.trim().charAt(0) || "O";
+  // 기관 계정 표시명에 대괄호 등 기호가 있어도 아바타에는 글자만 표시합니다.
+  const avatar = profileName.match(/[가-힣A-Za-z0-9]/u)?.[0]?.toUpperCase() ?? "O";
 
   return (
     <>
@@ -133,10 +134,6 @@ export function WebLayout({
 
           <div className="header-right">
             <time dateTime={now.toISOString()}>현재 KST {new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now)}</time>
-
-            <span className="signal">
-              <i /> 서버 상태는 각 화면 조회 결과 참조
-            </span>
 
             {user && <span className="avatar">{avatar}</span>}
             {notifications}

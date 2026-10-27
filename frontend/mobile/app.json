@@ -10,6 +10,12 @@
     },
     "ios": {
       "supportsTablet": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "57f10872-dae0-49f5-a6c9-a7648ce8b9e9"
+      }
+    },
+    "owner": "alswo0548"
   }
 }

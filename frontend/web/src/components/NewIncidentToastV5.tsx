@@ -67,13 +67,16 @@ export function NewIncidentToastV5({ session, openIncident }: {
       <button onClick={() => open(toast)}>새 사건 · {incidentLabel(toast)} · {hazardLabel(toast.hazard_type)}</button>
     </div>}
     {opened && <section className="panel incident-notice-dropdown" aria-label="최근 사건 알림 목록" style={{ padding: 16, width: 360, maxHeight: "65vh", overflowY: "auto" }}>
-      <strong>이번 로그인 이후 신규 사건</strong>
-      <p>최대 100건 · 로그아웃 시 초기화 · 시연 종료 후에도 수신 이력 보존</p>
+      <strong>알림</strong>
       {error && <p role="alert">{error}</p>}
       {!notices.length && <p>수신한 새 사건이 없습니다.</p>}
-      {[...notices].reverse().map(({incident, read}) => <button key={incident.id} onClick={() => open(incident)} style={{ display: "block", padding: 12, textAlign: "left", width: "100%" }}>
-        {archived.includes(incident.id) ? "종료된 시연 이력" : read ? "읽음" : "새 알림"} · {incidentLabel(incident)}<br/>{hazardLabel(incident.hazard_type)} · {incident.cctv_name}
-      </button>)}
+      {[...notices].reverse().map(({incident, read}) => <div className="octv-notice-row" key={incident.id}>
+        <button className="octv-notice-main" onClick={() => open(incident)}>
+          <span>{archived.includes(incident.id) ? "종료된 시연" : read ? "읽음" : "새 알림"} · {incidentLabel(incident)}</span>
+          <small>{hazardLabel(incident.hazard_type)} · {incident.cctv_name}</small>
+        </button>
+        <button className="octv-notice-dismiss" type="button" aria-label={`${incidentLabel(incident)} 알림 삭제`} title="이 목록에서 삭제" onClick={() => setNotices(old => old.filter(n => n.incident.id !== incident.id))}>×</button>
+      </div>)}
     </section>}
   </div>;
 }

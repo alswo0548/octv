@@ -12,6 +12,7 @@ import { mobileSession } from "../mobileSession";
 import { Badge, Button, Field, T, type ShowDialog } from "../components/UI";
 import { s, color } from "../styles/theme";
 import type { Navigate } from "../navigation/types";
+import { incidentDisplayNo, agencyDeliveryStatusLabel } from "../incidentLabel";
 
 type SupportType = "PERSONNEL" | "EQUIPMENT" | "TRAFFIC_CONTROL" | "OTHER";
 type SupportItem = {
@@ -257,13 +258,13 @@ export function LiveSupportRequestScreen({
     <>
       <Badge priority={incident.priority ?? "평가 대기"} />
       <Text style={[s.title, { marginTop: 13 }]}>
-        추가 지원요청 · {incident.incident_no}
+        추가 지원요청 · {incidentDisplayNo(incident)}
       </Text>
       <T muted>기관: {session.user?.agency_name ?? `#${agencyId}`}</T>
       <View style={[s.info, { marginVertical: 16 }]}>
-        <T>현재 기관 전달 상태: {agencyStatus ?? "확인 필요"}</T>
+        <T>현재 기관 전달 상태: {agencyDeliveryStatusLabel(agencyStatus)}</T>
         <T muted>
-          전달 완료(DELIVERED) 상태에서만 추가 요청을 등록할 수 있습니다.
+          기관에 전달된 사건만 추가 지원요청을 등록할 수 있습니다.
         </T>
       </View>
       <T>요청 유형</T>

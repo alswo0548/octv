@@ -18,6 +18,7 @@ import {
 import { Panel, type ShowModal } from "../components/Primitives";
 
 import { go } from "../routing/useRoute";
+import { isTestCamera } from "../cameraVisibility";
 
 /**
  * connection_status는 브라우저의 WebRTC 영상 재생 상태가 아니라
@@ -67,7 +68,7 @@ export function TargetsPage({
   const [query, setQuery] = useState("");
 
   const rows = (data ?? []).filter(
-    (camera) =>
+    (camera) => !isTestCamera(camera) &&
       (!region || camera.region_code === region) &&
       `${camera.external_cctv_id} ${camera.name} ${camera.address ?? ""}`
         .toLowerCase()
@@ -152,7 +153,7 @@ export function TargetsPage({
           <label>
             검색
             <input
-              placeholder="CCTV ID / 이름 / 도로명 검색"
+              placeholder="CCTV ID / 이름 검색"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -167,7 +168,6 @@ export function TargetsPage({
                   "CCTV ID",
                   "CCTV 이름",
                   "설치 지역",
-                  "위치 / 도로명",
                   "수집 연결 상태",
                   "감시 안내",
                   "감시상태",
@@ -187,8 +187,6 @@ export function TargetsPage({
                   <td>
                     {camera.sigungu_name ?? camera.region_code ?? "미확인"}
                   </td>
-
-                  <td>{camera.address ?? "미확인"}</td>
 
                   <td>
                     <span

@@ -107,21 +107,31 @@ main {
   font-size: 12px;
 }
 .overview-layout > .panel {
-  height: clamp(460px, calc(100dvh - 280px), 620px);
+  /* Both cards share the height of their grid row, even as the map resizes. */
+  height: auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
+/* Keep the SVG's native 820:430 aspect ratio in the responsive grid. */
+.overview-layout > .panel:first-child .section-title {
+  gap: 12px;
+}
+.overview-layout > .panel:first-child .section-title > button {
+  flex-shrink: 0;
+}
 .overview-layout .map-shell {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .overview-layout .road-map {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 820 / 430;
   max-height: none;
 }
 .overview-layout .map-caption,
@@ -379,4 +389,31 @@ main {
   .ambient-video {
     display: none;
   }
+}
+
+
+/* 웹 2차 UI 재검수: 공통 제목 박스에 상하좌우 실제 내부 여백 확보. */
+main > header.octv-global-header {
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 18px 24px;
+  gap: 20px;
+  box-sizing: border-box;
+}
+main > header.octv-global-header > div:first-child { min-width: 0; }
+main > header.octv-global-header .header-right { min-width: 0; }
+
+/* 여러 사건이 같은 CCTV 좌표에 있을 때 사건번호가 지도 위에 중첩되지 않도록
+   기본 라벨을 감추고, 마우스/키보드 선택 시에만 표시합니다. 사건 마커 자체는 보존. */
+.incident-pin .incident-pin-label {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+.incident-pin:hover .incident-pin-label,
+.incident-pin:focus-visible .incident-pin-label,
+.incident-pin.pin-active .incident-pin-label { opacity: 1; }
+@media (max-width: 730px) {
+  main > header.octv-global-header { padding: 14px 16px; gap: 10px; }
 }

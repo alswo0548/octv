@@ -14,6 +14,15 @@ import {
 } from "../operationsData";
 import { Panel, Pair, type ShowModal } from "../components/Primitives";
 import { go } from "../routing/useRoute";
+type IntegrationEvidence = {
+  weather: { status: string; detail: string };
+  water: { status: string; detail: string };
+  traffic: { status: string; detail: string };
+  kakao: { status: string; detail: string };
+  fcm: { status: string; detail: string };
+  disclaimer: string;
+};
+
 export function SettingsPage({
   tab = "analysis",
   show,
@@ -30,6 +39,10 @@ export function SettingsPage({
     revision,
   );
   const cameras = useOperations<Cctv[]>(session, "/api/cctvs", revision);
+  const evidence = useOperations<IntegrationEvidence>(
+    session, tab === "integrations" ? "/api/dashboard/integration-evidence" : null,
+    revision, 30_000,
+  );
   const [draft, setDraft] = useState<SettingsValues | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -225,10 +238,7 @@ export function SettingsPage({
                       : "미조회"
                   }
                 />
-                <Pair
-                  label="Runtime 적용"
-                  value="저장 완료와 적용 완료는 별도 확인"
-                />
+
               </dl>
               <button className="text-button" onClick={() => go("monitor")}>
                 CCTV 모니터링 보기 →
@@ -272,22 +282,29 @@ export function SettingsPage({
       ) : (
         <Panel title="외부 서비스 연동 상태">
           <dl>
-            {[
-              "기상청",
-              "수위",
-              "교통",
-              "카카오 경로",
-              "FCM",
-              "CCTV Runtime",
-            ].map((x) => (
-              <Pair
-                key={x}
-                label={x}
-                value={<span className="status check">실연동 확인 대기</span>}
-              />
-            ))}
+            {([
+              ["기상청", "weather"], ["수위", "water"], ["교통", "traffic"],
+              ["카카오 경로", "kakao"], ["FCM", "fcm"],
+            ] as const).map(([name, key]) => {
+              const entry = evidence.data?.[key];
+              return <Pair key={key} label={name} value={
+                <span className={entry?.status === "RECORDED" ? "status detect" : "status check"}>
+                  {entry?.status === "RECORDED" ? "저장 기록 확인" : "실제 응답 미검증"}
+                  <small className="octv-evidence-detail">
+                    {entry?.detail ?? (evidence.loading ? "기록 확인 중" : "증거 조회 필요")}
+                  </small>
+                </span>
+              } />;
+            })}
+            <Pair label="CCTV Runtime" value={cameras.data
+              ? <span className={cameras.data.some(c => c.is_monitored && c.connection_status === "CONNECTED") ? "status detect" : "status check"}>
+                  감시 중 수집 연결 {cameras.data.filter(c => c.is_monitored && c.connection_status === "CONNECTED").length}대
+                </span>
+              : <span className="status check">연결 조회 필요</span>} />
           </dl>
-          <p className="content-footnote">영상 연결 상태를 확인해주세요.</p>
+          {evidence.error && <p role="alert">연동 기록 조회 오류 · {evidence.error}</p>}
+          <p className="content-footnote">{evidence.data?.disclaimer ?? "DB 기록과 실제 API 응답은 구분합니다."} CCTV 수집 연결과 영상 재생도 별도 상태입니다.</p>
+          <button className="secondary" type="button" onClick={() => setRevision(v => v + 1)}>연동 기록 새로고침</button>
           <button className="text-button" onClick={() => go("monitor")}>
             CCTV 모니터링 보기 →
           </button>

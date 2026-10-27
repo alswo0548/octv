@@ -27,6 +27,7 @@ import {
   type WebIncidentSession,
 } from "../incidentData";
 import { IncidentContext } from "../components/IncidentContext";
+import { AgencyRoutePreview } from "../components/AgencyRoutePreview";
 import { statusLabel } from "../operationsData";
 import { pollWhileVisible } from "../polling";
 import { go } from "../routing/useRoute";
@@ -700,7 +701,7 @@ export function LiveIncidentsPage({
             <section className="panel info">
               <div className="section-title">
                 <h2>사건 정보</h2>
-                <span className="tag">{detail.status}</span>
+                <span className="tag">{statusLabel(detail.status)}</span>
               </div>
 
               <dl>
@@ -848,19 +849,18 @@ export function LiveIncidentsPage({
               </p>
 
               <div className="live-llm-explanation">
-                <p><strong>AI 분석 설명</strong> · LLM 결과는 저장된 점수를 변경하지 않습니다.</p>
                 {isAdmin && <button className="secondary" disabled={llmBusy || detail.risk_score == null} onClick={() => void explainWithLlm()}>
-                  {llmBusy ? 'LLM 설명 생성 중…' : 'LLM 설명 생성'}
+                  {llmBusy ? '분석 내용 생성 중…' : '분석 내용 확인'}
                 </button>}
-                {llmResult ? <p role="status">{llmResult.status === 'OK' ? 'LLM 설명: ' : 'LLM 상태: '}{llmResult.text}</p> :
-                  <p>{detail.risk_score == null ? '분석 결과 저장 대기 중입니다.' : '저장된 위험도에 대한 설명은 버튼을 눌러 생성할 수 있습니다.'}</p>}
+                {llmResult?.status === 'OK' ? <p role="status" aria-live="polite" className="octv-llm-answer">{llmResult.text}</p> :
+                  <p role={llmResult ? 'alert' : undefined}>{llmResult?.text ?? '분석 내용을 확인하시려면 ‘분석 내용 확인’을 눌러주세요.'}</p>}
               </div>
               {detail.analysis_status === "PENDING" && (
                 <p>분석 결과가 아직 저장되지 않았습니다.</p>
               )}
             </section>
 
-            <IncidentContext incident={detail} />
+            <IncidentContext incident={detail} session={session} />
           </div>
 
           <section className="panel page-section live-delivery">
@@ -881,7 +881,7 @@ export function LiveIncidentsPage({
                 : "우리 기관에 전달된 사건의 저장 경로와 대응 정보를 조회할 수 있습니다."}
             </p>
 
-            {isAdmin && detail.status === "DETECTED" && <p>추천 기관은 지금 조회할 수 있습니다. 실제 전달은 위의 ‘사건 확인’ 처리 후 가능합니다.</p>}
+            {isAdmin && <AgencyRoutePreview key={`${session.version}:${detail.id}`} session={session} incidentId={detail.id} />}
             {isAdmin && (
               <button
                 className="primary"

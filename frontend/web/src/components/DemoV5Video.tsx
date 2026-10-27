@@ -3,6 +3,7 @@
  * No YOLO/Incident values are simulated in the browser.
  */
 import { useEffect, useRef, useState } from "react";
+import { N001BboxOverlay, type N001OverlayData } from "./N001BboxOverlay";
 import { requestWebApi, type WebIncidentSession } from "../incidentData";
 import { operationsError, type Cctv } from "../operationsData";
 
@@ -15,6 +16,8 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   compact?: boolean;
 }) {
   const [attempt, setAttempt] = useState(0);
+  const n001 = camera.provider.trim().toUpperCase() === "DEMO" && camera.external_cctv_id === "DEMO-N001";
+  const [overlay, setOverlay] = useState<N001OverlayData | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,6 +36,18 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     });
     return () => { disposed = true; };
   }, [session.version, camera.id, camera.is_monitored, startedAt, attempt]);
+
+  // Only N001 uses offline inference metadata aligned to ORIGINAL MP4 time.
+  // Failure or missing data falls back to the unmodified video player.
+  useEffect(() => {
+    let disposed = false;
+    setOverlay(null);
+    if (!n001 || !camera.is_monitored || !startedAt) return;
+    void requestWebApi<N001OverlayData>(session.version, `/api/demo/v5/n001-overlay/${camera.id}`)
+      .then(data => { if (!disposed && data.ready) setOverlay(data); })
+      .catch(() => { /* N001 overlay is optional; never prevent video playback */ });
+    return () => { disposed = true; };
+  }, [n001, camera.id, camera.is_monitored, startedAt, session.version, attempt]);
 
   // A newly opened camera jumps to the *current* scenario position instead
   // of starting the prerecorded file at 00:00.
@@ -86,7 +101,10 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
             ? "시연 영상 공통 시작 시각·재생 주소 확인 중"
             : "시연 시작 전 · 영상 대기"}</p>
         )}
-        <div className="camera-overlay-label">DEMO · {camera.external_cctv_id}</div>
+        {n001 && url && startedAt && overlay?.ready && (
+          <N001BboxOverlay videoRef={videoRef} data={overlay} />
+        )}
+        <div className="camera-overlay-label">DEMO · {camera.external_cctv_id}{n001 && overlay?.ready ? " · 사전 YOLO 시각화" : ""}</div>
       </div>
       {error && <p role="alert">{error}</p>}
       {!compact && (

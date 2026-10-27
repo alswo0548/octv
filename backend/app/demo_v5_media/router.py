@@ -77,6 +77,16 @@ def watch_demo_video(cctv_id: int, token: str):
     return FileResponse(target, media_type="video/mp4", headers={"Cache-Control": "no-store"})
 
 
+@router.get("/n001-overlay/{cctv_id}")
+def n001_visual_overlay(cctv_id: int, _admin=Depends(require_control_admin)):
+    """Precomputed visual-only N001 rectangles (never incident decisions)."""
+    source = _file_for_active_demo(cctv_id)
+    if source.name != "N001_demo.mp4":
+        raise HTTPException(404, "N001 전용 영상 시각화입니다.")
+    from .n001_overlay import read_n001_overlay
+    return read_n001_overlay(source)
+
+
 @router.get("/sync")
 def demo_synchronized_start(_admin=Depends(require_control_admin)):
     """Shared scenario timeline for three independent authenticated MP4 players.
