@@ -17,5 +17,36 @@
     }
 }
 
-# Public WebRTC reverse proxy deliberately DISABLED by default.
-# Enabling the stream hostname requires real access control and test on Android/web.
+# WHEP signaling: CONTROL_ADMIN Bearer JWT required on every non-OPTIONS request.
+# Never proxy the MediaMTX control API (9997), or expose the WHEP port (8889) directly.
+# UDP 8189 is a separate encrypted ICE/DTLS media channel; leave closed until
+# approved client/firewall verification and OCTV_WEBRTC_UDP_BIND configuration.
+stream.{$OCTV_PUBLIC_HOST} {
+    header {
+        Access-Control-Allow-Origin "https://{$OCTV_PUBLIC_HOST}"
+        Access-Control-Allow-Methods "GET, POST, DELETE, PATCH, OPTIONS"
+        Access-Control-Allow-Headers "Authorization, Content-Type"
+        Access-Control-Expose-Headers "Location, ETag, Link"
+        Vary Origin
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+
+    @preflight method OPTIONS
+    handle @preflight {
+        respond "" 204
+    }
+
+    handle {
+        forward_auth api:8000 {
+            uri /api/cctvs/stream-access
+        }
+        reverse_proxy mediamtx:8889 {
+            # One consistent CORS policy from Caddy, not duplicate upstream values.
+            header_down -Access-Control-Allow-Origin
+            header_down -Access-Control-Allow-Methods
+            header_down -Access-Control-Allow-Headers
+            header_down -Access-Control-Expose-Headers
+        }
+    }
+}
