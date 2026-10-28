@@ -6,10 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { N001BboxOverlay, type N001OverlayData } from "./N001BboxOverlay";
 import type { Preview } from "./InferencePreview";
 import { hazardLabel } from "@octv/shared";
-import { formatSeoulTime, requestWebApi, type WebIncidentSession } from "../incidentData";
+import { formatSeoulTime, requestWebApi, loadDemoVideoUrl, type WebIncidentSession } from "../incidentData";
 import { operationsError, type Cctv } from "../operationsData";
-
-type PlaybackInfo = { url: string; expires_in: number };
 
 export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   session: WebIncidentSession;
@@ -24,8 +22,8 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   const [error, setError] = useState<string | null>(null);
   // This mode shows the exact frame analyzed by the running YOLO worker.
   // It never places current detections over a different MP4 playback frame.
-  // An active DEMO starts in genuine YOLO preview mode without a manual click.
-  const [showLiveInference, setShowLiveInference] = useState(() => Boolean(startedAt && camera.is_monitored));
+  // Start every DEMO in synchronized video mode; YOLO preview remains opt-in.
+  const [showLiveInference, setShowLiveInference] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,22 +31,36 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   // Reset the default only when the scenario or selected camera changes.
   // Manual video/inference switching remains available during one session.
   useEffect(() => {
-    setShowLiveInference(Boolean(startedAt && camera.is_monitored));
+    setShowLiveInference(false);
   }, [camera.id, camera.is_monitored, startedAt]);
 
   useEffect(() => {
     let disposed = false;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
     setUrl(null);
     setError(null);
     if (!camera.is_monitored || !startedAt) return;
-    void requestWebApi<PlaybackInfo>(session.version, `/api/demo/v5/playback/${camera.id}`, {
-      method: "POST",
-    }).then((response) => {
-      if (!disposed) setUrl(response.url);
-    }).catch((reason) => {
-      if (!disposed) setError(operationsError(reason));
-    });
-    return () => { disposed = true; };
+    // Use the existing authorized, browser-compatible MP4 variant (H.264)
+    // instead of streaming the large original source with a short-lived ticket.
+    // No DEMO video, YOLO input, incident or backend API behavior is changed.
+    void loadDemoVideoUrl(session.version, camera.id, controller.signal, true)
+      .then((videoUrl) => {
+        if (disposed) {
+          URL.revokeObjectURL(videoUrl);
+          return;
+        }
+        objectUrl = videoUrl;
+        setUrl(videoUrl);
+      })
+      .catch((reason) => {
+        if (!disposed) setError(operationsError(reason));
+      });
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [session.version, camera.id, camera.is_monitored, startedAt, attempt]);
 
   // Only N001 uses offline inference metadata aligned to ORIGINAL MP4 time.
