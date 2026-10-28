@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   loadDemoVideoUrl,
   requestWebApi,
+  getAdminStreamHeaders,
   type WebIncidentSession,
 } from "../incidentData";
 
@@ -46,8 +47,6 @@ export function LiveCamera({
 
   const [playing, setPlaying] = useState(false);
 
-  const [playback, setPlayback] = useState<string | null>(null);
-
   const sourceLabel = camera.provider.toUpperCase().includes("UTIC")
     ? CCTV_SOURCE
     : `${camera.provider} 제공`;
@@ -58,6 +57,7 @@ export function LiveCamera({
     let peer: RTCPeerConnection | null = null;
 
     let resource: string | null = null;
+    let streamHeaders: { Authorization: string } | null = null;
 
     let demoObjectUrl: string | null = null;
 
@@ -107,14 +107,15 @@ export function LiveCamera({
 
       peer = null;
 
-      if (resource) {
+      if (resource && streamHeaders) {
         void fetch(resource, {
           method: "DELETE",
+          headers: streamHeaders,
           keepalive: true,
         }).catch(() => {});
-
         resource = null;
       }
+      streamHeaders = null;
 
       if (demoObjectUrl) {
         URL.revokeObjectURL(demoObjectUrl);
@@ -128,8 +129,6 @@ export function LiveCamera({
     // =====================================================
 
     setPlaying(false);
-    setPlayback(null);
-
     if (!camera.is_monitored) {
       setPhase("감시 OFF · 영상을 준비하지 않습니다.");
 
@@ -241,8 +240,6 @@ export function LiveCamera({
       ) {
         throw new Error("invalid stream response");
       }
-
-      setPlayback(page.href);
 
       setPhase("스트림 준비됨 · 영상 연결 중");
 
@@ -361,11 +358,15 @@ export function LiveCamera({
       // MediaMTX WHEP
       // ===================================================
 
+      // MediaMTX HTTP는 외부 비공개이며 Caddy가 관리자 JWT를 매번 검증합니다.
+      // ICE/DTLS 실제 미디어는 WHEP 인증 협상 뒤에만 연결할 수 있습니다.
+      streamHeaders = getAdminStreamHeaders(session.version);
       const response = await fetch(endpoint, {
         method: "POST",
 
         headers: {
           "Content-Type": "application/sdp",
+          ...streamHeaders,
         },
 
         body: current.localDescription?.sdp,
@@ -519,16 +520,7 @@ export function LiveCamera({
           영상 다시 연결
         </button>
 
-        {playback && (
-          <a
-            className="secondary"
-            href={playback}
-            target="_blank"
-            rel="noreferrer"
-          >
-            영상 서버에서 확인
-          </a>
-        )}
+
       </div>
     </>
   );
