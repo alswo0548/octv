@@ -131,6 +131,16 @@ export function getWebIncidentApi(sessionVersion: number) {
   return active?.visible.version === sessionVersion ? active.api : null;
 }
 
+// 관리자 실시간 CCTV WHEP의 인증용: 기존 JWT를 네이티브 브라우저 fetch의
+// Authorization 헤더에만 전달하며 URL·로그·미디어 서버 응답에는 넣지 않습니다.
+export function getAdminStreamHeaders(sessionVersion: number): { Authorization: string } {
+  const session = requireSession(sessionVersion);
+  if (session.visible.user.role !== "CONTROL_ADMIN") throw new Error("관리자 권한이 필요합니다.");
+  const token = session.getToken();
+  if (!token) throw new Error("로그인 상태를 확인할 수 없습니다.");
+  return { Authorization: `Bearer ${token}` };
+}
+
 export async function disconnectWebIncidentSession(): Promise<void> {
   const current = active;
 

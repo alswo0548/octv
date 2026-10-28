@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     Query,
+    Response,
     status,
 )
 
@@ -76,6 +77,18 @@ def get_cctv_summary(
     return service.get_cctv_summary(
         region_code=region_code,
     )
+
+
+@router.get(
+    "/stream-access",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="관리자 실시간 CCTV WHEP 접근 확인",
+)
+def verify_stream_access(
+    _admin=Depends(require_control_admin),
+):
+    """Caddy forward_auth 전용: 관리자 JWT·활성 계정을 확인한 뒤 본문 없이 허용."""
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
