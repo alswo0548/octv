@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from threading import Lock
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from backend.app.db.session import get_connection
@@ -25,7 +25,7 @@ DEMO_FILES = {
     "DEMO-N003": "N003_demo.mp4",
 }
 TOKEN_TTL_SEC = 900
-_tickets: dict[str, tuple[int, float]] = {}
+_tickets: dict[str, tuple[int, float, bool]] = {}
 _lock = Lock()
 
 
@@ -54,17 +54,25 @@ def _file_for_active_demo(cctv_id: int) -> Path:
 
 
 @router.post("/playback/{cctv_id}")
-def grant_playback(cctv_id: int, request: Request, _admin=Depends(require_control_admin)):
+def grant_playback(
+    cctv_id: int,
+    request: Request,
+    mobile_compatible: bool = Query(False),
+    _admin=Depends(require_control_admin),
+):
+    # This existing JWT-protected endpoint issues a 15-minute, CCTV-bound ticket.
+    # The variant choice is bound to that ticket, never controlled by the GET URL.
     _file_for_active_demo(cctv_id)
     now = time.monotonic()
     token = secrets.token_urlsafe(32)
     with _lock:
-        stale = [k for k, (_, exp) in _tickets.items() if exp < now]
+        stale = [k for k, (_, exp, _) in _tickets.items() if exp < now]
         for key in stale:
             _tickets.pop(key, None)
-        _tickets[token] = (cctv_id, now + TOKEN_TTL_SEC)
+        _tickets[token] = (cctv_id, now + TOKEN_TTL_SEC, mobile_compatible)
+    # Relative origin prevents HTTPS/proxy address mismatches in browser <video>.
     url = request.url_for("watch_demo_video", cctv_id=cctv_id)
-    return {"url": f"{url}?token={token}", "expires_in": TOKEN_TTL_SEC}
+    return {"url": f"{url.path}?token={token}", "expires_in": TOKEN_TTL_SEC}
 
 
 @router.get("/watch/{cctv_id}", name="watch_demo_video")
@@ -74,6 +82,12 @@ def watch_demo_video(cctv_id: int, token: str):
     if ticket is None or ticket[0] != cctv_id or time.monotonic() >= ticket[1]:
         raise HTTPException(403, "재생 권한이 만료됐습니다. 다시 연결해주세요.")
     target = _file_for_active_demo(cctv_id)
+    if ticket[2]:
+        # Progressive H.264/yuv420p copy has the same recording timeline.
+        variant = target.with_name(f"{target.stem}_mobile{target.suffix}")
+        if variant.is_file():
+            target = variant
+    # Starlette FileResponse handles HTTP Range/206 for immediate seek/playback.
     return FileResponse(target, media_type="video/mp4", headers={"Cache-Control": "no-store"})
 
 
