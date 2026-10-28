@@ -89,7 +89,7 @@ def n001_visual_overlay(cctv_id: int, _admin=Depends(require_control_admin)):
 
 @router.get("/sync")
 def demo_synchronized_start(_admin=Depends(require_control_admin)):
-    """Shared scenario timeline for three independent authenticated MP4 players.
+    """Shared scenario timeline for the approved active Demo cameras.
 
     Demo start stores a KST-naive weather_alerts.issued_at in the DB. We attach
     Asia/Seoul here, so all browser players use one absolute timestamp and late
@@ -110,7 +110,7 @@ def demo_synchronized_start(_admin=Depends(require_control_admin)):
             "AND external_alert_id LIKE %s",
             ("DEMO:main_demo:%",),
         ).fetchone()
-    if not row or row["count"] != 3 or not isinstance(row["issued_at"], datetime):
+    if not row or row["count"] != status.case_count or not isinstance(row["issued_at"], datetime):
         return {"active": False, "started_at": None}
     issued = row["issued_at"]
     if issued.tzinfo is None:

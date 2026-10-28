@@ -109,9 +109,14 @@ export function MonitorPage({
   const isDemoActive = demoStatus.data?.active ?? demoActive;
   const startedAt = demoSync.data?.active ? demoSync.data.started_at : null;
   const visibleData = (data ?? []).filter(
-    (camera) => !isTestCamera(camera) && (
-      camera.provider.trim().toUpperCase() !== "DEMO" ||
-      (activeDemoAlert && camera.is_monitored)),
+    (camera) => {
+      if (isTestCamera(camera)) return false;
+      const provider = camera.provider.trim().toUpperCase();
+      // During a rehearsal show only the monitored UTIC cameras. Operators
+      // retain the existing Settings screen for safely choosing the two feeds.
+      if (provider === "UTIC" && isDemoActive && !camera.is_monitored) return false;
+      return provider !== "DEMO" || (activeDemoAlert && camera.is_monitored);
+    },
   ).sort((a, b) => {
     // Demo cameras first during the scenario; preserve original UTIC order.
     const isActiveDemo = (camera: Cctv) =>

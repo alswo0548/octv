@@ -168,11 +168,13 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
             aria-pressed={!showLiveInference} onClick={() => setShowLiveInference(false)}>
             동기화 영상
           </button>
-          <button type="button" className={showLiveInference ? "primary" : "secondary"}
-            aria-pressed={showLiveInference} disabled={!camera.is_monitored || !startedAt}
-            onClick={() => setShowLiveInference(true)}>
-            실제 YOLO 추론 화면
-          </button>
+          {n001 && (
+            <button type="button" className={showLiveInference ? "primary" : "secondary"}
+              aria-pressed={showLiveInference} disabled={!camera.is_monitored || !startedAt}
+              onClick={() => setShowLiveInference(true)}>
+              실제 YOLO 추론 화면
+            </button>
+          )}
         </div>
       )}
       <div className="camera live-camera" style={compact ? { minHeight: 0, aspectRatio: "16 / 9" } : undefined}>
