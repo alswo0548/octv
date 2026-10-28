@@ -241,7 +241,8 @@ function demoVideoSource(incident: IncidentDto) {
   }
 
   return {
-    uri: `${requireServerUrl()}/api/demo/cctvs/${incident.cctv_id}/video`,
+    uri: `${requireServerUrl()}/api/demo/cctvs/${incident.cctv_id}/video?mobile_compatible=true`,
+    contentType: "progressive" as const,
     headers: {
       Authorization: `Bearer ${activeToken}`,
     },
