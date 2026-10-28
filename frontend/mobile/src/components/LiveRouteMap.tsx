@@ -1,6 +1,6 @@
 /**
  * 후속-05 모바일 지도: 기존 react-native-svg와 실제 경로 좌표만 사용합니다.
- * 화면에 필요한 온라인 OpenStreetMap 타일만 로드하며 실패하면 배경과 경로를 분리 표시.
+ * 리허설 모바일 경로 화면은 이용 정책을 확인한 공개 비상업 지도 타일을 사용합니다.
  * 지도 전용 새 네이티브 패키지는 추가하지 않습니다. 경로 계산/판정은 변경하지 않습니다.
  */
 import { useMemo, useState, useEffect } from "react";
@@ -9,11 +9,14 @@ import Svg, { Polyline, Circle } from "react-native-svg";
 import { makeMapViewport, type MapLine, type LonLat } from "../routeMapMath";
 
 const HEIGHT = 245;
-// 다른 타일 제공자는 이용 약관과 출처 표시를 확인한 뒤 빌드 환경변수로 설정합니다.
-// 기본은 기존 OSM이며 403은 앱 내부에서 우회하지 않습니다.
+// 기존 OSM 운영 타일의 403 차단을 다른 서버로 우회하지 않고, 별도 제공자의 공개 이용 정책에 따라 요청합니다.
+// OpenMaps.fr: 비상업적/저용량 사용, 식별 가능한 User-Agent 및 눈에 보이는 출처 표시가 필요합니다.
+// 외부 환경 변수로 다른 승인된 제공자를 설정하는 기존 기능은 유지합니다.
 const tileTemplate = process.env.EXPO_PUBLIC_OCTV_MAP_TILE_URL_TEMPLATE?.trim() ?? "";
 const providerAttribution = process.env.EXPO_PUBLIC_OCTV_MAP_ATTRIBUTION?.trim();
 const alternateTiles = /^https:\/\//.test(tileTemplate) && !!providerAttribution && ["{z}","{x}","{y}"].every((key) => tileTemplate.includes(key));
+const fallbackTileTemplate = "https://tile.openmaps.fr/opentopomap/{z}/{x}/{y}.png";
+const fallbackAttribution = "© OpenTopoMap-R · © OpenStreetMap · openmaps.fr/donate";
 export function LiveRouteMap({
   lines,
   selectedId,
@@ -57,9 +60,10 @@ export function LiveRouteMap({
           key={tile.key}
           onError={() => setTilesFailed(true)}
           source={{
-            uri: alternateTiles
-              ? tileTemplate.replace("{z}", tile.key.split("-")[0]).replace("{x}", tile.key.split("-")[1]).replace("{y}", tile.key.split("-")[2])
-              : tile.uri,
+            uri: (alternateTiles ? tileTemplate : fallbackTileTemplate)
+              .replace("{z}", tile.key.split("-")[0])
+              .replace("{x}", tile.key.split("-")[1])
+              .replace("{y}", tile.key.split("-")[2]),
             headers: {
               "User-Agent": "OCTV-Mobile/0.1 (com.octv.mobile; +https://github.com/alswo0548/octv)",
             },
@@ -114,12 +118,12 @@ export function LiveRouteMap({
           right: 3,
           bottom: 3,
           padding: 3,
-          fontSize: 9,
+          fontSize: 10,
           color: "#fff",
           backgroundColor: "#142a34cc",
         }}
       >
-        {alternateTiles ? providerAttribution : "© OpenStreetMap contributors"}
+        {alternateTiles ? providerAttribution : fallbackAttribution}
       </Text>
     </View>
   );
