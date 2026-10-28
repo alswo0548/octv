@@ -95,10 +95,10 @@ def validate_approved_files() -> None:
 
     scenario = json.loads((ROOT / "demo/scenarios.json").read_text(encoding="utf-8"))
     cases = scenario["main_demo"]["cases"]
-    expected = {"DEMO-N001": "N001_demo.mp4", "DEMO-N002": "N002_demo.mp4", "DEMO-N003": "N003_demo.mp4"}
+    expected = {"DEMO-N001": "N001_demo.mp4", "DEMO-N003": "N003_demo.mp4"}
     found = {case["external_cctv_id"]: case["video"] for case in cases}
     if found != expected or any(case.get("provider", "").upper() != "DEMO" for case in cases):
-        raise RuntimeError("demo/scenarios.json의 3개 대응이 승인 v5와 다릅니다.")
+        raise RuntimeError("demo/scenarios.json의 승인 시연 2개 대응이 올바르지 않습니다.")
 
 
 class DemoModelRouter:
@@ -140,8 +140,14 @@ def build_router(
     validate_approved_files()
     ids = read_demo_id_map(connection)
     routes: dict[int, tuple[DemoRoute, Any]] = {}
+    # Demo N002's approved model and asset hashes remain available for rollback,
+    # but the lightweight rehearsal only loads/runs the two scenario models.
+    scenario = json.loads((ROOT / "demo/scenarios.json").read_text(encoding="utf-8"))
+    active_demo_ids = {case["external_cctv_id"] for case in scenario["main_demo"]["cases"]}
     detectors_by_path: dict[Path, Any] = {Path(base_detector.model_path).resolve(): base_detector}
     for route in APPROVED_ROUTES:
+        if route.external_id not in active_demo_ids:
+            continue
         path = (MODELS_DIR / route.model_name).resolve()
         detector = detectors_by_path.get(path)
         if detector is None:
