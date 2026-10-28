@@ -6,8 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { N001BboxOverlay, type N001OverlayData } from "./N001BboxOverlay";
 import type { Preview } from "./InferencePreview";
 import { hazardLabel } from "@octv/shared";
-import { formatSeoulTime, requestWebApi, loadDemoVideoUrl, type WebIncidentSession } from "../incidentData";
+import { formatSeoulTime, requestWebApi, type WebIncidentSession } from "../incidentData";
 import { operationsError, type Cctv } from "../operationsData";
+
+type PlaybackInfo = { url: string; expires_in: number };
 
 export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   session: WebIncidentSession;
@@ -36,31 +38,27 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
 
   useEffect(() => {
     let disposed = false;
-    let objectUrl: string | null = null;
-    const controller = new AbortController();
     setUrl(null);
     setError(null);
     if (!camera.is_monitored || !startedAt) return;
-    // Use the existing authorized, browser-compatible MP4 variant (H.264)
-    // instead of streaming the large original source with a short-lived ticket.
-    // No DEMO video, YOLO input, incident or backend API behavior is changed.
-    void loadDemoVideoUrl(session.version, camera.id, controller.signal, true)
-      .then((videoUrl) => {
-        if (disposed) {
-          URL.revokeObjectURL(videoUrl);
-          return;
+    // A JWT-authenticated ticket grants native HTTP Range streaming of the
+    // mobile-compatible MP4. Avoid waiting for a full fetch()/blob() download
+    // before displaying the video, especially over distant connections.
+    void requestWebApi<PlaybackInfo>(
+      session.version,
+      `/api/demo/v5/playback/${camera.id}?mobile_compatible=true`,
+      { method: "POST" },
+    )
+      .then(({ url: playbackUrl }) => {
+        if (!playbackUrl.startsWith(`/api/demo/v5/watch/${camera.id}?token=`)) {
+          throw new Error("시연 영상 주소 형식을 확인할 수 없습니다.");
         }
-        objectUrl = videoUrl;
-        setUrl(videoUrl);
+        if (!disposed) setUrl(playbackUrl);
       })
       .catch((reason) => {
         if (!disposed) setError(operationsError(reason));
       });
-    return () => {
-      disposed = true;
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
+    return () => { disposed = true; };
   }, [session.version, camera.id, camera.is_monitored, startedAt, attempt]);
 
   // Only N001 uses offline inference metadata aligned to ORIGINAL MP4 time.
@@ -179,7 +177,7 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
       )}
       <div className="camera live-camera" style={compact ? { minHeight: 0, aspectRatio: "16 / 9" } : undefined}>
         {url && startedAt ? (
-          <video ref={videoRef} src={url} autoPlay muted playsInline loop preload="metadata"
+          <video ref={videoRef} src={url} autoPlay muted playsInline loop preload="auto"
             // Do not expose independent seek UI: timeline is shared across cameras.
             controls={false}
             style={{ display: showLiveInference ? "none" : "block", width: "100%", height: "100%", objectFit: "contain" }}
