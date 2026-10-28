@@ -308,6 +308,7 @@ export async function loadDemoVideoUrl(
   sessionVersion: number,
   cctvId: number,
   signal?: AbortSignal,
+  mobileCompatible = false,
 ): Promise<string> {
   if (!isId(cctvId)) {
     throw new Error("CCTV ID를 확인할 수 없습니다.");
@@ -325,7 +326,7 @@ export async function loadDemoVideoUrl(
     : session.controller.signal;
 
   const response = await fetch(
-    `${session.baseUrl}/api/demo/cctvs/${cctvId}/video`,
+    `${session.baseUrl}/api/demo/cctvs/${cctvId}/video${mobileCompatible ? "?mobile_compatible=true" : ""}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
