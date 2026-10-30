@@ -147,7 +147,15 @@ def start_demo(
                 from ..workers import prewarm_context_mapping
 
                 for cctv in result.cctvs:
-                    prewarm_context_mapping.apply_async(args=(int(cctv.id),))
+                    try:
+                        prewarm_context_mapping.apply_async(args=(int(cctv.id),))
+                    except Exception as exc:
+                        import logging
+
+                        logging.getLogger(__name__).warning(
+                            "DEMO mapping prewarm unavailable for cctv=%s: %s",
+                            cctv.id, type(exc).__name__,
+                        )
         except Exception as exc:
             import logging
 
