@@ -195,7 +195,7 @@ export function MonitorPage({
           item.traffic_status === "DEMO_SIMULATION",
         ).length;
         if (simulated) {
-          demoMappingSummary = ` · 시연용 자동 매핑 ${simulated}대 준비(실제 관측·통제값 아님)`;
+          demoMappingSummary = ` · DEMO 자동 매핑 ${simulated}대 준비`;
         }
       } catch {
         // Do not prevent the original Demo start when a provider is unavailable.
