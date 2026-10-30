@@ -244,7 +244,7 @@ export function LiveRoutesScreen({
                   <T muted>제외 사유: {item.disqualify_reason}</T>
                 )}
                 {!path && (
-                  <T muted>경로 좌표 없음·형식 오류 (지도/내비 제한)</T>
+                  <T muted>경로 좌표 없음·형식 오류 (지도 경로 표시 제한)</T>
                 )}
                 {!isExcluded && item.requires_review && (
                   <T muted>도로 통제·안전 추가 확인 필요</T>
