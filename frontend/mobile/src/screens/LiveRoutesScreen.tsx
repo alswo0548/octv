@@ -19,6 +19,7 @@ import {
 } from "../liveRoutes";
 import { LiveRouteMap } from "../components/LiveRouteMap";
 import { openKakaoNavi } from "../kakaoNavi";
+import { canOpenKakaoNavi } from "../kakaoNaviEligibility";
 import type { Navigate } from "../navigation/types";
 import { incidentDisplayNo } from "../incidentLabel";
 
@@ -115,21 +116,19 @@ export function LiveRoutesScreen({
   const destination = validDestination(incident)
     ? ([incident.longitude, incident.latitude] as const)
     : null;
-  const blocked =
-    !route ||
-    route.disqualify_reason !== null ||
-    route.verification_status === "DISQUALIFIED" ||
-    !route.navigation_available ||
-    !validLine(route.route_path_json) ||
-    !destination;
+  // Kakao Navi calculates its own route to the incident coordinates.
+  // A missing OCTV route polyline must not block destination navigation.
+  // Explicitly disqualified or unknown-verification routes stay blocked.
+  const blocked = !canOpenKakaoNavi(route, destination !== null);
 
   const confirmNavi = () => {
     if (blocked || !route || busy) return;
     const needsReview =
-      route.verification_status !== "VERIFIED" || route.requires_review;
+      route.verification_status !== "VERIFIED" || route.requires_review ||
+      !route.navigation_available || !validLine(route.route_path_json);
     show({
       title: needsReview ? "도로 통제·안전 확인 필요" : "카카오내비 안내",
-      body: `${needsReview ? "선택 경로는 도로 통제·안전 확인이 필요합니다. " : ""}카카오내비로 연동하시겠습니까?`,
+      body: `${needsReview ? "선택 경로는 도로 통제·안전 확인이 필요합니다. " : ""}카카오내비는 OCTV의 저장 경로와 별개로 현재 위치부터 목적지까지 경로를 계산합니다. 실행하시겠습니까?`,
       confirm: "카카오내비 열기",
       onConfirm: () => {
         setBusy(true);
