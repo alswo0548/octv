@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import secrets
 import time
 from typing import Any
@@ -25,6 +26,9 @@ RECREATE_SETTLE_SECONDS = 15
 COOLDOWN_SECONDS = 600
 LOCK_SECONDS = 180
 MAX_ATTEMPTS_PER_HOUR = 2
+# Brief proof that this exact CCTV was an actively managed warm path.
+# Redis holds the external CCTV ID, never the source URL or credentials.
+WARM_SEEN_TTL_SECONDS = 600
 KEY_PREFIX = "octv:cctv:stream-recovery"
 
 _RELEASE_LOCK_SCRIPT = """
@@ -37,7 +41,7 @@ return 0
 
 def _keys(cctv_id: int) -> dict[str, str]:
     prefix = f"{KEY_PREFIX}:{cctv_id}"
-    return {suffix: f"{prefix}:{suffix}" for suffix in ("lock", "cooldown", "attempts", "backup")}
+    return {suffix: f"{prefix}:{suffix}" for suffix in ("lock", "cooldown", "attempts", "backup", "warm_seen")}
 
 
 def _monitored_targets() -> list[tuple[int, str]]:
@@ -86,6 +90,11 @@ def _path_config(path: str) -> dict[str, Any] | None:
 def _managed_warm_path(config: dict[str, Any] | None) -> bool:
     """An idle/on-demand or missing path must never be started by the watchdog."""
     return bool(config and config.get("source") and config.get("sourceOnDemand") is False)
+
+
+def _missing_path_recreate_enabled() -> bool:
+    """Extra opt-in: a missing path is different from an unready existing path."""
+    return os.getenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "0").strip() == "1"
 
 
 def _add_path(path: str, config: dict[str, Any]) -> None:
@@ -156,13 +165,34 @@ class StreamRecoveryWatchdog:
     def _check_one(self, cctv_id: int, external_id: str) -> str:
         path = f"cctv-{cctv_id}"
         state = _path_state(path)
+        keys = _keys(cctv_id)
         if _ready(state):
+            # A ready stream stays healthy even if the config API briefly fails.
+            # Only observed warm paths may later be recreated if config disappears.
+            try:
+                current = _path_config(path)
+                if _managed_warm_path(current):
+                    self.redis.set(keys["warm_seen"], external_id, ex=WARM_SEEN_TTL_SECONDS)
+                elif current is not None:
+                    self.redis.set(keys["warm_seen"], "-", ex=WARM_SEEN_TTL_SECONDS)
+            except Exception as error:
+                log.debug("CCTV %s warm proof unavailable (%s)", cctv_id, type(error).__name__)
             self.consecutive_failures.pop(cctv_id, None)
             return "healthy"
 
-        # No explicit warm path => not a watchdog-managed stream.
         current = _path_config(path)
-        if not _managed_warm_path(current):
+        if _managed_warm_path(current):
+            self.redis.set(keys["warm_seen"], external_id, ex=WARM_SEEN_TTL_SECONDS)
+        elif current is not None:
+            # An explicit on-demand/non-warm path must never be overwritten.
+            self.redis.set(keys["warm_seen"], "-", ex=WARM_SEEN_TTL_SECONDS)
+            self.consecutive_failures.pop(cctv_id, None)
+            return "not-warm-path"
+        elif not (
+            _missing_path_recreate_enabled()
+            and self.redis.get(keys["warm_seen"]) == external_id
+        ):
+            # Missing path with no recent proven warm state: leave it untouched.
             self.consecutive_failures.pop(cctv_id, None)
             return "not-warm-path"
 
@@ -191,7 +221,12 @@ class StreamRecoveryWatchdog:
             if _ready(_path_state(path)):
                 return "already-ready"
             original = _path_config(path)
-            if not _managed_warm_path(original):
+            missing_with_proof = (
+                original is None
+                and _missing_path_recreate_enabled()
+                and self.redis.get(keys["warm_seen"]) == external_id
+            )
+            if not missing_with_proof and not _managed_warm_path(original):
                 return "not-warm-path"
 
             if int(self.redis.get(keys["attempts"]) or 0) >= MAX_ATTEMPTS_PER_HOUR:
@@ -207,6 +242,27 @@ class StreamRecoveryWatchdog:
             if attempt_number == 1:
                 self.redis.expire(keys["attempts"], 3600)
             attempted = True
+
+            if missing_with_proof:
+                # A missing path is only ADDed; never DELETE an unrelated path.
+                # A competing API request may register a path first: do not PATCH it.
+                if not _still_monitored(cctv_id, external_id):
+                    return "monitoring-off"
+                if _path_config(path) is not None:
+                    return "config-changed"
+                payload = {
+                    "source": source_url,
+                    "sourceOnDemand": False,
+                    "sourceOnDemandStartTimeout": streaming.SOURCE_ON_DEMAND_START_TIMEOUT,
+                    "sourceOnDemandCloseAfter": streaming.SOURCE_ON_DEMAND_CLOSE_AFTER,
+                    "sourceFingerprint": fingerprint,
+                }
+                _add_path(path, payload)
+                self.sleep(RECREATE_SETTLE_SECONDS)
+                if _ready(_path_state(path)):
+                    log.info("CCTV %s missing warm path restored", cctv_id)
+                    return "missing-path-restored"
+                return "missing-path-added-waiting"
 
             streaming._upsert_mediamtx_path(
                 path_name=path,

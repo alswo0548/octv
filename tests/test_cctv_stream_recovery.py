@@ -80,7 +80,9 @@ def arm_repair(monkeypatch, *, ids=((9, "E910006"), (10, "E910012")), states=Non
 
 def test_healthy_cctv_never_changes(monkeypatch):
     setup(monkeypatch, states={9: READY, 10: READY})
-    monkeypatch.setattr(recovery, "_path_config", lambda path: pytest.fail(f"healthy config read: {path}"))
+    monkeypatch.setattr(recovery.streaming, "_upsert_mediamtx_path", lambda **_kwargs: pytest.fail("healthy PATCH"))
+    monkeypatch.setattr(recovery, "_recreate_path", lambda *_args: pytest.fail("healthy DELETE/ADD"))
+    monkeypatch.setattr(recovery, "_add_path", lambda *_args: pytest.fail("healthy ADD"))
     watchdog = recovery.StreamRecoveryWatchdog(FakeRedis(), sleep=lambda _: None)
     for _ in range(6):
         assert watchdog.step() == {9: "healthy", 10: "healthy"}
@@ -226,3 +228,123 @@ def test_read_failure_never_triggers_recovery(monkeypatch):
     for _ in range(4):
         assert monitor.step() == {9: "check-error", 10: "healthy"}
     assert monitor.consecutive_failures == {}
+
+
+def test_missing_path_requires_recent_warm_proof(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    states, configs = setup(monkeypatch, ids=((9, "E910006"),),
+                            states={9: None}, config={})
+    calls = []
+    monkeypatch.setattr(recovery, "_add_path", lambda *_args: calls.append("add"))
+    watchdog = recovery.StreamRecoveryWatchdog(FakeRedis(), sleep=lambda _: None)
+    for _ in range(4):
+        assert watchdog.step() == {9: "not-warm-path"}
+    assert not calls
+
+
+def test_previously_warm_missing_path_adds_without_delete(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    states, configs = setup(monkeypatch, ids=((9, "E910006"),),
+                            states={9: READY}, config={9: dict(WARM)})
+    redis = FakeRedis()
+    watchdog = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    assert watchdog.step() == {9: "healthy"}
+    assert redis.get(recovery._keys(9)["warm_seen"]) == "E910006"
+    assert redis.expiries[recovery._keys(9)["warm_seen"]] == recovery.WARM_SEEN_TTL_SECONDS
+    states[9] = None
+    configs.clear()
+    calls = []
+    def add(path, payload):
+        calls.append((path, payload))
+        configs[9] = dict(payload)
+        states[9] = READY
+    monkeypatch.setattr(recovery, "_add_path", add)
+    monkeypatch.setattr(recovery, "_recreate_path", lambda *_args: pytest.fail("must not DELETE"))
+    assert watchdog.step() == {9: "observing"}
+    assert watchdog.step() == {9: "observing"}
+    assert watchdog.step() == {9: "missing-path-restored"}
+    assert len(calls) == 1
+    assert calls[0][0] == "cctv-9"
+    assert calls[0][1]["sourceOnDemand"] is False
+    assert calls[0][1]["source"] == "https://example.test/old"
+    assert watchdog.step() == {9: "healthy"}
+
+
+def test_missing_path_feature_disabled_keeps_original_behavior(monkeypatch):
+    monkeypatch.delenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", raising=False)
+    states, configs = setup(monkeypatch, ids=((9, "E910006"),),
+                            states={9: READY}, config={9: dict(WARM)})
+    monitor = recovery.StreamRecoveryWatchdog(FakeRedis(), sleep=lambda _: None)
+    assert monitor.step()[9] == "healthy"
+    states[9] = None
+    configs.clear()
+    monkeypatch.setattr(recovery, "_add_path", lambda *_a: pytest.fail("disabled ADD"))
+    for _ in range(5):
+        assert monitor.step()[9] == "not-warm-path"
+
+
+def test_missing_path_proof_bound_to_external_id(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    states, configs = setup(monkeypatch, ids=((9, "E999999"),), states={9: None}, config={})
+    redis = FakeRedis()
+    redis.set(recovery._keys(9)["warm_seen"], "E910006", ex=600)
+    monitor = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    monkeypatch.setattr(recovery, "_add_path", lambda *_a: pytest.fail("different ID ADD"))
+    assert monitor.step()[9] == "not-warm-path"
+
+
+def test_switch_to_on_demand_invalidates_warm_proof(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    states, configs = setup(monkeypatch, ids=((9, "E910006"),),
+                            states={9: READY}, config={9: dict(WARM)})
+    redis = FakeRedis()
+    monitor = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    assert monitor.step()[9] == "healthy"
+    states[9] = BROKEN
+    configs[9]["sourceOnDemand"] = True
+    assert monitor.step()[9] == "not-warm-path"
+    assert redis.get(recovery._keys(9)["warm_seen"]) == "-"
+    configs.clear()
+    assert monitor.step()[9] == "not-warm-path"
+
+
+def test_missing_path_off_guard_blocks_add(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    setup(monkeypatch, ids=((9, "E910006"),), states={9: None}, config={})
+    redis = FakeRedis()
+    redis.set(recovery._keys(9)["warm_seen"], "E910006", ex=600)
+    monkeypatch.setattr(recovery, "_still_monitored", lambda *_a: False)
+    monkeypatch.setattr(recovery, "_add_path", lambda *_a: pytest.fail("OFF ADD"))
+    monitor = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    monitor.step(); monitor.step()
+    assert monitor.step()[9] == "monitoring-off"
+
+
+def test_missing_path_race_new_config_blocks_add(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    states, configs = setup(monkeypatch, ids=((9, "E910006"),),
+                            states={9: None}, config={})
+    redis = FakeRedis()
+    redis.set(recovery._keys(9)["warm_seen"], "E910006", ex=600)
+    monitor = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    monitor.step(); monitor.step()
+    calls = [0]
+    def config_change(_path):
+        calls[0] += 1
+        # Existing path appears between lock acquisition and final ADD guard.
+        return {"sourceOnDemand": True, "source": "https://example.test/new"} if calls[0] >= 3 else None
+    monkeypatch.setattr(recovery, "_path_config", config_change)
+    monkeypatch.setattr(recovery, "_add_path", lambda *_a: pytest.fail("racing ADD"))
+    assert monitor.step()[9] == "config-changed"
+
+
+def test_missing_path_rate_limit_guard(monkeypatch):
+    monkeypatch.setenv("OCTV_CCTV_RECOVERY_RECREATE_MISSING_ENABLED", "1")
+    setup(monkeypatch, ids=((9, "E910006"),), states={9: None}, config={})
+    redis = FakeRedis()
+    redis.set(recovery._keys(9)["warm_seen"], "E910006", ex=600)
+    redis.set(recovery._keys(9)["attempts"], "2", ex=3600)
+    monkeypatch.setattr(recovery, "_add_path", lambda *_a: pytest.fail("rate-limited ADD"))
+    monitor = recovery.StreamRecoveryWatchdog(redis, sleep=lambda _: None)
+    monitor.step(); monitor.step()
+    assert monitor.step()[9] == "hourly-limit"
