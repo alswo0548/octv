@@ -5,6 +5,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { View, Text, Pressable, Image, ActivityIndicator } from "react-native";
+import Svg, { Rect } from "react-native-svg";
 import { File, Paths } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import {
@@ -32,6 +33,7 @@ import {
 } from "../notifications";
 import { VideoView, useVideoPlayer, type VideoSource } from "expo-video";
 import { incidentDisplayNo, incidentStatusLabel, agencyDeliveryStatusLabel } from "../incidentLabel";
+import { readIncidentDetectionBox } from "../incidentDetectionBox";
 
 // API에서 받은 UTC 시각만 한국 시간으로 변환합니다.
 function incidentTime(value: string) {
@@ -100,10 +102,14 @@ function DemoIncidentVideo({ source }: { source: VideoSource }) {
 // JWT를 유지한 채 이미지 바이트를 가져와 앱 전용 캐시에 잠시 저장하고, 화면 이탈 시 지웁니다.
 function AuthorizedIncidentImage({
   source,
+  incident,
 }: {
   source: NonNullable<ReturnType<typeof mobileSession.incidentImageSource>>;
+  incident: IncidentDto;
 }) {
   const [localUri, setLocalUri] = useState<string | null>(null);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const box = readIncidentDetectionBox(incident.detection_bbox_json);
   const [error, setError] = useState<string | null>(null);
   const uri = source.uri;
   const authorization = source.headers.Authorization;
@@ -114,6 +120,7 @@ function AuthorizedIncidentImage({
       `octv-incident-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`,
     );
     setLocalUri(null);
+    setImageSize(null);
     setError(null);
     void (async () => {
       try {
@@ -145,12 +152,61 @@ function AuthorizedIncidentImage({
   if (error) return <T muted>{error}</T>;
   if (!localUri) return <ActivityIndicator color={color.cyan} />;
   return (
-    <Image
-      source={{ uri: localUri }}
-      resizeMode="contain"
-      onError={() => setError("이미지 디코딩에 실패했습니다.")}
-      style={{ width: "100%", height: 200 }}
-    />
+    <View style={{ width: "100%", height: 200, backgroundColor: "#07131d", overflow: "hidden", borderRadius: 8 }}>
+      <Image
+        source={{ uri: localUri }}
+        resizeMode="contain"
+        onLoad={(event) => {
+          const { width, height } = event.nativeEvent.source;
+          if (width > 0 && height > 0) setImageSize({ width, height });
+        }}
+        onError={() => {
+          setImageSize(null);
+          setError("이미지 디코딩에 실패했습니다.");
+        }}
+        style={{ width: "100%", height: "100%" }}
+      />
+      {imageSize && box && (
+        <>
+          <Svg
+            pointerEvents="none"
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+            preserveAspectRatio="xMidYMid meet"
+            style={{ position: "absolute", top: 0, left: 0 }}
+          >
+            <Rect
+              x={box.x1}
+              y={box.y1}
+              width={box.x2 - box.x1}
+              height={box.y2 - box.y1}
+              fill="#66ddeb09"
+              stroke="#66ddeb"
+              strokeWidth={3}
+            />
+          </Svg>
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              paddingHorizontal: 9,
+              paddingVertical: 5,
+              backgroundColor: "#07131de8",
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: "#66ddeb77",
+            }}
+          >
+            <Text style={{ color: "#a8f5ff", fontSize: 11, fontWeight: "600" }}>
+              AI 탐지 · {hazardLabel(incident.hazard_type)} {(incident.confidence * 100).toFixed(1)}%
+            </Text>
+          </View>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -355,6 +411,7 @@ function DeliveredIncidentDetail({
           <AuthorizedIncidentImage
             key={`${incident.id}-${incident.representative_image_updated_at}`}
             source={imageSource}
+            incident={incident}
           />
         </Panel>
       ) : (
