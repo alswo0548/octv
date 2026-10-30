@@ -112,4 +112,6 @@ class DashboardExternalStatusResponse(BaseModel):
     # ITS nearby alerts are location references, not verified control/closed lanes.
     nearby_traffic_event_count: int | None = Field(default=None, ge=0)
     mapping_state: dict[str, str] = Field(default_factory=dict)
+    # Read-only example values for an explicitly assessed DEMO incident only.
+    demo_mapping_preview: dict | None = None
     focused_monitoring_cctv_count: int = Field(ge=0)
