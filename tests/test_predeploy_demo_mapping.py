@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, call, patch
 
 from backend.app.demo_v5_media import mapping
 from backend.app.demo import router as demo_router, schemas
+from backend.app.dashboard import service as dashboard_service
+from backend.app.integrations import cctv_mapping
 
 
 class Connection:
@@ -165,6 +167,106 @@ class DemoStartMappingDispatchTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 demo_router.start_demo(schemas.DemoStartRequest())
         task.apply_async.assert_not_called()
+
+
+class DemoMappingFallbackTests(unittest.TestCase):
+    """No network/Redis writes. Official mapping is never forged."""
+
+    camera = {
+        'id': 4, 'provider': 'DEMO', 'external_cctv_id': 'DEMO-N001',
+        'name': 'N001', 'latitude': 37.5, 'longitude': 127.0,
+        'region_code': 'TEST', 'address': 'example',
+    }
+
+    @staticmethod
+    def incident(provider='DEMO', identifier='DEMO-N001', enabled=True):
+        return {
+            'id': 2000, 'cctv_id': 4, 'provider': provider,
+            'cctv_name': 'N001', 'latitude': 37.5, 'longitude': 127.0,
+            'region_code': 'TEST', 'address': 'example',
+            'risk_breakdown_json': {
+                'demo_simulation': {
+                    'enabled': enabled,
+                    'score_source': 'DEMO_SIMULATION',
+                    'external_cctv_id': identifier,
+                },
+            },
+        }
+
+    def test_demo_camera_has_auto_fallback_without_redis(self):
+        with (patch.object(mapping, 'get_cached_mapping', return_value=None),
+              patch.object(mapping, 'auto_mapping_enabled', return_value=True)):
+            result = mapping._one_status(self.camera)
+        self.assertFalse(result['cache_ready'])
+        self.assertTrue(result['weather_grid_ready'])
+        self.assertEqual(result['water_status'], 'DEMO_SIMULATION')
+        self.assertEqual(result['traffic_status'], 'DEMO_SIMULATION')
+        self.assertFalse(result['water_mapped'])
+        self.assertFalse(result['traffic_rule_mapped'])
+        self.assertEqual(result['demo_mapping']['source'], 'DEMO_SIMULATION')
+        self.assertEqual(result['demo_mapping']['rainfall_mm'], 30.0)
+        self.assertEqual(result['demo_mapping']['blocked_lane_count'], 2)
+
+    def test_real_official_water_is_retained_and_sim_traffic_is_separate(self):
+        official = {
+            'weather_grid': {'nx': 61, 'ny': 125},
+            'water_level': {
+                'status': 'NEARBY_STATION_WITH_THRESHOLDS', 'station_id': '123456',
+            },
+            'traffic': {'status': 'NEEDS_ROAD_DIRECTION_VERIFICATION'},
+        }
+        with (patch.object(mapping, 'get_cached_mapping', return_value=official),
+              patch.object(mapping, 'auto_mapping_enabled', return_value=True)):
+            result = mapping._one_status(self.camera)
+        self.assertEqual(result['water_status'], 'NEARBY_STATION_WITH_THRESHOLDS')
+        self.assertTrue(result['water_mapped'])
+        self.assertEqual(result['traffic_status'], 'DEMO_SIMULATION')
+        self.assertFalse(result['traffic_rule_mapped'])
+
+    def test_disabled_demo_does_not_auto_invent(self):
+        with (patch.object(mapping, 'get_cached_mapping', return_value=None),
+              patch.object(mapping, 'auto_mapping_enabled', return_value=False)):
+            result = mapping._one_status(self.camera)
+        self.assertEqual(result['water_status'], 'CACHE_NOT_READY')
+        self.assertIsNone(result['demo_mapping'])
+
+    def test_never_simulates_general_or_unapproved_incident(self):
+        for incident in (
+            self.incident(provider='UTIC'),
+            self.incident(identifier='DEMO-N999'),
+            self.incident(enabled=False),
+            {**self.incident(), 'risk_breakdown_json': None},
+        ):
+            self.assertIsNone(mapping.demo_preview_for_incident(incident))
+        self.assertIsNone(mapping.demo_preview_for_camera(
+            'DEMO-N999', 37.5, 127.0))
+
+    def test_dashboard_demo_fallback_but_general_cache_miss_preserved(self):
+        with (patch.object(cctv_mapping, 'auto_mapping_enabled', return_value=True),
+              patch.object(cctv_mapping, 'get_cached_mapping', return_value=None)):
+            self.assertEqual(dashboard_service._mapping_state(self.incident()), {
+                'weather': 'GRID_READY',
+                'water': 'DEMO_SIMULATION',
+                'traffic': 'DEMO_SIMULATION',
+            })
+            self.assertEqual(dashboard_service._mapping_state(
+                self.incident(provider='UTIC')), {
+                    'weather': 'CACHE_NOT_READY',
+                    'water': 'CACHE_NOT_READY',
+                    'traffic': 'CACHE_NOT_READY',
+                })
+
+    def test_preview_uses_preexisting_scenario_inputs_without_risk_change(self):
+        expected = {'DEMO-N001': (30.0, 2), 'DEMO-N002': (10.0, 0),
+                    'DEMO-N003': (0.0, 0)}
+        for ident, (rain, lanes) in expected.items():
+            preview = mapping.demo_preview_for_camera(ident, 37.5, 127.0)
+            self.assertEqual(preview['rainfall_mm'], rain)
+            self.assertEqual(preview['blocked_lane_count'], lanes)
+            self.assertEqual(preview['source'], 'DEMO_SIMULATION')
+            self.assertGreater(preview['water_level_m'], 0)
+            self.assertIsNone(preview.get('station_id'))
+            self.assertIsNone(preview.get('road_link_id'))
 
 
 if __name__ == '__main__':
