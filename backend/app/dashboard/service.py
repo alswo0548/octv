@@ -181,15 +181,18 @@ def _saved_metric(measurements: dict, name: str, unit: str,
 
 
 def _mapping_state(incident: dict) -> dict[str, str]:
-    """Read verified Redis mapping metadata; absence is not an error-free status."""
+    """Read verified mapping; clearly label DEMO-only fallback as simulated."""
     try:
         from ..integrations.cctv_mapping import auto_mapping_enabled, get_cached_mapping
         if not auto_mapping_enabled():
             return {"weather": "AUTO_MAPPING_DISABLED", "water": "AUTO_MAPPING_DISABLED",
                     "traffic": "AUTO_MAPPING_DISABLED"}
-        # 외부상황 응답은 사건 ID(id)와 CCTV ID(cctv_id)를 둘 다 포함합니다.
-        # Redis 매핑 키와 지문은 CCTV ID를 기준으로 생성됩니다.
-        # 사건 ID로 조회하면 정상 매핑 캐시도 CACHE_NOT_READY로 보입니다.
+
+        # The approved DEMO reference is a display-only overlay. It is never
+        # persisted to Redis as official data or consumed by actual risk rules.
+        from ..demo_v5_media.mapping import demo_preview_for_incident, WATER_READY
+        demo = demo_preview_for_incident(incident)
+
         cctv = {
             "id": incident["cctv_id"],
             "latitude": incident.get("latitude"),
@@ -201,11 +204,21 @@ def _mapping_state(incident: dict) -> dict[str, str]:
         }
         cached = get_cached_mapping(cctv)
         if cached is None:
+            if demo:
+                return {"weather": "GRID_READY", "water": "DEMO_SIMULATION",
+                        "traffic": "DEMO_SIMULATION"}
             return {"weather": "CACHE_NOT_READY", "water": "CACHE_NOT_READY",
                     "traffic": "CACHE_NOT_READY"}
-        return {"weather": "GRID_READY",
-                "water": str((cached.get("water_level") or {}).get("status") or "NO_MAPPING"),
-                "traffic": str((cached.get("traffic") or {}).get("status") or "NO_MAPPING")}
+
+        water = str((cached.get("water_level") or {}).get("status") or "NO_MAPPING")
+        traffic = str((cached.get("traffic") or {}).get("status") or "NO_MAPPING")
+        if demo:
+            # Retain verified, real water station mapping where available.
+            # Unverified traffic links must not masquerade as closures.
+            if water not in WATER_READY:
+                water = "DEMO_SIMULATION"
+            traffic = "DEMO_SIMULATION"
+        return {"weather": "GRID_READY", "water": water, "traffic": traffic}
     except Exception:
         return {"weather": "CACHE_UNAVAILABLE", "water": "CACHE_UNAVAILABLE",
                 "traffic": "CACHE_UNAVAILABLE"}
@@ -562,6 +575,8 @@ def get_external_status(
 
     measurements, captured = _saved_context(incident)
     mapping = _mapping_state(incident)
+    from ..demo_v5_media.mapping import demo_preview_for_incident
+    demo_preview = demo_preview_for_incident(incident)
     data_source = "SAVED_SNAPSHOT"
     live_checked_at = None
     if live:
@@ -624,6 +639,7 @@ def get_external_status(
             road_control_count=_unmapped_metric("count"),
             blocked_lane_count=_saved_metric(measurements, "blocked_lane_count", "count", captured),
             mapping_state=mapping,
+            demo_mapping_preview=demo_preview,
             focused_monitoring_cctv_count=(
                 focused_count
             ),
