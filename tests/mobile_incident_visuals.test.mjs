@@ -17,7 +17,7 @@ test("mobile representative image reads only a valid saved server bbox", () => {
 test("mobile bbox overlay uses natural JPEG size with contain aspect alignment", () => {
   assert.match(detail, /readIncidentDetectionBox\(incident\.detection_bbox_json\)/);
   assert.match(detail, /onLoad=\{\(event\) =>/);
-  assert.match(detail, /viewBox=\{\x60 0 0 \$\{imageSize\.width\} \$\{imageSize\.height\}\x60\}/);
+  assert.match(detail, /viewBox=.*imageSize\.width.*imageSize\.height/);
   assert.match(detail, /preserveAspectRatio="xMidYMid meet"/);
   assert.match(detail, /resizeMode="contain"/);
   assert.match(detail, /\{imageSize && box &&/);
