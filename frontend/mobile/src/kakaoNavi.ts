@@ -15,6 +15,9 @@ export type KakaoNaviLaunch =
   | "not-configured"
   | "unsupported";
 
+// Initialize only once per running app process; on failure, the next attempt may retry.
+let kakaoSdkInitialized = false;
+
 export async function openKakaoNavi(
   incident: IncidentDto,
 ): Promise<KakaoNaviLaunch> {
@@ -32,8 +35,11 @@ export async function openKakaoNavi(
     return "not-configured";
   // The Kakao Navi native client crashes if KakaoSdk is not initialized.
   // Initialize the native SDK before the first navigation API call.
-  const { initializeKakaoSDK } = await import("@react-native-kakao/core");
-  await initializeKakaoSDK(nativeAppKey);
+  if (!kakaoSdkInitialized) {
+    const { initializeKakaoSDK } = await import("@react-native-kakao/core");
+    await initializeKakaoSDK(nativeAppKey);
+    kakaoSdkInitialized = true;
+  }
   // 기능 사용 시에만 내비 네이티브 패키지 로드. Expo Go에서는 호출하지 않습니다.
   const { navigateTo } = await import("@react-native-kakao/navi");
   const opened = await navigateTo({
