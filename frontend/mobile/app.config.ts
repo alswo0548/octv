@@ -110,6 +110,9 @@ export default function configureApp({ config }: ConfigContext): ExpoConfig {
     extra: {
       ...config.extra,
       octvKakaoNaviConfigured: !!kakaoNativeAppKey,
+      // Kakao Native App Key is a client-side identifier already embedded in the APK.
+      // Expose only this key so the JS bridge can initialize the Android SDK.
+      ...(kakaoNativeAppKey ? { octvKakaoNativeAppKey: kakaoNativeAppKey } : {}),
       ...(easProjectId
         ? { eas: { ...config.extra?.eas, projectId: easProjectId } }
         : {}),
