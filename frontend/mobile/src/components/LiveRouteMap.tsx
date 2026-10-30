@@ -142,7 +142,8 @@ export function LiveRouteMap({
           {startSide && Number.isFinite(startSide.x) && Number.isFinite(startSide.y) && (
             <>
               <Circle cx={startSide.x} cy={startSide.y} r={8} stroke="#fff" strokeWidth={2} fill="#4bd2e7" />
-              <SvgText x={startSide.x} y={startSide.y - 14} fontSize={11} fontWeight="bold" fill="#dcf7ff" textAnchor="middle" stroke="#06121f" strokeWidth={2} paintOrder="stroke">
+              <Rect x={startSide.x - 24} y={startSide.y - 30} width={48} height={16} rx={4} fill="#09202ae8" />
+              <SvgText x={startSide.x} y={startSide.y - 18} fontSize={11} fontWeight="bold" fill="#dcf7ff" textAnchor="middle">
                 출발측
               </SvgText>
             </>
@@ -150,7 +151,8 @@ export function LiveRouteMap({
           {view.destination && (
             <>
               <Circle cx={view.destination.x} cy={view.destination.y} r={9} stroke="#fff" strokeWidth={2.5} fill="#ec5269" />
-              <SvgText x={view.destination.x} y={view.destination.y - 15} fontSize={11} fontWeight="bold" fill="#ffe4e7" textAnchor="middle" stroke="#06121f" strokeWidth={2} paintOrder="stroke">
+              <Rect x={view.destination.x - 32} y={view.destination.y - 31} width={64} height={16} rx={4} fill="#09202ae8" />
+              <SvgText x={view.destination.x} y={view.destination.y - 19} fontSize={11} fontWeight="bold" fill="#ffe4e7" textAnchor="middle">
                 사건 위치
               </SvgText>
             </>
