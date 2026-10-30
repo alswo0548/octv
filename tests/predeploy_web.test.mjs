@@ -32,7 +32,7 @@ test('hidden records cannot cross login sessions and can be restored',()=>{
 });
 
 test('demo-only mapping is visibly labelled as simulated', () => {
- assert.match(mappingStatus('DEMO_SIMULATION'), /시연용.*가상/);
+ assert.match(mappingStatus('DEMO_SIMULATION'), /DEMO 데이터/);
  assert.match(mappingStatus('VERIFIED_EXACT_COLOCATION'), /공식 관측소/);
  assert.match(mappingStatus('CACHE_NOT_READY'), /캐시 없음/);
 });
