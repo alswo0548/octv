@@ -104,7 +104,6 @@ export function LiveRouteMap({
           javaScriptEnabled
           scrollEnabled={false}
           cacheEnabled
-          // One missing OSM tile must not hide every successfully loaded tile.
           onError={() => setTilesFailed(true)}
           onShouldStartLoadWithRequest={(request) =>
             request.url === "about:blank" || request.url === mapOrigin || request.url.startsWith(mapOrigin + "/")
