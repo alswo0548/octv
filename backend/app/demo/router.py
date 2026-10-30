@@ -134,7 +134,37 @@ def start_demo(
     """
 
     try:
-        return service.start_demo(body.scenario)
+        result = service.start_demo(body.scenario)
+
+        # DEMO start activates CCTV rows directly, bypassing the ordinary
+        # CCTV monitoring endpoint that enqueues auto-mapping preparation.
+        # Enqueue only successfully activated DEMO CCTV after DB commit.
+        # Redis/provider failures must never cancel a started DEMO session.
+        try:
+            from ..integrations.cctv_mapping import auto_mapping_enabled
+
+            if auto_mapping_enabled():
+                from ..workers import prewarm_context_mapping
+
+                for cctv in result.cctvs:
+                    try:
+                        prewarm_context_mapping.apply_async(args=(int(cctv.id),))
+                    except Exception as exc:
+                        import logging
+
+                        logging.getLogger(__name__).warning(
+                            "DEMO mapping prewarm unavailable for cctv=%s: %s",
+                            cctv.id, type(exc).__name__,
+                        )
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "DEMO mapping prewarm scheduling unavailable: %s",
+                type(exc).__name__,
+            )
+
+        return result
 
     except LookupError as exc:
         raise HTTPException(

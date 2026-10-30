@@ -31,6 +31,11 @@ type StreamInfo = {
 
 const PREPARE_TIMEOUT_MS = 30_000;
 const PLAYBACK_TIMEOUT_MS = 25_000;
+// 일시적인 WebRTC 끊김은 잠시 기다리고, 지속되는 장애만 재연결합니다.
+const DISCONNECT_GRACE_MS = 4_000;
+const STALL_TIMEOUT_MS = 12_000;
+const STABLE_PLAYBACK_MS = 15_000;
+const RECONNECT_DELAYS_MS = [2_000, 5_000, 10_000];
 
 export function LiveCamera({
   session,
@@ -42,6 +47,8 @@ export function LiveCamera({
   const video = useRef<HTMLVideoElement>(null);
 
   const [attempt, setAttempt] = useState(0);
+  // 이 컴포넌트의 연속 장애만 카운트하며, 안정적으로 재생되면 초기화합니다.
+  const reconnectCount = useRef(0);
 
   const [phase, setPhase] = useState("대기");
 
@@ -68,6 +75,11 @@ export function LiveCamera({
     let prepareTimer: number | null = null;
 
     let playbackTimer: number | null = null;
+    let disconnectTimer: number | null = null;
+    let stallTimer: number | null = null;
+    let stableTimer: number | null = null;
+    let retryTimer: number | null = null;
+    let hasPlayed = false;
 
     // =====================================================
     // Timer 정리
@@ -92,6 +104,12 @@ export function LiveCamera({
     const clearTimers = () => {
       clearPrepareTimer();
       clearPlaybackTimer();
+      if (disconnectTimer !== null) window.clearTimeout(disconnectTimer);
+      if (stallTimer !== null) window.clearTimeout(stallTimer);
+      if (stableTimer !== null) window.clearTimeout(stableTimer);
+      disconnectTimer = null;
+      stallTimer = null;
+      stableTimer = null;
     };
 
     // =====================================================
@@ -137,6 +155,30 @@ export function LiveCamera({
 
     const isDemo = camera.provider.trim().toUpperCase() === "DEMO";
 
+    // DEMO MP4에는 영향 없이, 실시간 스트림에만 제한적 재연결을 적용합니다.
+    const failOrReconnect = (message: string) => {
+      if (stopped) return;
+
+      if (!isDemo && reconnectCount.current < RECONNECT_DELAYS_MS.length) {
+        const retry = reconnectCount.current++;
+        const delay = RECONNECT_DELAYS_MS[retry];
+        setPlaying(false);
+        setPhase(`영상 연결 끊김 · ${Math.round(delay / 1000)}초 후 자동 재연결 (${retry + 1}/${RECONNECT_DELAYS_MS.length})`);
+        controller.abort();
+        stop();
+        retryTimer = window.setTimeout(() => {
+          retryTimer = null;
+          setAttempt((value) => value + 1);
+        }, delay);
+        return;
+      }
+
+      setPlaying(false);
+      setPhase(isDemo ? message : "자동 재연결 실패 · 영상 다시 연결 버튼을 눌러주세요.");
+      controller.abort();
+      stop();
+    };
+
     // =====================================================
     // 1. FastAPI → UTIC → MediaMTX 준비
     // =====================================================
@@ -148,15 +190,7 @@ export function LiveCamera({
         return;
       }
 
-      setPlaying(false);
-
-      setPhase(
-        "스트림 준비 시간 초과 · UTIC 또는 영상 서버 연결을 확인해주세요.",
-      );
-
-      controller.abort();
-
-      stop();
+      failOrReconnect("스트림 준비 시간 초과 · UTIC 또는 영상 서버 연결을 확인해주세요.");
     }, PREPARE_TIMEOUT_MS);
 
     // =====================================================
@@ -252,15 +286,7 @@ export function LiveCamera({
           return;
         }
 
-        setPlaying(false);
-
-        setPhase(
-          "스트림 준비됨 · 영상 수신 시간 초과. 다시 연결을 시도해주세요.",
-        );
-
-        controller.abort();
-
-        stop();
+        failOrReconnect("스트림 준비됨 · 영상 수신 시간 초과. 다시 연결을 시도해주세요.");
       }, PLAYBACK_TIMEOUT_MS);
 
       // ===================================================
@@ -289,18 +315,26 @@ export function LiveCamera({
       };
 
       current.onconnectionstatechange = () => {
-        if (stopped) {
+        if (stopped) return;
+        const state = current.connectionState;
+
+        // 순간적인 disconnected 상태에서는 즉시 재협상하지 않습니다.
+        if (state === "disconnected") {
+          if (disconnectTimer === null) {
+            disconnectTimer = window.setTimeout(() => {
+              disconnectTimer = null;
+              if (!stopped && current.connectionState === "disconnected") {
+                failOrReconnect("스트림 준비됨 · 영상 연결 끊김. 다시 연결해주세요.");
+              }
+            }, DISCONNECT_GRACE_MS);
+          }
           return;
         }
 
-        if (
-          ["failed", "disconnected", "closed"].includes(current.connectionState)
-        ) {
-          clearPlaybackTimer();
-
-          setPlaying(false);
-
-          setPhase("스트림 준비됨 · 영상 연결 끊김. 다시 연결해주세요.");
+        if (disconnectTimer !== null) window.clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+        if (state === "failed" || state === "closed") {
+          failOrReconnect("스트림 준비됨 · 영상 연결 끊김. 다시 연결해주세요.");
         }
       };
 
@@ -399,20 +433,12 @@ export function LiveCamera({
         return;
       }
     })().catch((error) => {
-      if (!controller.signal.aborted) {
-        clearTimers();
-
-        setPlaying(false);
-
-        setPhase(
-          prepared
-            ? "스트림 준비됨 · 브라우저 영상 연결에 실패했습니다. " +
-                "다시 연결을 시도해주세요."
-            : operationsError(error),
-        );
-      }
-
-      stop();
+      if (stopped || controller.signal.aborted) return;
+      failOrReconnect(
+        prepared
+          ? "스트림 준비됨 · 브라우저 영상 연결에 실패했습니다. 다시 연결을 시도해주세요."
+          : operationsError(error),
+      );
     });
 
     // =====================================================
@@ -427,10 +453,15 @@ export function LiveCamera({
       }
 
       clearTimers();
-
+      hasPlayed = true;
       setPlaying(true);
-
       setPhase("영상 재생 중");
+      if (!isDemo) {
+        // 잠시 보이다 끊기는 경우는 성공으로 세지 않습니다.
+        stableTimer = window.setTimeout(() => {
+          if (!stopped) reconnectCount.current = 0;
+        }, STABLE_PLAYBACK_MS);
+      }
     };
 
     const onWaiting = () => {
@@ -439,8 +470,18 @@ export function LiveCamera({
       }
 
       setPlaying(false);
-
       setPhase("스트림 준비됨 · 영상 버퍼링 중");
+      if (stableTimer !== null) window.clearTimeout(stableTimer);
+      stableTimer = null;
+      // 재생 중 멈춘 경우에만 감시합니다. 최초 수신은 기존 timeout을 사용합니다.
+      if (!isDemo && hasPlayed && !element?.paused && stallTimer === null) {
+        stallTimer = window.setTimeout(() => {
+          stallTimer = null;
+          if (!stopped && !element?.paused) {
+            failOrReconnect("스트림 준비됨 · 영상 버퍼링이 계속됩니다.");
+          }
+        }, STALL_TIMEOUT_MS);
+      }
     };
 
     element?.addEventListener("playing", onPlaying);
@@ -453,7 +494,8 @@ export function LiveCamera({
 
     return () => {
       controller.abort();
-
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      retryTimer = null;
       stop();
 
       element?.removeEventListener("playing", onPlaying);
@@ -515,7 +557,10 @@ export function LiveCamera({
         <button
           className="secondary"
           disabled={!camera.is_monitored}
-          onClick={() => setAttempt((value) => value + 1)}
+          onClick={() => {
+            reconnectCount.current = 0;
+            setAttempt((value) => value + 1);
+          }}
         >
           영상 다시 연결
         </button>

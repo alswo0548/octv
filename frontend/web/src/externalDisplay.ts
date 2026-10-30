@@ -2,6 +2,7 @@
 export function mappingStatus(code: string | undefined): string {
   const labels: Record<string, string> = {
     GRID_READY: "CCTV 좌표 격자 연결 준비",
+    DEMO_SIMULATION: "DEMO 데이터",
     VERIFIED_EXACT_COLOCATION: "공식 관측소 일치 · 매핑 확인",
     NEARBY_STATION_WITH_THRESHOLDS: "반경 관측소 · 기준값 확인",
     NEARBY_STATION_NO_THRESHOLDS: "인근 관측소 후보 연결 · 기준값 확인 필요",

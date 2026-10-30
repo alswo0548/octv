@@ -5,11 +5,11 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
-import Svg, { Circle, Polyline } from "react-native-svg";
+import Svg, { Circle, Polyline, Rect, Text as SvgText } from "react-native-svg";
 import { WebView } from "react-native-webview";
 import { makeMapViewport, type MapLine, type LonLat, type MapViewport } from "../routeMapMath";
 
-const HEIGHT = 245;
+const HEIGHT = 290;
 const BACKGROUND = "#102534";
 // 기존 API 주소의 HTTPS origin만 Referer로 사용합니다. JWT/개인정보는 HTML에 넣지 않습니다.
 const mapOrigin = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "")
@@ -23,7 +23,7 @@ function tileDocument(view: MapViewport): string {
     .map((tile) => {
       const left = tile.x.toFixed(2);
       const top = tile.y.toFixed(2);
-      return `<img src="${tile.uri}" loading="eager" draggable="false" style="left:${left}px;top:${top}px" onerror="window.ReactNativeWebView?.postMessage('tile-error')">`;
+      return `<img src="${tile.uri}" loading="eager" draggable="false" style="left:${left}px;top:${top}px" onerror="this.style.display='none'">`;
     })
     .join("");
   return `<!doctype html>
@@ -67,6 +67,23 @@ export function LiveRouteMap({
 
   // 요청 실패 시 저장된 경로선은 계속 표시합니다. 접근 차단 이미지를 우회·저장하지 않습니다.
   const basemapOn = showTiles && !tilesFailed && tileSource !== null;
+  // Draw other candidates first, then the selected one, as on the web route map.
+  const orderedPaths = [...view.paths].sort((a, b) =>
+    Number(a.id === selectedId) - Number(b.id === selectedId),
+  );
+  // The saved route endpoint farther from the incident is the start-side marker.
+  const selectedPath = view.paths.find((path) => path.id === selectedId);
+  const endpoints = selectedPath?.points.split(" ").filter(Boolean) ?? [];
+  const startSide = endpoints.length >= 2 && view.destination
+    ? [endpoints[0], endpoints[endpoints.length - 1]]
+      .map((point) => {
+        const [x, y] = point.split(",").map(Number);
+        return { x, y };
+      })
+      .sort((a, b) =>
+        Math.hypot(b.x - view.destination!.x, b.y - view.destination!.y) -
+        Math.hypot(a.x - view.destination!.x, a.y - view.destination!.y))[0]
+    : null;
   return (
     <View
       onLayout={onLayout}
@@ -87,9 +104,6 @@ export function LiveRouteMap({
           javaScriptEnabled
           scrollEnabled={false}
           cacheEnabled
-          onMessage={(event) => {
-            if (event.nativeEvent.data === "tile-error") setTilesFailed(true);
-          }}
           onError={() => setTilesFailed(true)}
           onShouldStartLoadWithRequest={(request) =>
             request.url === "about:blank" || request.url === mapOrigin || request.url.startsWith(mapOrigin + "/")
@@ -99,29 +113,53 @@ export function LiveRouteMap({
       )}
       <View pointerEvents="none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
         <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`}>
-          {view.paths.map((path) => (
+          {basemapOn && <Rect x={0} y={0} width={width} height={HEIGHT} fill="#06121f" opacity={0.30} />}
+          {orderedPaths.map((path) => (
+            <Polyline
+              key={`outline-${path.id}`}
+              points={path.points}
+              fill="none"
+              stroke={path.id === selectedId ? "#09202a" : "#102635"}
+              strokeWidth={path.id === selectedId ? 10 : 5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={path.id === selectedId ? 0.96 : 0.75}
+            />
+          ))}
+          {orderedPaths.map((path) => (
             <Polyline
               key={path.id}
               points={path.points}
               fill="none"
-              stroke={path.id === selectedId ? "#ffe16d" : "#26bad2"}
-              strokeWidth={path.id === selectedId ? 6 : 3}
+              stroke={path.id === selectedId ? "#ff5968" : "#69b2c4"}
+              strokeWidth={path.id === selectedId ? 5.5 : 2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={path.id === selectedId ? 1 : 0.65}
+              opacity={path.id === selectedId ? 1 : 0.78}
             />
           ))}
+          {startSide && Number.isFinite(startSide.x) && Number.isFinite(startSide.y) && (
+            <>
+              <Circle cx={startSide.x} cy={startSide.y} r={8} stroke="#fff" strokeWidth={2} fill="#4bd2e7" />
+              <Rect x={startSide.x - 24} y={startSide.y - 30} width={48} height={16} rx={4} fill="#09202ae8" />
+              <SvgText x={startSide.x} y={startSide.y - 18} fontSize={11} fontWeight="bold" fill="#dcf7ff" textAnchor="middle">
+                출발측
+              </SvgText>
+            </>
+          )}
           {view.destination && (
-            <Circle
-              cx={view.destination.x}
-              cy={view.destination.y}
-              r={8}
-              stroke="#fff"
-              strokeWidth={2}
-              fill="#fa7070"
-            />
+            <>
+              <Circle cx={view.destination.x} cy={view.destination.y} r={9} stroke="#fff" strokeWidth={2.5} fill="#ec5269" />
+              <Rect x={view.destination.x - 32} y={view.destination.y - 31} width={64} height={16} rx={4} fill="#09202ae8" />
+              <SvgText x={view.destination.x} y={view.destination.y - 19} fontSize={11} fontWeight="bold" fill="#ffe4e7" textAnchor="middle">
+                사건 위치
+              </SvgText>
+            </>
           )}
         </Svg>
+      </View>
+      <View pointerEvents="none" style={{ position: "absolute", left: 8, bottom: 26, backgroundColor: "#0b1a27e8", borderWidth: 1, borderColor: "#315167", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7 }}>
+        <Text style={{ color: "#f0f5fb", fontSize: 11 }}>🔴 선택 경로   <Text style={{ color: "#9bd7e5" }}>━ 다른 후보</Text></Text>
       </View>
       <Pressable
         accessibilityRole="button"

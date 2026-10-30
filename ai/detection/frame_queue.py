@@ -32,7 +32,7 @@ class AnalysisFrameQueue:
 
     def __init__(
         self,
-        maxsize: int = 4,
+        maxsize: int = 6,
     ):
         if maxsize <= 0:
             raise ValueError(

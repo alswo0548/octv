@@ -39,6 +39,15 @@ type DemoStartResponse = {
   }[];
 };
 
+type DemoMappingResponse = {
+  items: {
+    external_cctv_id: string;
+    weather_grid_ready: boolean;
+    water_status: string;
+    traffic_status: string;
+  }[];
+};
+
 type DemoStopResponse = {
   scenario: string;
   stopped: boolean;
@@ -169,16 +178,25 @@ export function MonitorPage({
     setDemoBusy(true);
     setDemoMessage(null);
 
+    let demoMappingSummary = "";
     try {
-      // Prepare actual coordinate-based external mappings before starting Demo.
+      // Prefer real provider mappings; the backend returns explicitly labelled
+      // DEMO-only examples when official station/traffic mapping is unavailable.
       // This is a backend operation, not a UI/test fixture or a Risk score override.
       // External data may still be unavailable when official matching is unverified.
       try {
-        await requestWebApi(
+        const mapping = await requestWebApi<DemoMappingResponse>(
           session.version,
           "/api/demo/v5/prepare-mapping",
           { method: "POST" },
         );
+        const simulated = mapping.items.filter(item =>
+          item.water_status === "DEMO_SIMULATION" ||
+          item.traffic_status === "DEMO_SIMULATION",
+        ).length;
+        if (simulated) {
+          demoMappingSummary = ` · DEMO 자동 매핑 ${simulated}대 준비`;
+        }
       } catch {
         // Do not prevent the original Demo start when a provider is unavailable.
         // Missing measurements remain unverified in existing Context/Rule.
@@ -205,7 +223,7 @@ export function MonitorPage({
       }
 
       setRevision((value) => value + 1);
-      setDemoMessage("기상특보가 발효되어 Demo CCTV 감시가 시작됐습니다.");
+      setDemoMessage(`기상특보가 발효되어 Demo CCTV 감시가 시작됐습니다.${demoMappingSummary}`);
     } catch (error) {
       setDemoMessage(operationsError(error));
     } finally {
