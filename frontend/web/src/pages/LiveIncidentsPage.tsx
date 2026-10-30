@@ -845,7 +845,7 @@ export function LiveIncidentsPage({
               </div>
 
               <p className="content-footnote">
-                {detail.risk_breakdown_json?.demo_simulation ? '시연용 가상 위험도 · 실제 관측 기반 점수 아님' : '규칙: ' + (detail.rule_version ?? '분석 결과 없음')}
+                {detail.risk_breakdown_json?.demo_simulation ? 'DEMO 기준 위험도' : '규칙: ' + (detail.rule_version ?? '분석 결과 없음')}
               </p>
 
               <div className="live-llm-explanation">
