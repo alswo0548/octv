@@ -576,7 +576,8 @@ def get_external_status(
     measurements, captured = _saved_context(incident)
     mapping = _mapping_state(incident)
     from ..demo_v5_media.mapping import demo_preview_for_incident
-    demo_preview = demo_preview_for_incident(incident)
+    from ..integrations.cctv_mapping import auto_mapping_enabled
+    demo_preview = demo_preview_for_incident(incident) if auto_mapping_enabled() else None
     data_source = "SAVED_SNAPSHOT"
     live_checked_at = None
     if live:
