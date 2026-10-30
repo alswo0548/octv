@@ -45,7 +45,7 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
                            key === "blocked_lane_count")) {
       const example = demo[key];
       if (typeof example === "number" && Number.isFinite(example)) {
-        return `${example} (시연용)`;
+        return `${example}*`;
       }
     }
     return contextStatus(item.status);
@@ -95,10 +95,9 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
       </p>
       {demo && (
         <p className="content-footnote" role="note">
-          🎬 시연용 자동 매핑 · 기상 격자 ({demo.weather_grid?.nx ?? "–"}, {demo.weather_grid?.ny ?? "–"})
-          {" · "}가상 수위 위험등급: {demo.water_risk_level ?? "미설정"}
-          {" · "}‘시연용’ 표시값은 실제 관측·도로 통제 정보가 아닙니다.
-          실제 외부 데이터와 사건 분석 기록은 변경하지 않습니다.
+          🎬 DEMO 데이터 · 기상 격자 ({demo.weather_grid?.nx ?? "–"}, {demo.weather_grid?.ny ?? "–"})
+          {" · "}수위 기준: {demo.water_risk_level ?? "미설정"}
+          {" · "}* 예시값
         </p>
       )}
       {mapped.error ? <p role="alert">사건별 매핑 조회 실패 · {mapped.error}</p> : (
