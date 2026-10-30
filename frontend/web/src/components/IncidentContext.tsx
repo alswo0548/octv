@@ -1,6 +1,5 @@
 /** 저장된 분석 스냅샷의 관측값·상태만 기존 외부 상황 카드에 표시합니다. 미확인은 0으로 바꾸지 않습니다. */
-import { contextStatus } from "../incidentLabel";
-import { mappingStatus } from "../externalDisplay";
+import { externalMetric } from "../externalDisplay";
 import { useOperations } from "../operationsData";
 import { formatSeoulTime, type IncidentDetailDto, type WebIncidentSession } from "../incidentData";
 
@@ -29,26 +28,28 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
   const measurements = record(snapshot.measurements);
   const preview = mapped.data?.demo_mapping_preview;
   const demo = preview?.source === "DEMO_SIMULATION" ? preview : null;
-  const metric = (key: string) => {
+  const metric = (key: string, unit = "") => {
     const item = record(measurements[key]);
-    if (item.status === "OK" &&
-        ["number", "string", "boolean"].includes(typeof item.value)) {
-      return String(item.value);
-    }
-    // Clearly labelled fallback for DEMO only; the real DB Context is intact.
+    // Preserve the existing DEMO fallback scope; a real zero always wins.
     const useDemoExample = demo && (
       key === "rainfall_mm" ||
       (key === "water_level_m" && mapped.data?.mapping_state?.water === "DEMO_SIMULATION") ||
       (key === "blocked_lane_count" && mapped.data?.mapping_state?.traffic === "DEMO_SIMULATION")
     );
-    if (demo && useDemoExample && (key === "rainfall_mm" || key === "water_level_m" ||
-                           key === "blocked_lane_count")) {
-      const example = demo[key];
-      if (typeof example === "number" && Number.isFinite(example)) {
-        return `${example}*`;
-      }
-    }
-    return contextStatus(item.status);
+    const example = useDemoExample ? demo?.[key as "rainfall_mm" | "water_level_m" | "blocked_lane_count"] : undefined;
+    return { ...externalMetric(item, unit, example), item };
+  };
+  const rain = metric("rainfall_mm", "mm");
+  const water = metric("water_level_m", "m");
+  const lanes = metric("blocked_lane_count");
+  const hospital = metric("nearby_hospital_distance_m", "m");
+  const hasExample = [rain, water, lanes, hospital].some(value => value.simulated);
+  const provenance = (value: ReturnType<typeof metric>) => {
+    if (!value.numeric || value.simulated) return null;
+    const source = typeof value.item.source === "string" ? value.item.source : "출처 미확인";
+    const observed = typeof value.item.observed_at === "string" && Number.isFinite(Date.parse(value.item.observed_at))
+      ? formatSeoulTime(value.item.observed_at) : "관측 시각 미확인";
+    return <small className="external-provenance">{source} · {observed}</small>;
   };
   return (
     <section className="panel external">
@@ -56,7 +57,7 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
         <h2>외부 상황</h2>
         <span className="subtle">
           {typeof snapshot.captured_at === "string"
-            ? formatSeoulTime(snapshot.captured_at)
+            ? `분석 저장 · ${formatSeoulTime(snapshot.captured_at)}`
             : "저장된 분석 시점 기준"}
         </span>
       </div>
@@ -65,47 +66,37 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
           <span className="weather-icon">☂</span>
           <div>
             <label>강수량</label>
-            <strong>
-              {metric("rainfall_mm")}
-              <small> mm</small>
+            <strong className={rain.numeric ? "external-number" : "external-status"}>
+              {rain.text}{rain.unit && <small> {rain.unit}</small>}
             </strong>
+            {provenance(rain)}
           </div>
         </div>
         <div>
           <span className="weather-icon">≋</span>
           <div>
             <label>수위</label>
-            <strong>
-              {metric("water_level_m")}
-              <small> m</small>
+            <strong className={water.numeric ? "external-number" : "external-status"}>
+              {water.text}{water.unit && <small> {water.unit}</small>}
             </strong>
+            {provenance(water)}
           </div>
         </div>
       </div>
       <div className="external-row">
         <span>차단 차로 수</span>
-        <b>{metric("blocked_lane_count")}</b>
+        <div className="external-row-value"><b>{lanes.text}</b>{provenance(lanes)}</div>
       </div>
       <div className="external-row">
         <span>인근 병원 거리</span>
-        <b>{metric("nearby_hospital_distance_m")} m</b>
+        <div className="external-row-value"><b>{hospital.text}{hospital.unit && ` ${hospital.unit}`}</b>{provenance(hospital)}</div>
       </div>
-      <p className="content-footnote">
-        저장된 분석 시점의 수집 상태입니다. 미수집은 안전 또는 정상 판정이 아닙니다.
-      </p>
-      {demo && (
+      {hasExample && (
         <p className="content-footnote" role="note">
-          🎬 DEMO 데이터 · 기상 격자 ({demo.weather_grid?.nx ?? "–"}, {demo.weather_grid?.ny ?? "–"})
-          {" · "}수위 기준: {demo.water_risk_level ?? "미설정"}
-          {" · "}* 예시값
+          * 시나리오 설정값 · 실제 관측값과 구분
         </p>
       )}
-      {mapped.error ? <p role="alert">사건별 매핑 조회 실패 · {mapped.error}</p> : (
-        <p className="content-footnote">
-          자동 매핑 확인 · 기상: {mappingStatus(mapped.data?.mapping_state?.weather)} / 수위: {mappingStatus(mapped.data?.mapping_state?.water)} / 교통: {mappingStatus(mapped.data?.mapping_state?.traffic)}
-          <br/>외부 API 실제 수집은 사건 분석 Worker와 별도로 검증해야 합니다.
-        </p>
-      )}
+      {mapped.error && <p role="alert">매핑 조회 실패 · {mapped.error}</p>}
     </section>
   );
 }

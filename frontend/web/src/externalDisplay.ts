@@ -1,3 +1,34 @@
+/** UI-only numeric/status formatting; never substitutes missing observations with zero. */
+export type ExternalMeasurement = {
+  status?: unknown;
+  value?: unknown;
+  source?: unknown;
+  observed_at?: unknown;
+};
+
+export function externalMetric(item: ExternalMeasurement | null | undefined, unit = "", example?: number) {
+  const raw = item?.value;
+  const numeric = typeof raw === "number" ||
+    (typeof raw === "string" && /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(raw.trim()));
+  const value = numeric ? Number(raw) : NaN;
+  if (item?.status === "OK" && Number.isFinite(value) && value >= 0) {
+    return { text: String(value), unit, simulated: false, numeric: true };
+  }
+  if (typeof example === "number" && Number.isFinite(example) && example >= 0) {
+    return { text: `${example}*`, unit, simulated: true, numeric: true };
+  }
+  const statuses: Record<string, string> = {
+    STALE: "기간 경과", TIMEOUT: "조회 지연", ERROR: "조회 실패",
+    INVALID: "확인 필요", NO_MAPPING: "미수집", NO_DATA: "미수집",
+  };
+  return { text: statuses[String(item?.status)] ?? "미수집", unit: "", simulated: false, numeric: false };
+}
+
+export function externalMetricText(item: ExternalMeasurement | null | undefined, unit = "") {
+  const display = externalMetric(item, unit);
+  return display.text + (display.unit ? ` ${display.unit}` : "");
+}
+
 /** UI-only translation of automatic CCTV mapping cache state. No inference about safety. */
 export function mappingStatus(code: string | undefined): string {
   const labels: Record<string, string> = {
@@ -15,3 +46,4 @@ export function mappingStatus(code: string | undefined): string {
   };
   return code ? (labels[code] ?? "매핑 결과 확인 필요") : "매핑 상태 미확인";
 }
+
