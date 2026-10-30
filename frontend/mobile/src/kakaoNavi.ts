@@ -22,9 +22,19 @@ export async function openKakaoNavi(
   if (!validDestination(incident))
     throw new Error("사건 목적지의 위도·경도를 확인할 수 없습니다.");
   // config plugin과 빌드 설정이 반영된 Android APK에서만 실행합니다.
-  if (Constants.expoConfig?.extra?.octvKakaoNaviConfigured !== true)
+  const extra = Constants.expoConfig?.extra;
+  const nativeAppKey = extra?.octvKakaoNativeAppKey;
+  if (
+    extra?.octvKakaoNaviConfigured !== true ||
+    typeof nativeAppKey !== "string" ||
+    !nativeAppKey.trim()
+  )
     return "not-configured";
-  // 기능 사용 시에만 네이티브 패키지 로드. Expo Go에서는 호출하지 않습니다.
+  // The Kakao Navi native client crashes if KakaoSdk is not initialized.
+  // Initialize the native SDK before the first navigation API call.
+  const { initializeKakaoSDK } = await import("@react-native-kakao/core");
+  await initializeKakaoSDK(nativeAppKey);
+  // 기능 사용 시에만 내비 네이티브 패키지 로드. Expo Go에서는 호출하지 않습니다.
   const { navigateTo } = await import("@react-native-kakao/navi");
   const opened = await navigateTo({
     destination: {
