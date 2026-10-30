@@ -152,6 +152,17 @@ services:
     depends_on:
       redis: {condition: service_healthy}
 
+  # Optional and disabled by default; enabled only after separate approval.
+  cctv-stream-recovery:
+    <<: *app
+    profiles: ["cctv-stream-recovery"]
+    restart: "on-failure:3"
+    command: ["python", "-m", "scripts.run_cctv_stream_recovery"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      mediamtx: {condition: service_started}
+
   cctv:
     <<: *app
     profiles: ["cctv-runtime"] # never auto-start incidentization during stack bring-up
