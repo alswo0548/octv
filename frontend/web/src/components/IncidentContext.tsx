@@ -41,7 +41,7 @@ export function IncidentContext({ incident, session }: { incident: IncidentDetai
       (key === "water_level_m" && mapped.data?.mapping_state?.water === "DEMO_SIMULATION") ||
       (key === "blocked_lane_count" && mapped.data?.mapping_state?.traffic === "DEMO_SIMULATION")
     );
-    if (useDemoExample && (key === "rainfall_mm" || key === "water_level_m" ||
+    if (demo && useDemoExample && (key === "rainfall_mm" || key === "water_level_m" ||
                            key === "blocked_lane_count")) {
       const example = demo[key];
       if (typeof example === "number" && Number.isFinite(example)) {
