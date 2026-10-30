@@ -24,19 +24,11 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
-  // This mode shows the exact frame analyzed by the running YOLO worker.
-  // It never places current detections over a different MP4 playback frame.
-  // Start every DEMO in synchronized video mode; YOLO preview remains opt-in.
-  const [showLiveInference, setShowLiveInference] = useState(false);
+  // Exact YOLO inference frames are shown in a small, clearly labeled inset.
+  // They must never be overlaid on a different, independently playing MP4 frame.
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Reset the default only when the scenario or selected camera changes.
-  // Manual video/inference switching remains available during one session.
-  useEffect(() => {
-    setShowLiveInference(false);
-  }, [camera.id, camera.is_monitored, startedAt]);
 
   useEffect(() => {
     let disposed = false;
@@ -77,12 +69,12 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     return () => { disposed = true; };
   }, [n001, camera.id, camera.is_monitored, startedAt, session.version, attempt]);
 
-  // Poll only for the selected DEMO camera while the real-inference view is
-  // visible. Existing JWT/session cancellation and read-only API are reused.
+  // Only the full-size N001 player polls its existing, read-only preview API.
+  // This adds no detector inference and never affects incident creation.
   useEffect(() => {
     setPreview(null);
     setPreviewError(false);
-    if (compact || !showLiveInference || !camera.is_monitored || !startedAt) return;
+    if (compact || !n001 || !camera.is_monitored || !startedAt) return;
 
     let disposed = false;
     let inFlight = false;
@@ -121,9 +113,13 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [compact, showLiveInference, session.version, camera.id, camera.is_monitored, startedAt]);
+  }, [compact, n001, session.version, camera.id, camera.is_monitored, startedAt]);
 
-  const liveFrame = showLiveInference && preview?.state === "READY" ? preview.frame : null;
+  const recentFrame = preview?.state === "READY" ? preview.frame : null;
+  // Do not retain a stale detection or imply a continuous live video feed.
+  const liveFrame = recentFrame && Number.isFinite(Date.parse(recentFrame.captured_at))
+    && Math.abs(Date.now() - Date.parse(recentFrame.captured_at)) <= 15_000
+    ? recentFrame : null;
 
   // Synchronize once after the browser can actually play decoded frames.
   // Repeated seeking every 2.5s while buffering generated overlapping Range
@@ -207,27 +203,12 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
 
   return (
     <div>
-      {!compact && (
-        <div className="action-row" role="group" aria-label="시연 CCTV 화면 모드">
-          <button type="button" className={!showLiveInference ? "primary" : "secondary"}
-            aria-pressed={!showLiveInference} onClick={() => setShowLiveInference(false)}>
-            동기화 영상
-          </button>
-          {n001 && (
-            <button type="button" className={showLiveInference ? "primary" : "secondary"}
-              aria-pressed={showLiveInference} disabled={!camera.is_monitored || !startedAt}
-              onClick={() => setShowLiveInference(true)}>
-              실제 YOLO 추론 화면
-            </button>
-          )}
-        </div>
-      )}
       <div className="camera live-camera" style={compact ? { minHeight: 0, aspectRatio: "16 / 9" } : undefined}>
         {url && startedAt ? (
           <video ref={videoRef} src={url} autoPlay muted playsInline loop preload="auto"
             // Do not expose independent seek UI: timeline is shared across cameras.
             controls={false}
-            style={{ display: showLiveInference ? "none" : "block", width: "100%", height: "100%", objectFit: "contain" }}
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
             aria-label={`${camera.name} 시연 동기화 영상`}
             onPlaying={() => setIsPlaying(true)}
             onWaiting={() => setIsPlaying(false)}
@@ -240,60 +221,75 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
             ? "시연 영상 공통 시작 시각·재생 주소 확인 중"
             : "시연 시작 전 · 영상 대기"}</p>
         )}
-        {!showLiveInference && url && !isPlaying && !error && (
+        {url && !isPlaying && !error && (
           <p role="status" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: 16, pointerEvents: "none" }}>
             동기화 영상 재생 준비 중…
           </p>
         )}
-        {!showLiveInference && n001 && url && startedAt && overlay?.ready && (
+        {n001 && url && startedAt && overlay?.ready && (
           <N001BboxOverlay videoRef={videoRef} data={overlay} />
         )}
-        {showLiveInference && (liveFrame ? (
-          <svg viewBox={`0 0 ${liveFrame.width} ${liveFrame.height}`}
-            preserveAspectRatio="xMidYMid meet" role="img"
-            aria-label={`${camera.external_cctv_id} 실제 YOLO 분석 프레임과 탐지 결과`}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-            <image href={`data:image/jpeg;base64,${liveFrame.image}`}
-              width={liveFrame.width} height={liveFrame.height} />
-            {liveFrame.detections.map((d, i) => (
-              <g key={i}>
-                <rect x={d.bbox[0]} y={d.bbox[1]}
-                  width={Math.max(0, d.bbox[2] - d.bbox[0])}
-                  height={Math.max(0, d.bbox[3] - d.bbox[1])}
-                  fill="none" stroke="#42e8ed" strokeWidth={3} />
-                <text x={d.bbox[0] + 4} y={Math.max(22, d.bbox[1] - 8)}
-                  fill="#dffeff" stroke="#071a29" strokeWidth={4}
-                  paintOrder="stroke" fontSize={Math.max(16, liveFrame.width / 60)}
-                  fontWeight="700">
-                  {hazardLabel(d.hazard_type)} {(d.confidence * 100).toFixed(1)}%
-                </text>
-              </g>
-            ))}
-          </svg>
-        ) : (
-          <p role="status" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: 16 }}>
-            {previewError ? "실제 YOLO 프레임 조회 실패 · API 상태를 확인해주세요."
-              : preview?.state === "OFF" ? "CCTV 감시 OFF"
-              : "최근 YOLO 분석 프레임 대기 중"}
-          </p>
-        ))}
+        {!compact && n001 && camera.is_monitored && startedAt && (
+          <aside aria-label="N001 최근 실제 YOLO 분석 프레임" style={{
+            position: "absolute", right: 12, bottom: 12, zIndex: 2,
+            width: "34%", minWidth: 165, maxWidth: 280,
+            padding: 8, borderRadius: 8, pointerEvents: "none",
+            border: "1px solid rgba(66,232,237,0.45)",
+            background: "rgba(7,26,41,0.92)", color: "#dffeff",
+            boxSizing: "border-box",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 5 }}>
+              실제 YOLO · 최근 분석 프레임
+            </div>
+            {liveFrame ? (
+              <>
+                <svg viewBox={`0 0 ${liveFrame.width} ${liveFrame.height}`}
+                  preserveAspectRatio="xMidYMid meet" role="img"
+                  aria-label="실제 분석된 이미지와 그 이미지에서 검출된 객체"
+                  style={{ display: "block", width: "100%", height: "auto" }}>
+                  <image href={`data:image/jpeg;base64,${liveFrame.image}`}
+                    width={liveFrame.width} height={liveFrame.height} />
+                  {liveFrame.detections.filter(d => d.bbox.length === 4).map((d, i) => (
+                    <g key={i}>
+                      <rect x={d.bbox[0]} y={d.bbox[1]}
+                        width={Math.max(0, d.bbox[2] - d.bbox[0])}
+                        height={Math.max(0, d.bbox[3] - d.bbox[1])}
+                        fill="none" stroke="#42e8ed" strokeWidth={3} />
+                      <text x={d.bbox[0] + 4} y={Math.max(22, d.bbox[1] - 8)}
+                        fill="#dffeff" stroke="#071a29" strokeWidth={4}
+                        paintOrder="stroke" fontSize={Math.max(16, liveFrame.width / 60)}
+                        fontWeight="700">
+                        {hazardLabel(d.hazard_type)} {(d.confidence * 100).toFixed(1)}%
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+                <div style={{ fontSize: 10, marginTop: 4 }}>
+                  {formatSeoulTime(liveFrame.captured_at)} · 탐지 {liveFrame.detections.length}개
+                </div>
+              </>
+            ) : (
+              <div role="status" style={{ fontSize: 11, padding: "12px 0" }}>
+                {previewError ? "실제 YOLO 프레임 조회 실패"
+                  : preview?.state === "OFF" ? "CCTV 감시 OFF"
+                  : "최근 분석 프레임 대기 중"}
+              </div>
+            )}
+          </aside>
+        )}
         <div className="camera-overlay-label">
           DEMO · {camera.external_cctv_id}
-          {showLiveInference ? " · 실제 YOLO 추론" : n001 && overlay?.ready ? " · 사전 YOLO 시각화" : " · 원본 영상"}
+          {n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
         </div>
       </div>
-      {!showLiveInference && error && <p role="alert">{error}</p>}
-      {!showLiveInference && syncWarning && <p role="status">{syncWarning}</p>}
+      {error && <p role="alert">{error}</p>}
+      {syncWarning && <p role="status">{syncWarning}</p>}
       {!compact && (
         <>
-          {showLiveInference ? (
-            <p>
-              {liveFrame ? `${formatSeoulTime(liveFrame.captured_at)} · 실제 분석 프레임 · 탐지 ${liveFrame.detections.length}개`
-                : "현재 분석 프레임을 기다리고 있습니다."}
-              {" · "}추론 프레임 갱신 표시이며 원본 영상과 동기화된 연속 영상이 아닙니다.
-            </p>
+          {n001 ? (
+            <p>메인 영상의 박스는 MP4 시점에 맞춘 사전 YOLO 결과입니다. 오른쪽 작은 화면은 실제 YOLO의 최근 분석 프레임으로, 메인 영상과 동일한 프레임은 아닙니다.</p>
           ) : (
-            <p>시연 시작 시점에 맞춘 동기화 재생입니다. N001 박스는 사전 분석 시각화이며, 실제 YOLO·사건 생성은 별도로 수행합니다.</p>
+            <p>시연 시작 시점에 맞춘 동기화 재생입니다. 실제 YOLO 분석과 사건 생성은 별도로 수행합니다.</p>
           )}
           <button className="secondary" type="button" disabled={!camera.is_monitored}
             onClick={() => setAttempt((value) => value + 1)}>영상 재연결</button>
