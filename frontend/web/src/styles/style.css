@@ -1602,3 +1602,24 @@ th {
 .incident-notice-popup { min-width: 260px; }
 @media (max-width: 1200px) { .octv-global-header .header-right .signal { display: none; } }
 @media (max-width: 700px) { .incident-notice-dropdown { max-width: min(360px, 85vw); } }
+
+
+/* External values retain their units only when numeric; source metadata stays compact. */
+.external .weather > div, .external .weather > div > div { min-width: 0; }
+.external .weather strong { white-space: nowrap; }
+.external .weather .external-status { font-size: 16px; }
+.external .external-provenance {
+  display: block;
+  font-size: 10px;
+  color: #8faabb;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.external .external-row { gap: 12px; }
+.external .external-row-value { min-width: 0; text-align: right; }
+.external .external-row-value b { white-space: nowrap; }
+@media (max-width: 480px) {
+  .external .weather { flex-wrap: wrap; gap: 12px; }
+  .external .weather > div { width: 100%; }
+  .external .weather > div + div { border-left: 0; padding-left: 0; }
+}

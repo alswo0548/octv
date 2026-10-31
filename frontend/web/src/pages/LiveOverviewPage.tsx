@@ -1,5 +1,5 @@
-import { incidentLabel, contextStatus } from "../incidentLabel";
-import { mappingStatus } from "../externalDisplay";
+import { incidentLabel } from "../incidentLabel";
+import { externalMetricText } from "../externalDisplay";
 /**
  * 후속-03 · 상황실 통합관제의 실제 사건 목록
  * 기존 mock 통계·도로 좌표 SVG를 실제 수치·지도인 것처럼 보여주지 않습니다.
@@ -116,17 +116,7 @@ export function LiveOverviewPage({
     ["활성 특보", data?.summary.active_weather_alert_count ?? "–", "건"],
   ];
 
-  const metric = (
-    value:
-      | {
-          status: string;
-          value: number | null;
-        }
-      | undefined,
-  ) =>
-    value?.status === "OK" && value.value != null
-      ? String(value.value)
-      : contextStatus(value?.status);
+  const metric = externalMetricText;
 
   return (
     <>
@@ -277,7 +267,6 @@ export function LiveOverviewPage({
 
       <Panel title={first ? `외부 상황 · 최우선 사건 ${incidentLabel(first)}` : "외부 상황"}>
         {external.error && <p role="alert">{external.error}</p>}
-        {first && <p className="content-footnote">{first.priority ?? "우선순위 대기"} · 위험도 {first.risk_score ?? "분석 대기"} · 진행 중인 최우선 사건 1건의 정보만 표시합니다.</p>}
 
         <div className="weather-alert info-strip">
           <span>☂</span>
@@ -299,9 +288,9 @@ export function LiveOverviewPage({
         <dl>
           <Pair
             label="강수량 / 수위"
-            value={`${metric(external.data?.rainfall_mm)} mm / ${metric(
-              external.data?.water_level_m,
-            )} m`}
+            value={`${metric(external.data?.rainfall_mm, "mm")} / ${metric(
+              external.data?.water_level_m, "m",
+            )}`}
           />
 
           <Pair
@@ -331,7 +320,7 @@ export function LiveOverviewPage({
           />
 
           <Pair
-            label={external.data?.external_data_source === "LIVE_MCP" ? "MCP 최신 조회 시각" : "외부 분석 저장 시각"}
+            label={external.data?.external_data_source === "LIVE_MCP" ? "MCP 수집 시각" : external.data?.external_data_source === "SAVED_FALLBACK" ? "최신 조회 실패 · 분석 저장 시각" : "외부 분석 저장 시각"}
             value={
               external.data?.last_received_at
                 ? formatSeoulTime(external.data.last_received_at)
@@ -340,16 +329,6 @@ export function LiveOverviewPage({
           />
         </dl>
 
-        {first && <p className="content-footnote">
-          자동 매핑 · 기상 {mappingStatus(external.data?.mapping_state?.weather)} / 수위 {mappingStatus(external.data?.mapping_state?.water)} / 교통 {mappingStatus(external.data?.mapping_state?.traffic)}
-          <br />{external.data?.external_data_source === "LIVE_MCP"
-            ? `MCP 최신 조회 성공 · ${external.data.live_checked_at ? formatSeoulTime(external.data.live_checked_at) : "조회 시각 미확인"} (최대 약 3분간 결과 재사용)`
-            : external.data?.external_data_source === "SAVED_FALLBACK"
-              ? "MCP 최신 조회 실패 · 아래 값은 과거 LangGraph 분석에 저장된 관측값입니다."
-              : "LangGraph 저장 관측값 · MCP 최신 조회 대기"}
-          <br />표시 수치는 각 외부기관의 실제 관측 시각을 따르며, 새 조회 자체가 새 관측값을 보장하지 않습니다. 특보 집중감시 수는 ALERT 모드 CCTV만 셉니다.
-          <br />검증되지 않은 도로통제·차단 차로는 숫자를 추정하지 않습니다.
-        </p>}
         {isAdmin && (
           <div className="quick-links">
             <button className="secondary" onClick={() => go("monitor")}>
@@ -365,3 +344,4 @@ export function LiveOverviewPage({
     </>
   );
 }
+

@@ -36,3 +36,30 @@ test('demo-only mapping is visibly labelled as simulated', () => {
  assert.match(mappingStatus('VERIFIED_EXACT_COLOCATION'), /공식 관측소/);
  assert.match(mappingStatus('CACHE_NOT_READY'), /캐시 없음/);
 });
+
+
+// Numeric provenance regressions: zero, unavailable, and scenario values must differ.
+import { externalMetric, externalMetricText } from '../frontend/web/src/externalDisplay.ts';
+test('actual zero takes precedence over a demo example and keeps its unit', () => {
+ const actual = externalMetric({status:'OK', value:0}, 'mm', 30);
+ assert.deepEqual(actual, {text:'0',unit:'mm',simulated:false,numeric:true});
+ assert.equal(externalMetricText({status:'OK',value:'0'}, 'm'), '0 m');
+});
+test('missing, stale and malformed values never gain physical units or become zero', () => {
+ for (const value of [null, undefined, '', ' ', true, false, NaN, Infinity, 'Infinity', 'missing', -1, '0x10']) {
+   const display = externalMetric({status:'OK',value}, 'm');
+   assert.equal(display.unit, '');
+   assert.equal(display.numeric, false);
+   assert.notEqual(display.text, '0');
+ }
+ for (const status of ['NO_DATA','NO_MAPPING','STALE','ERROR','TIMEOUT']) {
+   assert.equal(externalMetric({status,value:2.4}, 'm').unit, '');
+ }
+});
+test('only a supplied finite scenario example gets a star and unit', () => {
+ assert.deepEqual(externalMetric({status:'NO_DATA'}, 'm', 2.4),
+   {text:'2.4*',unit:'m',simulated:true,numeric:true});
+ assert.equal(externalMetric({status:'NO_MAPPING'}, '', 0).text, '0*');
+ assert.equal(externalMetric({status:'NO_DATA'}, 'm', NaN).unit, '');
+ assert.equal(externalMetric({status:'OK',value:1.1}, 'm', 2.4).text, '1.1');
+});
