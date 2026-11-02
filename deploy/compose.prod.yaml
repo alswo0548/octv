@@ -171,6 +171,27 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
 
+  # N001 DEMO-only bbox visualizer. It NEVER calls the Incident pipeline.
+  # Explicitly opt in using --profile n001-bbox. API flag is separate and OFF
+  # by default. Stop this service first if existing CCTV detection is delayed.
+  n001-bbox:
+    <<: *app
+    profiles: ["n001-bbox"]
+    restart: "on-failure:3"
+    command: ["python", "-m", "scripts.run_n001_bbox_display"]
+    cpus: 0.70
+    mem_limit: 1800m
+    pids_limit: 128
+    environment:
+      OCTV_N001_LIVE_BBOX_ENABLED: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
   web:
     build:
       context: ..

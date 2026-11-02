@@ -25,10 +25,11 @@ function pick(frames: LiveFrame[], videoTime: number): Picked | null {
 }
 
 export function RealtimeJsonOverlay({
-  videoRef, apiBase,
+  videoRef, apiBase, fetchFrames,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
-  apiBase: string;
+  apiBase?: string;
+  fetchFrames?: (videoTime: number) => Promise<{ enabled: boolean; frames: LiveFrame[] }>;
 }) {
   const [selected, setSelected] = useState<Picked | null>(null);
   const framesRef = useRef<LiveFrame[]>([]);
@@ -50,12 +51,19 @@ export function RealtimeJsonOverlay({
       } else {
         try {
           const stamp = video!.currentTime;
-          const response = await fetch(
-            `${apiBase}/api/demo/v5/live-boxes/4?video_time=${encodeURIComponent(stamp.toFixed(3))}`,
-            { cache: "no-store" },
-          );
-          if (!response.ok) throw new Error("YOLO JSON network error");
-          const data = await response.json() as { enabled: boolean; frames: LiveFrame[] };
+          // In production reuse the authenticated web session. The standalone
+          // localhost demo uses its own local-only API and the same overlay.
+          const data = fetchFrames
+            ? await fetchFrames(stamp)
+            : await (async () => {
+                if (!apiBase) throw new Error("No YOLO JSON source");
+                const response = await fetch(
+                  `${apiBase}/api/demo/v5/live-boxes/4?video_time=${encodeURIComponent(stamp.toFixed(3))}`,
+                  { cache: "no-store" },
+                );
+                if (!response.ok) throw new Error("YOLO JSON network error");
+                return response.json() as Promise<{ enabled: boolean; frames: LiveFrame[] }>;
+              })();
           if (!disposed) {
             framesRef.current = data.enabled && Array.isArray(data.frames) ? data.frames : [];
             receivedRef.current = performance.now();
@@ -97,7 +105,7 @@ export function RealtimeJsonOverlay({
       video.removeEventListener("waiting", onReset);
       video.removeEventListener("emptied", onReset);
     };
-  }, [apiBase, videoRef]);
+  }, [apiBase, fetchFrames, videoRef]);
 
   const frame = selected?.frame;
   return (
