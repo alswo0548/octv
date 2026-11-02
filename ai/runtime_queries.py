@@ -154,6 +154,11 @@ def create_query_factory(settings: dict, environment: dict):
                 weather_request_for, water_request_for, traffic_request_for,
                 mapping_reference_for,
             )
+            # Opt-in lazy repair: expired Redis mappings otherwise remain absent
+            # until monitoring is toggled or a manual prewarm is run.
+            if str(environment.get('OCTV_MAPPING_REPAIR_ON_MISS', '0')) == '1':
+                from backend.app.integrations.cctv_mapping import ensure_mapping
+                ensure_mapping(incident)
             reference_metadata = mapping_reference_for(incident)
             automatic_weather = weather_request_for(incident)
             if automatic_weather.get('mapped') is True:
@@ -169,6 +174,8 @@ def create_query_factory(settings: dict, environment: dict):
                     **(previous if isinstance(previous, dict) else {}),
                     **automatic_traffic,
                 }
+        from backend.app.integrations.verified_traffic import reviewed_query
+        traffic_link_query = reviewed_query(incident, cctv.get('traffic_link_review'), now, environment)
         weather = cctv.get('weather', {'mapped': False})
         if not isinstance(weather, dict):
             raise ValueError('weather 설정은 JSON 객체여야 합니다.')
@@ -184,6 +191,7 @@ def create_query_factory(settings: dict, environment: dict):
             if not secrets['WEATHER_API_KEY']:
                 weather = {'mapped': False}
         weather_query = _prepare_query(weather, now, variables)
+        weather_query['previous_hour_fallback'] = str(environment.get('OCTV_WEATHER_PREVIOUS_HOUR_ENABLED', '0')) == '1'
 
         water = cctv.get('water_level', {'mapped': False})
         if not isinstance(water, dict):
@@ -230,6 +238,7 @@ def create_query_factory(settings: dict, environment: dict):
             'water_level': water_query,
             'traffic': traffic_query,
             'traffic_nearby_events': traffic_events_query,
+            'traffic_link_observation': traffic_link_query,
             'mapping_references': reference_metadata,
             'places': {
                 'mapped': bool(places_key),

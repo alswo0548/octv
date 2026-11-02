@@ -4,7 +4,7 @@ r"""기존 감시 ON CCTV를 포함하여 자동 매핑 캐시를 한 번 준비
   .venv\Scripts\python -m scripts.prewarm_cctv_context_mapping --cctv-id 3
   .venv\Scripts\python -m scripts.prewarm_cctv_context_mapping --all-monitored
 
-API 요청·DB 변경·사건/알림 생성 없음. Redis 매핑 키만 생성합니다.
+외부 API 조회 및 Redis 매핑 키 생성. DB 변경·사건/알림 생성 없음.
 """
 
 import argparse
@@ -35,3 +35,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

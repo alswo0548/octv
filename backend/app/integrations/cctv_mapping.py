@@ -459,3 +459,19 @@ def cache_weather_payload(query: dict, payload: dict) -> None:
     except Exception:
         # 캐시 실패는 정상 API 응답을 덮어쓰지 않는다.
         return
+
+
+
+def ensure_mapping(incident: dict) -> str:
+    """Repair an expired mapping in the analysis worker, never the video path.
+
+    Existing distributed lock and short error TTL bound retries. No DB writes.
+    Caller must explicitly enable OCTV_MAPPING_REPAIR_ON_MISS.
+    """
+    cctv = {**incident, "id": incident.get("cctv_id", incident.get("id")),
+            "name": incident.get("cctv_name") or incident.get("name"),
+            "provider": incident.get("provider", "UTIC")}
+    try:
+        return prepare_cached_mapping(cctv)
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return "INVALID_COORDINATES"

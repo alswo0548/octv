@@ -63,6 +63,8 @@ def collect_context(incident_id, query_factory):
         }
     )
     traffic_events = nearby_event_measurement(queries.get('traffic_nearby_events'))
+    from .verified_traffic import fetch_speed
+    traffic_speed = fetch_speed(queries.get('traffic_link_observation', {'now': now}))
     facilities = places.fetch_data(
         {
             **queries.get('places', {'mapped': False}),
@@ -77,6 +79,7 @@ def collect_context(incident_id, query_factory):
         'water_risk_level': water_risk,
         **road,
         'traffic_nearby_events': traffic_events,
+        'traffic_speed_kmh': traffic_speed,
         **facilities,
         # 자동 매핑 미확정 사유는 Rule 입력과 별도 이름으로 보존합니다.
         # 위험 판단·기관 추천 정책은 변경하지 않습니다.
@@ -98,3 +101,4 @@ def collect_context(incident_id, query_factory):
     )
 
     return snapshot
+
