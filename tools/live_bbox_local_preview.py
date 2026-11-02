@@ -4,15 +4,14 @@ Binds to 127.0.0.1 only. Exactly one YOLO model, one analysis thread.
 from __future__ import annotations
 
 import json
-import math
 import re
-import numpy as np
-from urllib.parse import parse_qs, urlsplit
 import threading
 import time
 from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit, parse_qs
+from math import isfinite
 from pathlib import Path
 
 import cv2
@@ -33,7 +32,7 @@ MOBILE = ASSET_ROOT / "demo/videos/N001_demo_mobile.mp4"
 MODEL = ASSET_ROOT / "demo/videos/_v5/weights/N052_S2_epoch005.pt"
 PUBLIC_VIDEO = MOBILE if MOBILE.is_file() else VIDEO
 PORT = 8765
-INTERVAL_SEC = 3.0
+INTERVAL_SEC = 1.0  # Fresh real inference each second, independent of native video playback
 ALLOWED_ORIGINS = {"http://127.0.0.1:4173", "http://localhost:4173"}
 
 if not VIDEO.is_file() or not MODEL.is_file():
@@ -60,6 +59,8 @@ samples = 0
 positive = 0
 last_pts = None
 last_poll = time.monotonic()
+clock_time = 0.0
+clock_received = time.monotonic()
 
 
 def snapshot_status() -> dict:
@@ -82,7 +83,10 @@ def analysis_worker(token: int, stopper: threading.Event, offset: float, started
             if stopper.wait(max(0.0, next_tick - time.monotonic())):
                 break
             captured_monotonic = time.monotonic()
-            t = (offset + captured_monotonic - started) % DURATION
+            with state_lock:
+                # The browser sends ONLY its currentTime, not the video pixels.
+                # YOLO still runs on real decoded source frames in this process.
+                t = (clock_time + captured_monotonic - clock_received) % DURATION
             cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
             ok, image = cap.read()
             if ok:
@@ -145,14 +149,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        global last_poll
-        path = self.path.split("?", 1)[0]
+        global last_poll, clock_time, clock_received
+        parsed = urlsplit(self.path)
+        path = parsed.path
         if path == "/api/status":
             return self.json_response(200, snapshot_status())
         if path == "/api/demo/v5/live-boxes/4":
             now = time.monotonic()
+            query = parse_qs(parsed.query)
             with state_lock:
                 last_poll = now
+                # Correct drift using video playback time, without ever seeking
+                # or changing the speed of the browser's native <video>.
+                try:
+                    reported = float(query.get("video_time", ["nan"])[0])
+                    if isfinite(reported) and 0 <= reported < DURATION and active:
+                        expected = (clock_time + now - clock_received) % DURATION
+                        distance = abs((reported - expected + DURATION / 2) % DURATION - DURATION / 2)
+                        if distance > 0.12:
+                            clock_time = reported
+                            clock_received = now
+                except (ValueError, TypeError):
+                    pass
                 rows = [{**{k: v for k, v in row.items() if k != "captured_monotonic"},
                          "age_sec": max(0, now - row["captured_monotonic"])}
                         for row in history if now - row["captured_monotonic"] <= 3.0]
@@ -163,16 +181,13 @@ class Handler(BaseHTTPRequestHandler):
         return self.json_response(404, {"error": "not found"})
 
     def do_POST(self):
-        global active, session, stop_event, samples, positive, last_pts, last_poll
+        global active, session, stop_event, samples, positive, last_pts, last_poll, clock_time, clock_received
         origin = self.headers.get("Origin", "")
         if origin and origin not in ALLOWED_ORIGINS:
             return self.json_response(403, {"error": "origin not allowed"})
-        endpoint = urlsplit(self.path).path
-        if endpoint == "/api/infer-frame":
-            return self.infer_browser_frame()
-        if endpoint not in ("/api/start", "/api/start-browser", "/api/stop"):
+        if self.path not in ("/api/start", "/api/stop"):
             return self.json_response(404, {"error": "not found"})
-        if endpoint in ("/api/start", "/api/start-browser"):
+        if self.path == "/api/start":
             length = int(self.headers.get("Content-Length", "0"))
             if length > 128:
                 return self.json_response(413, {"error": "body too long"})
@@ -190,62 +205,16 @@ class Handler(BaseHTTPRequestHandler):
             stop_event = threading.Event()
             history.clear()
             samples, positive, last_pts = 0, 0, None
-            active = endpoint in ("/api/start", "/api/start-browser")
+            active = self.path == "/api/start"
             last_poll = time.monotonic()
-            # In browser mode YOLO only consumes real browser-displayed JPEG frames.
-            # Do NOT start a second, independently timed video decoder.
-            if endpoint == "/api/start":
+            if active:
+                clock_time = offset
+                clock_received = last_poll
                 started = time.monotonic()
                 threading.Thread(target=analysis_worker,
                                  args=(token, stop_event, offset, started),
                                  daemon=True, name="preview-yolo").start()
         return self.json_response(200, {"enabled": active, "session": token})
-
-    def infer_browser_frame(self):
-        global samples, positive, last_pts, last_poll
-        params = parse_qs(urlsplit(self.path).query)
-        try:
-            pts = float(params.get("t", ["-1"])[0])
-            size = int(self.headers.get("Content-Length", "0"))
-            if not math.isfinite(pts) or not 0 <= pts < DURATION or not 1 <= size <= 750000:
-                raise ValueError("invalid image size or time")
-        except (TypeError, ValueError, OverflowError):
-            return self.json_response(400, {"error": "invalid image time or size"})
-        if self.headers.get("Content-Type", "").split(";", 1)[0] != "image/jpeg":
-            return self.json_response(415, {"error": "expected image/jpeg"})
-        with state_lock:
-            if not active:
-                return self.json_response(409, {"error": "preview is stopped"})
-            token = session
-        image = cv2.imdecode(np.frombuffer(self.rfile.read(size), dtype=np.uint8), cv2.IMREAD_COLOR)
-        if image is None or image.shape[0] > 720 or image.shape[1] > 1280:
-            return self.json_response(400, {"error": "invalid frame dimensions"})
-        with detector_lock:
-            res = detector.predict(source=image, imgsz=640, device="cpu",
-                                   conf=0.5, verbose=False)[0]
-        boxes = []
-        if res.boxes is not None:
-            for xyxy, conf, cls in zip(res.boxes.xyxy.cpu().tolist(),
-                                       res.boxes.conf.cpu().tolist(),
-                                       res.boxes.cls.cpu().tolist()):
-                if res.names[int(cls)] == "flood" and conf >= 0.8:
-                    boxes.append({"bbox": [float(v) for v in xyxy],
-                                  "confidence": float(conf), "hazard_type": "flood"})
-        with state_lock:
-            if token != session or not active:
-                return self.json_response(409, {"error": "preview restarted"})
-            samples += 1
-            positive += bool(boxes)
-            last_pts = round(pts, 3)
-            last_poll = time.monotonic()
-        print(f"[BROWSER FRAME YOLO] t={pts:.2f} boxes={len(boxes)}", flush=True)
-        return self.json_response(200, {
-            "enabled": True, "frames": [{
-                "t": pts, "age_sec": 0, "width": image.shape[1],
-                "height": image.shape[0], "source_epoch": str(token),
-                "boxes": boxes,
-            }]
-        })
 
     def stream_video(self):
         length = PUBLIC_VIDEO.stat().st_size
@@ -298,6 +267,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"[PREVIEW] localhost:{PORT}, file={PUBLIC_VIDEO.name}", flush=True)
     print("[PREVIEW] Production DB/API/Redis/FCM are not used.", flush=True)
+    print("[PREVIEW] REAL YOLO => fresh JSON about once per second; video playback is independent.", flush=True)
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True
     try:

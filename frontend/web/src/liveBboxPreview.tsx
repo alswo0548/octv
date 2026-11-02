@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { LiveBboxOverlay } from "./components/LiveBboxOverlay";
-import type { LiveFrame } from "./components/liveBboxTiming";
+import { RealtimeJsonOverlay } from "./components/RealtimeJsonOverlay";
 
 const API = "http://127.0.0.1:8765";
 type Status = {
@@ -22,30 +21,6 @@ function LocalPreview() {
   const [status, setStatus] = useState<Status | null>(null);
   const [videoTime, setVideoTime] = useState(0);
   const [dropped, setDropped] = useState("N/A");
-
-  const fetchFrames = useCallback(async (): Promise<{
-    enabled: boolean;
-    frames: LiveFrame[];
-  }> => {
-    const response = await fetch(`${API}/api/demo/v5/live-boxes/4`, {
-      cache: "no-store",
-    });
-    if (!response.ok) throw new Error(`Local API ${response.status}`);
-    return response.json() as Promise<{ enabled: boolean; frames: LiveFrame[] }>;
-  }, []);
-
-  const inferVideoFrame = useCallback(async (blob: Blob, mediaTime: number): Promise<{
-    enabled: boolean;
-    frames: LiveFrame[];
-  }> => {
-    const response = await fetch(
-      `${API}/api/infer-frame?t=${encodeURIComponent(mediaTime.toFixed(3))}`,
-      { method: "POST", headers: { "Content-Type": "image/jpeg" },
-        body: blob, cache: "no-store" },
-    );
-    if (!response.ok) throw new Error(`YOLO frame request: ${response.status}`);
-    return response.json() as Promise<{ enabled: boolean; frames: LiveFrame[] }>;
-  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -103,7 +78,7 @@ function LocalPreview() {
         });
       }
       await video.play();
-      const response = await fetch(`${API}/api/start-browser`, {
+      const response = await fetch(`${API}/api/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ offset: video.currentTime }),
@@ -144,8 +119,9 @@ function LocalPreview() {
         <h1 style={{ fontSize: 28, margin: "7px 0" }}>N001 실시간 YOLO 바운딩박스</h1>
         <p style={{ color: "#a6bccb", marginTop: 5, lineHeight: 1.6 }}>
           실제 N001 영상과 실제 N052 YOLO 모델을 사용합니다. 운영 DB·Redis·알림·서버에는
-          연결하지 않습니다. 브라우저는 영상을 30FPS로 그대로 재생하면서, 화면의 실제 프레임을
-          약 0.7초마다 Python YOLO에 보내 추론합니다. 가짜 박스나 사전 JSON은 사용하지 않습니다.
+          연결하지 않습니다. 브라우저는 영상을 원래 FPS와 1배속 그대로 재생합니다. 별도 Python YOLO가
+          영상 파일을 약 1초 간격으로 실시간 분석하고, 웹은 0.5초마다 JSON만 조회합니다.
+          사전 분석 JSON은 사용하지 않습니다.
         </p>
         <div
           style={{
@@ -170,13 +146,7 @@ function LocalPreview() {
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
           {running && (
-            <LiveBboxOverlay
-              cameraId={4}
-              sessionVersion={0}
-              videoRef={videoRef}
-              fetchFrames={fetchFrames}
-              inferVideoFrame={inferVideoFrame}
-            />
+            <RealtimeJsonOverlay videoRef={videoRef} apiBase={API} />
           )}
           <div
             style={{
@@ -217,10 +187,10 @@ function LocalPreview() {
             분석 원본: N001_demo.mp4</div>
         </section>
         <p style={{ color: "#adc7d4", fontSize: 13, lineHeight: 1.7 }}>
-          <span style={{ color: "#42e8ed" }}>■ 청록색 실선</span>은 실제 YOLO가
-          해당 화면 프레임을 분석한 결과입니다. 청록색 점선은 최대 1.1초 안의
-          최근 YOLO 박스 위치이며, 새 탐지·객체 추적이 아닙니다. 다음 분석에서 탐지가
-          없거나 결과가 오래되면 즉시 사라집니다. 감지·추론 이외의 사건 처리는 하지 않습니다.
+          <span style={{ color: "#42e8ed" }}>■ 청록색</span>은 독립 실행 중인 YOLO가
+          실시간 분석해 반환한 JSON입니다. 각 박스에 분석 시점과의 차이를 표시하고
+          1.35초가 지나면 숨깁니다. 브라우저에서 별도 프레임 추출·전송·재추론·보간은
+          하지 않습니다. 영상 재생 속도는 변경하지 않습니다.
           검증 후 테스트 창을 닫고 실행 창 두 개에서 Ctrl+C를 누르면 종료됩니다.
         </p>
       </main>
