@@ -15,6 +15,12 @@ if not exist "node_modules\.bin\vite.cmd" (
     exit /b 1
   )
 )
+echo Checking local web TypeScript compilation...
+call npm run typecheck --workspace=@octv/web
+if errorlevel 1 (
+  echo TypeScript errors detected: preview not started.
+  exit /b 1
+)
 "%OCTV_PY%" -c "import cv2,ultralytics; print('Python YOLO packages OK')"
 if errorlevel 1 (
   echo Python venv missing cv2 or ultralytics.
