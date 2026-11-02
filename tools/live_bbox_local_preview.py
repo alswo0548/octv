@@ -16,16 +16,25 @@ import cv2
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parents[1]
-VIDEO = ROOT / "demo/videos/N001_demo.mp4"
-MOBILE = ROOT / "demo/videos/N001_demo_mobile.mp4"
-MODEL = ROOT / "demo/videos/_v5/weights/N052_S2_epoch005.pt"
+# This preview runs in a separate git worktree. Large MP4/PT assets are usually
+# gitignored and remain only in the user's ORIGINAL octv checkout. Read them
+# there without copying or changing the original files.
+ASSET_CANDIDATES = (ROOT, ROOT.parent / "octv")
+ASSET_ROOT = next((
+    root for root in ASSET_CANDIDATES
+    if (root / "demo/videos/N001_demo.mp4").is_file()
+    and (root / "demo/videos/_v5/weights/N052_S2_epoch005.pt").is_file()
+), ROOT)
+VIDEO = ASSET_ROOT / "demo/videos/N001_demo.mp4"
+MOBILE = ASSET_ROOT / "demo/videos/N001_demo_mobile.mp4"
+MODEL = ASSET_ROOT / "demo/videos/_v5/weights/N052_S2_epoch005.pt"
 PUBLIC_VIDEO = MOBILE if MOBILE.is_file() else VIDEO
 PORT = 8765
 INTERVAL_SEC = 3.0
 ALLOWED_ORIGINS = {"http://127.0.0.1:4173", "http://localhost:4173"}
 
 if not VIDEO.is_file() or not MODEL.is_file():
-    raise SystemExit(f"Required N001 file missing: video={VIDEO.is_file()}, model={MODEL.is_file()}")
+    raise SystemExit(f"Required N001 assets missing: video={VIDEO.is_file()}, model={MODEL.is_file()}; searched: {ASSET_CANDIDATES}")
 
 probe = cv2.VideoCapture(str(VIDEO))
 fps = probe.get(cv2.CAP_PROP_FPS)
@@ -35,6 +44,7 @@ if fps <= 0 or count <= 0:
     raise SystemExit("Cannot read N001 video FPS/duration")
 DURATION = count / fps
 
+print(f"[PREVIEW] Reading real assets from: {ASSET_ROOT}", flush=True)
 print("[PREVIEW] Loading actual N001 YOLO model...", flush=True)
 detector = YOLO(str(MODEL))
 detector_lock = threading.Lock()
