@@ -25,11 +25,12 @@ function pick(frames: LiveFrame[], videoTime: number): Picked | null {
 }
 
 export function RealtimeJsonOverlay({
-  videoRef, apiBase, fetchFrames,
+  videoRef, apiBase, fetchFrames, onUnavailable,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   apiBase?: string;
   fetchFrames?: (videoTime: number) => Promise<{ enabled: boolean; frames: LiveFrame[] }>;
+  onUnavailable?: () => void;
 }) {
   const [selected, setSelected] = useState<Picked | null>(null);
   const framesRef = useRef<LiveFrame[]>([]);
@@ -65,8 +66,13 @@ export function RealtimeJsonOverlay({
                 return response.json() as Promise<{ enabled: boolean; frames: LiveFrame[] }>;
               })();
           if (!disposed) {
-            framesRef.current = data.enabled && Array.isArray(data.frames) ? data.frames : [];
-            receivedRef.current = performance.now();
+            if (!data.enabled) {
+              clear();
+              onUnavailable?.(); // N001-only sidecar stopped; restore original display.
+            } else {
+              framesRef.current = Array.isArray(data.frames) ? data.frames : [];
+              receivedRef.current = performance.now();
+            }
           }
         } catch {
           if (!disposed) clear();
@@ -105,7 +111,7 @@ export function RealtimeJsonOverlay({
       video.removeEventListener("waiting", onReset);
       video.removeEventListener("emptied", onReset);
     };
-  }, [apiBase, fetchFrames, videoRef]);
+  }, [apiBase, fetchFrames, onUnavailable, videoRef]);
 
   const frame = selected?.frame;
   return (

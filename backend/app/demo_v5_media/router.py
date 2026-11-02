@@ -254,16 +254,18 @@ def n001_live_boxes(cctv_id: int, _admin=Depends(require_control_admin)):
         return {"enabled": False, "frames": []}
     try:
         raw = client().get(key)
-        payload = json.loads(raw) if raw else {}
+        # Sidecar stopped or TTL expired: the UI can switch back to the
+        # original N001 overlay without restarting production API/CCTV.
+        if not raw:
+            return {"enabled": False, "frames": []}
+        payload = json.loads(raw)
         captured = datetime.fromisoformat(payload["captured_at"])
         generated = datetime.fromisoformat(payload["generated_at"])
         now = datetime.now(timezone.utc)
         age = (now - generated).total_seconds()
-        if (
-            payload.get("session") != started.isoformat()
-            or captured < started or not 0 <= age <= 3
-            or payload["frame"]["width"] <= 0 or payload["frame"]["height"] <= 0
-        ):
+        if payload.get("session") != started.isoformat() or captured < started:
+            return {"enabled": False, "frames": []}
+        if not 0 <= age <= 3 or payload["frame"]["width"] <= 0 or payload["frame"]["height"] <= 0:
             return {"enabled": True, "frames": []}
         frame = payload["frame"]
         if not isinstance(frame.get("boxes"), list):

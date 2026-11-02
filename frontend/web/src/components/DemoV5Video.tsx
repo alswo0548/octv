@@ -36,6 +36,17 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     [session.version, camera.id],
   );
 
+  const restoreN001Overlay = useCallback(() => {
+    setLiveMode(false);
+    void requestWebApi<N001OverlayData>(
+      session.version, `/api/demo/v5/n001-overlay/${camera.id}`,
+    ).then((data) => {
+      if (data.ready) setOverlay(data);
+    }).catch(() => {
+      // Never interfere with native MP4 playback if the optional JSON fails.
+    });
+  }, [session.version, camera.id]);
+
   useEffect(() => {
     let disposed = false;
     setUrl(null);
@@ -196,7 +207,8 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
         )}
         {liveMode && n001 && url && startedAt && (
           <RealtimeJsonOverlay key={`${camera.id}:${startedAt}:${attempt}`}
-            videoRef={videoRef} fetchFrames={fetchN001Frames} />
+            videoRef={videoRef} fetchFrames={fetchN001Frames}
+            onUnavailable={restoreN001Overlay} />
         )}
         {!liveMode && n001 && url && startedAt && overlay?.ready && (
           <N001BboxOverlay videoRef={videoRef} data={overlay} />
