@@ -77,10 +77,13 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   // The API opt-in flag selects live metadata; existing offline assets remain intact.
   useEffect(() => {
     let disposed = false;
+    let retryTimer: number | undefined;
+    let attempts = 0;
     setOverlay(null);
     setLiveMode(false);
     if (!camera.is_monitored || !startedAt || !n001) return;
-    void (async () => {
+
+    async function checkLiveMode() {
       let enabled = false;
       try {
         const mode = await requestWebApi<{ enabled: boolean }>(session.version,
@@ -88,16 +91,31 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
         enabled = mode.enabled;
       } catch { /* Older API: preserve the existing explicitly labelled replay. */ }
       if (disposed) return;
-      setLiveMode(enabled);
-      if (!enabled && n001) {
+      if (enabled) {
+        setOverlay(null);
+        setLiveMode(true);
+        return;
+      }
+      // The sidecar has no Redis JSON until the first active-session inference.
+      // Keep the original overlay while briefly retrying, rather than requiring a reload.
+      if (attempts === 0) {
         try {
           const data = await requestWebApi<N001OverlayData>(session.version,
             `/api/demo/v5/n001-overlay/${camera.id}`);
           if (!disposed && data.ready) setOverlay(data);
         } catch { /* Metadata failure never prevents MP4 playback. */ }
       }
-    })();
-    return () => { disposed = true; };
+      if (disposed) return;
+      attempts += 1;
+      if (attempts < 12) {
+        retryTimer = window.setTimeout(() => { void checkLiveMode(); }, 1500);
+      }
+    }
+    void checkLiveMode();
+    return () => {
+      disposed = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [n001, camera.id, camera.is_monitored, startedAt, session.version, attempt]);
 
   // Synchronize once after the browser can actually play decoded frames.
