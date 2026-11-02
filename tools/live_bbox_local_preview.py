@@ -4,7 +4,10 @@ Binds to 127.0.0.1 only. Exactly one YOLO model, one analysis thread.
 from __future__ import annotations
 
 import json
+import math
 import re
+import numpy as np
+from urllib.parse import parse_qs, urlsplit
 import threading
 import time
 from collections import deque
@@ -164,9 +167,12 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin", "")
         if origin and origin not in ALLOWED_ORIGINS:
             return self.json_response(403, {"error": "origin not allowed"})
-        if self.path not in ("/api/start", "/api/stop"):
+        endpoint = urlsplit(self.path).path
+        if endpoint == "/api/infer-frame":
+            return self.infer_browser_frame()
+        if endpoint not in ("/api/start", "/api/start-browser", "/api/stop"):
             return self.json_response(404, {"error": "not found"})
-        if self.path == "/api/start":
+        if endpoint in ("/api/start", "/api/start-browser"):
             length = int(self.headers.get("Content-Length", "0"))
             if length > 128:
                 return self.json_response(413, {"error": "body too long"})
@@ -184,14 +190,62 @@ class Handler(BaseHTTPRequestHandler):
             stop_event = threading.Event()
             history.clear()
             samples, positive, last_pts = 0, 0, None
-            active = self.path == "/api/start"
+            active = endpoint in ("/api/start", "/api/start-browser")
             last_poll = time.monotonic()
-            if active:
+            # In browser mode YOLO only consumes real browser-displayed JPEG frames.
+            # Do NOT start a second, independently timed video decoder.
+            if endpoint == "/api/start":
                 started = time.monotonic()
                 threading.Thread(target=analysis_worker,
                                  args=(token, stop_event, offset, started),
                                  daemon=True, name="preview-yolo").start()
         return self.json_response(200, {"enabled": active, "session": token})
+
+    def infer_browser_frame(self):
+        global samples, positive, last_pts, last_poll
+        params = parse_qs(urlsplit(self.path).query)
+        try:
+            pts = float(params.get("t", ["-1"])[0])
+            size = int(self.headers.get("Content-Length", "0"))
+            if not math.isfinite(pts) or not 0 <= pts < DURATION or not 1 <= size <= 750000:
+                raise ValueError("invalid image size or time")
+        except (TypeError, ValueError, OverflowError):
+            return self.json_response(400, {"error": "invalid image time or size"})
+        if self.headers.get("Content-Type", "").split(";", 1)[0] != "image/jpeg":
+            return self.json_response(415, {"error": "expected image/jpeg"})
+        with state_lock:
+            if not active:
+                return self.json_response(409, {"error": "preview is stopped"})
+            token = session
+        image = cv2.imdecode(np.frombuffer(self.rfile.read(size), dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image is None or image.shape[0] > 720 or image.shape[1] > 1280:
+            return self.json_response(400, {"error": "invalid frame dimensions"})
+        with detector_lock:
+            res = detector.predict(source=image, imgsz=640, device="cpu",
+                                   conf=0.5, verbose=False)[0]
+        boxes = []
+        if res.boxes is not None:
+            for xyxy, conf, cls in zip(res.boxes.xyxy.cpu().tolist(),
+                                       res.boxes.conf.cpu().tolist(),
+                                       res.boxes.cls.cpu().tolist()):
+                if res.names[int(cls)] == "flood" and conf >= 0.8:
+                    boxes.append({"bbox": [float(v) for v in xyxy],
+                                  "confidence": float(conf), "hazard_type": "flood"})
+        with state_lock:
+            if token != session or not active:
+                return self.json_response(409, {"error": "preview restarted"})
+            samples += 1
+            positive += bool(boxes)
+            last_pts = round(pts, 3)
+            last_poll = time.monotonic()
+        print(f"[BROWSER FRAME YOLO] t={pts:.2f} boxes={len(boxes)}", flush=True)
+        return self.json_response(200, {
+            "enabled": True, "frames": [{
+                "t": pts, "age_sec": 0, "width": image.shape[1],
+                "height": image.shape[0], "source_epoch": str(token),
+                "boxes": boxes,
+            }]
+        })
 
     def stream_video(self):
         length = PUBLIC_VIDEO.stat().st_size

@@ -18,11 +18,16 @@ export function LiveBboxOverlay({
   cameraId,
   sessionVersion,
   fetchFrames,
+  inferVideoFrame,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   cameraId: number;
   sessionVersion: number;
   fetchFrames?: () => Promise<{ enabled: boolean; frames: LiveFrame[] }>;
+  inferVideoFrame?: (blob: Blob, mediaTime: number) => Promise<{
+    enabled: boolean;
+    frames: LiveFrame[];
+  }>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -44,6 +49,12 @@ export function LiveBboxOverlay({
     let lastCaptured = 0;
     let lastMediaTime = -1;
     let browserLoop = 0;
+    let lastInfer = 0;
+    let inferPending = false;
+    const inferCanvas = document.createElement("canvas");
+    inferCanvas.width = 640;
+    inferCanvas.height = 360;
+    const inferContext = inferCanvas.getContext("2d");
     const snapshots: GraySnapshot[] = [];
     const scaled = document.createElement("canvas");
     scaled.width = 256;
@@ -63,6 +74,7 @@ export function LiveBboxOverlay({
     // The video stays at its native FPS. Only a small 256x144 grayscale copy
     // is sampled for visualization, at <= 8Hz, with bounded memory and CPU.
     const capture = (now: number, mediaTime: number) => {
+      if (inferVideoFrame) return; // Local test uses the actual displayed video frame as YOLO input.
       if (disposed || document.hidden || video.paused || video.seeking ||
           video.readyState < 2 || !captureContext ||
           !Number.isFinite(mediaTime)) return;
@@ -107,6 +119,41 @@ export function LiveBboxOverlay({
       videoFrameId = video.requestVideoFrameCallback(onVideoFrame);
     }
 
+    const sendDisplayedFrame = (now: number) => {
+      if (!inferVideoFrame || !inferContext || disposed || inferPending ||
+          video.paused || video.seeking || document.hidden || video.readyState < 3 ||
+          !video.videoWidth || !video.videoHeight ||
+          now - lastInfer < 650) return;
+      const mediaTime = video.currentTime;
+      if (!Number.isFinite(mediaTime)) return;
+      const sent = performance.now();
+      lastInfer = now;
+      inferPending = true;
+      inferCanvas.height = Math.max(1, Math.round(640 * video.videoHeight / video.videoWidth));
+      try {
+        inferContext.drawImage(video, 0, 0, inferCanvas.width, inferCanvas.height);
+        inferCanvas.toBlob((blob) => {
+          if (!blob || disposed) {
+            inferPending = false;
+            return;
+          }
+          void inferVideoFrame(blob, mediaTime).then((data) => {
+            if (disposed) return;
+            frames = data.enabled && Array.isArray(data.frames) ? data.frames : [];
+            receivedAt = sent;
+            metadataRevision++;
+          }).catch(() => {
+            if (!disposed) clear();
+          }).finally(() => {
+            inferPending = false;
+          });
+        }, "image/jpeg", 0.78);
+      } catch {
+        inferPending = false;
+        clear();
+      }
+    };
+
     const poll = async () => {
       // Include network latency in age; never assume a received result is new.
       const sent = performance.now();
@@ -144,6 +191,7 @@ export function LiveBboxOverlay({
       if (canvas && now - lastDraw >= 50) {
         lastDraw = now;
         if (!hasVideoFrameCallback) capture(now, video.currentTime);
+        sendDisplayedFrame(now);
         const w = video.clientWidth;
         const h = video.clientHeight;
         if (canvas.width !== w) canvas.width = w;
@@ -155,8 +203,8 @@ export function LiveBboxOverlay({
           ctx.clearRect(0, 0, w, h);
           const canShow = !video.paused && !video.seeking &&
             !document.hidden && video.readyState >= 3 &&
-            receivedAt > 0 && snapshots.length > 0;
-          if (canShow &&
+            receivedAt > 0 && (inferVideoFrame ? true : snapshots.length > 0);
+          if (canShow && !inferVideoFrame &&
               (frameRevision !== computedFrameRevision ||
                metadataRevision !== computedMetadataRevision)) {
             computedFrameRevision = frameRevision;
@@ -179,35 +227,51 @@ export function LiveBboxOverlay({
             now - receivedAt <= 3600 &&
             Math.abs(snapshots[snapshots.length - 1].time - video.currentTime) <= 0.18
               ? visual : null;
-          if (current && visualAnchor) {
-            const ratio = Math.min(w / visualAnchor.width, h / visualAnchor.height);
-            const dx = (w - visualAnchor.width * ratio) / 2;
-            const dy = (h - visualAnchor.height * ratio) / 2;
+          // Local browser-driven preview: only render detections from an actual
+          // frame captured from this <video>. A dashed outline is the LAST
+          // sampled result (<1.1s old), not a new inference or fake tracking.
+          const recent = canShow && inferVideoFrame && now - receivedAt <= 1400
+            ? frames.find((f) => Number.isFinite(f.t) &&
+                f.t <= video.currentTime &&
+                video.currentTime - f.t <= 1.1 &&
+                f.boxes?.length > 0)
+            : undefined;
+          const source = recent ?? (current ? visualAnchor : null);
+          const boxes = recent?.boxes ?? current?.boxes;
+          if (source && boxes?.length) {
+            const ratio = Math.min(w / source.width, h / source.height);
+            const dx = (w - source.width * ratio) / 2;
+            const dy = (h - source.height * ratio) / 2;
+            const sampledAge = recent ? video.currentTime - recent.t : 0;
+            const cached = !!recent && sampledAge > 0.12;
+            const tracked = !recent && current?.kind === "visual-track";
             ctx.lineWidth = 2;
             ctx.font = "bold 13px sans-serif";
-            const tracked = current.kind === "visual-track";
             ctx.strokeStyle = tracked ? "#ffd07b" : "#42e8ed";
             ctx.fillStyle = ctx.strokeStyle;
-            for (const box of current.boxes) {
+            ctx.setLineDash(cached ? [7, 4] : []);
+            for (const box of boxes) {
               const b = box.bbox;
               if (!b.every(Number.isFinite) || b[0] < 0 || b[1] < 0 ||
-                  b[2] > visualAnchor.width || b[3] > visualAnchor.height ||
+                  b[2] > source.width || b[3] > source.height ||
                   b[2] <= b[0] || b[3] <= b[1]) continue;
               const x = dx + b[0] * ratio;
               const y = dy + b[1] * ratio;
               ctx.strokeRect(x, y, (b[2] - b[0]) * ratio, (b[3] - b[1]) * ratio);
               ctx.fillText(
                 tracked ? `${box.hazard_type} · 화면 추적` :
+                  cached ? `${box.hazard_type} · 최근 YOLO ${sampledAge.toFixed(1)}초` :
                   `${box.hazard_type} ${(box.confidence * 100).toFixed(1)}% · YOLO`,
                 x, Math.max(14, y - 5),
               );
             }
+            ctx.setLineDash([]);
           }
         }
       }
       if (!disposed) animation = requestAnimationFrame(draw);
     };
-    void poll();
+    if (!inferVideoFrame) void poll();
     animation = requestAnimationFrame(draw);
     return () => {
       disposed = true;
@@ -218,7 +282,7 @@ export function LiveBboxOverlay({
       video.removeEventListener("waiting", reset);
       video.removeEventListener("emptied", reset);
     };
-  }, [videoRef, cameraId, sessionVersion, fetchFrames]);
+  }, [videoRef, cameraId, sessionVersion, fetchFrames, inferVideoFrame]);
   return (
     <canvas
       ref={canvasRef}
