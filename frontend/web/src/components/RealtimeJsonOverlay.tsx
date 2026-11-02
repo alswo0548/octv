@@ -115,7 +115,7 @@ export function RealtimeJsonOverlay({
         if (![x1, y1, x2, y2].every(Number.isFinite) ||
             x1 < 0 || y1 < 0 || x2 > frame.width ||
             y2 > frame.height || x2 <= x1 || y2 <= y1) return null;
-        const label = `${box.hazard_type} ${(box.confidence * 100).toFixed(1)}% · YOLO ${(selected?.timeDifference ?? 0).toFixed(1)}초 전`;
+        const label = `${box.hazard_type} ${(box.confidence * 100).toFixed(1)}%`;
         return (
           <g key={i}>
             <rect x={x1} y={y1} width={x2 - x1} height={y2 - y1}
