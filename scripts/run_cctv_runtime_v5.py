@@ -39,6 +39,10 @@ def main() -> None:
         )
     from ai.demo_v5.session_pipeline import SessionPipeline
     runtime._incident_pipeline = SessionPipeline(runtime._incident_pipeline, router.routes_by_id)
+    from ai.demo_v5.live_metadata import enabled
+    if enabled():
+        from ai.demo_v5.timeline import attach_timeline
+        attach_timeline(runtime)
     from ai.demo_v5.telemetry import observing_detector
     runtime._yolo_worker.detect_fn = observing_detector(router.detect)
     print("[V5] 기존 VERIFY/Incident Pipeline 유지, UTIC 3대 + Demo 분기 준비 완료")
@@ -55,3 +59,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

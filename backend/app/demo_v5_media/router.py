@@ -210,3 +210,21 @@ def explain_incident_v5(incident_id: int, _admin=Depends(require_control_admin))
     if incident is None:
         raise HTTPException(404, '사건이 없습니다.')
     return explain(incident)
+
+
+
+@router.get("/live-boxes/{cctv_id}")
+def live_boxes(cctv_id: int, _admin=Depends(require_control_admin)):
+    """Metadata only; never seek, decode, infer or alter the video response."""
+    from ai.demo_v5.live_metadata import enabled, recent_frames, PREFIX
+    if not enabled():
+        return {"enabled": False, "frames": []}
+    source = _file_for_active_demo(cctv_id)
+    from ai.demo_v5.session_pipeline import active_session
+    from ai.demo_v5.telemetry import client
+    try:
+        frames = recent_frames(client().get(PREFIX + str(cctv_id)),
+                               active_session(cctv_id), source.name)
+    except Exception:
+        frames = []
+    return {"enabled": True, "frames": frames}

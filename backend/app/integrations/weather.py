@@ -138,7 +138,7 @@ def fetch_observations(query: dict) -> dict:
     # Celery가 자동 매핑 작업 실행
     # 같은 격자·발표시각은 Redis의 짧은 TTL 캐시를 공유합니다.
     # 관측값의 STALE 검사는 아래 measurement()에서 매 요청마다 다시 수행.
-    from .cctv_mapping import get_cached_weather_payload, cache_weather_payload
+    from .cctv_mapping import get_cached_weather_payload, cache_weather_payload, KMA_WEATHER_URL
     try:
         payload = get_cached_weather_payload(query)
         if payload is None:
@@ -147,10 +147,26 @@ def fetch_observations(query: dict) -> dict:
                 query['params'],
                 query.get('headers'),
             )
-            cache_weather_payload(query, payload)
+            # A requested hourly publication can still be unavailable. Retry
+            # exactly one preceding hour only for official NO_DATA (03).
+            # Authentication/provider errors are not hidden by this fallback.
+            if (query.get('previous_hour_fallback') is True
+                    and query.get('url') == KMA_WEATHER_URL
+                    and str(payload.get('response', {}).get('header', {}).get('resultCode')) == '03'):
+                params = dict(query['params'])
+                base = datetime.strptime(str(params['base_date']) + str(params['base_time']), '%Y%m%d%H%M')
+                base -= timedelta(hours=1)
+                params.update(base_date=base.strftime('%Y%m%d'), base_time=base.strftime('%H%M'))
+                fallback_query = {**query, 'params': params}
+                payload = get_cached_weather_payload(fallback_query)
+                if payload is None:
+                    payload = get_json(query['url'], params, query.get('headers'))
+                    cache_weather_payload(fallback_query, payload)
+            else:
+                cache_weather_payload(query, payload)
     except httpx.TimeoutException:
         return unavailable('TIMEOUT')
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
         return unavailable('ERROR')
 
     # 여기서 강수량과 풍속을 각각 추출
@@ -170,3 +186,4 @@ def fetch_observations(query: dict) -> dict:
             result[name] = unavailable('ERROR')[name]
 
     return result
+
