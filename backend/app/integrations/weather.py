@@ -166,7 +166,7 @@ def fetch_observations(query: dict) -> dict:
                 cache_weather_payload(query, payload)
     except httpx.TimeoutException:
         return unavailable('TIMEOUT')
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
         return unavailable('ERROR')
 
     # 여기서 강수량과 풍속을 각각 추출
