@@ -169,3 +169,13 @@ def test_metadata_full_queue_drops_without_affecting_detector():
     detections = [Detection('flood', .9, (1, 2, 10, 15), 'actual')]
     with patch('ai.demo_v5.live_metadata.enabled', return_value=True), patch('ai.demo_v5.live_metadata.MetadataPublisher', return_value=publisher):
         assert observing_detector(lambda f: detections)(frame) is detections
+
+
+def test_live_flag_preserves_original_untimed_preview():
+    from ai.demo_v5.telemetry import observing_detector
+    frame = Frame(3, NOW, np.zeros((20, 30, 3), dtype=np.uint8))
+    detections = []
+    with patch('ai.demo_v5.live_metadata.enabled', return_value=True), patch('ai.demo_v5.live_metadata.MetadataPublisher') as publisher, patch('ai.demo_v5.telemetry.publish') as preview:
+        assert observing_detector(lambda f: detections)(frame) is detections
+        preview.assert_called_once_with(frame, detections)
+        publisher.return_value.submit.assert_not_called()

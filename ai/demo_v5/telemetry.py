@@ -37,7 +37,7 @@ def observing_detector(detect):
     publisher = MetadataPublisher() if enabled() else None
     def wrapped(frame):
         detections = detect(frame)
-        if publisher is not None:
+        if publisher is not None and getattr(frame, 'media_time_sec', None) is not None:
             publisher.submit(frame, detections)
         else:
             publish(frame, detections)
