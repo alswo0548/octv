@@ -33,8 +33,14 @@ def publish(frame, detections):
 
 
 def observing_detector(detect):
+    from .live_metadata import enabled, MetadataPublisher
+    publisher = MetadataPublisher() if enabled() else None
     def wrapped(frame):
         detections = detect(frame)
-        publish(frame, detections)
+        if publisher is not None:
+            publisher.submit(frame, detections)
+        else:
+            publish(frame, detections)
         return detections
     return wrapped
+

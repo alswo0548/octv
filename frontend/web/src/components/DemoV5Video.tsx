@@ -3,6 +3,7 @@
  * No YOLO/Incident values are simulated in the browser.
  */
 import { useEffect, useRef, useState } from "react";
+import { LiveBboxOverlay } from "./LiveBboxOverlay";
 import { N001BboxOverlay, type N001OverlayData } from "./N001BboxOverlay";
 import { requestWebApi, type WebIncidentSession } from "../incidentData";
 import { operationsError, type Cctv } from "../operationsData";
@@ -17,6 +18,7 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
 }) {
   const [attempt, setAttempt] = useState(0);
   const n001 = camera.provider.trim().toUpperCase() === "DEMO" && camera.external_cctv_id === "DEMO-N001";
+  const [liveMode, setLiveMode] = useState(false);
   const [overlay, setOverlay] = useState<N001OverlayData | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,15 +53,29 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     return () => { disposed = true; };
   }, [session.version, camera.id, camera.is_monitored, startedAt, attempt]);
 
-  // Only N001 uses offline inference metadata aligned to ORIGINAL MP4 time.
-  // Failure or missing data falls back to the unmodified video player.
+  // The API opt-in flag selects live metadata; existing offline assets remain intact.
   useEffect(() => {
     let disposed = false;
     setOverlay(null);
-    if (!n001 || !camera.is_monitored || !startedAt) return;
-    void requestWebApi<N001OverlayData>(session.version, `/api/demo/v5/n001-overlay/${camera.id}`)
-      .then(data => { if (!disposed && data.ready) setOverlay(data); })
-      .catch(() => { /* N001 overlay is optional; never prevent video playback */ });
+    setLiveMode(false);
+    if (!camera.is_monitored || !startedAt) return;
+    void (async () => {
+      let enabled = false;
+      try {
+        const mode = await requestWebApi<{ enabled: boolean }>(session.version,
+          `/api/demo/v5/live-boxes/${camera.id}`);
+        enabled = mode.enabled;
+      } catch { /* Older API: preserve the existing explicitly labelled replay. */ }
+      if (disposed) return;
+      setLiveMode(enabled);
+      if (!enabled && n001) {
+        try {
+          const data = await requestWebApi<N001OverlayData>(session.version,
+            `/api/demo/v5/n001-overlay/${camera.id}`);
+          if (!disposed && data.ready) setOverlay(data);
+        } catch { /* Metadata failure never prevents MP4 playback. */ }
+      }
+    })();
     return () => { disposed = true; };
   }, [n001, camera.id, camera.is_monitored, startedAt, session.version, attempt]);
 
@@ -168,19 +184,25 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
             동기화 영상 재생 준비 중…
           </p>
         )}
-        {n001 && url && startedAt && overlay?.ready && (
+        {liveMode && url && startedAt && (
+          <LiveBboxOverlay key={`${camera.id}:${startedAt}:${attempt}`} videoRef={videoRef}
+            cameraId={camera.id} sessionVersion={session.version} />
+        )}
+        {!liveMode && n001 && url && startedAt && overlay?.ready && (
           <N001BboxOverlay videoRef={videoRef} data={overlay} />
         )}
         <div className="camera-overlay-label">
           DEMO · {camera.external_cctv_id}
-          {n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
+          {liveMode ? " · 실시간 YOLO · 동기화 대기 시 박스 숨김" : n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
         </div>
       </div>
       {error && <p role="alert">{error}</p>}
       {syncWarning && <p role="status">{syncWarning}</p>}
       {!compact && (
         <>
-          {n001 ? (
+          {liveMode ? (
+            <p>실제 분석 결과 중 영상 시각과 일치하는 박스만 표시합니다. 분석 지연 시 영상만 재생합니다.</p>
+          ) : n001 ? (
             <p>MP4 시점에 맞춘 사전 YOLO 결과입니다.</p>
           ) : (
             <p>시연 시작 시점에 맞춘 동기화 재생입니다. 실제 YOLO 분석과 사건 생성은 별도로 수행합니다.</p>
@@ -192,4 +214,5 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     </div>
   );
 }
+
 
