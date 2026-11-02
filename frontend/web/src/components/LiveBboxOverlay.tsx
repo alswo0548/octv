@@ -17,10 +17,12 @@ export function LiveBboxOverlay({
   videoRef,
   cameraId,
   sessionVersion,
+  fetchFrames,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   cameraId: number;
   sessionVersion: number;
+  fetchFrames?: () => Promise<{ enabled: boolean; frames: LiveFrame[] }>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -110,10 +112,12 @@ export function LiveBboxOverlay({
       const sent = performance.now();
       try {
         if (!document.hidden) {
-          const data = await requestWebApi<{
-            enabled: boolean;
-            frames: LiveFrame[];
-          }>(sessionVersion, `/api/demo/v5/live-boxes/${cameraId}`);
+          const data = fetchFrames
+            ? await fetchFrames()
+            : await requestWebApi<{
+                enabled: boolean;
+                frames: LiveFrame[];
+              }>(sessionVersion, `/api/demo/v5/live-boxes/${cameraId}`);
           if (disposed) return;
           frames = data.enabled && Array.isArray(data.frames) ? data.frames : [];
           receivedAt = sent;
@@ -214,7 +218,7 @@ export function LiveBboxOverlay({
       video.removeEventListener("waiting", reset);
       video.removeEventListener("emptied", reset);
     };
-  }, [videoRef, cameraId, sessionVersion]);
+  }, [videoRef, cameraId, sessionVersion, fetchFrames]);
   return (
     <canvas
       ref={canvasRef}
