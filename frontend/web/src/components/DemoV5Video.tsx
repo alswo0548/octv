@@ -2,8 +2,9 @@
  * The same scenario KST start time is used by the 3-up wall and detail view.
  * No YOLO/Incident values are simulated in the browser.
  */
-import { useEffect, useRef, useState } from "react";
-import { LiveBboxOverlay } from "./LiveBboxOverlay";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RealtimeJsonOverlay } from "./RealtimeJsonOverlay";
+import type { LiveFrame } from "./liveBboxTiming";
 import { N001BboxOverlay, type N001OverlayData } from "./N001BboxOverlay";
 import { requestWebApi, type WebIncidentSession } from "../incidentData";
 import { operationsError, type Cctv } from "../operationsData";
@@ -25,6 +26,26 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
   const [isPlaying, setIsPlaying] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Only DEMO-N001 uses the optional real-time YOLO JSON display endpoint.
+  // All other camera playback and detection paths are untouched.
+  const fetchN001Frames = useCallback(
+    (_videoTime: number) => requestWebApi<{ enabled: boolean; frames: LiveFrame[] }>(
+      session.version, `/api/demo/v5/n001-live-boxes/${camera.id}`,
+    ),
+    [session.version, camera.id],
+  );
+
+  const restoreN001Overlay = useCallback(() => {
+    setLiveMode(false);
+    void requestWebApi<N001OverlayData>(
+      session.version, `/api/demo/v5/n001-overlay/${camera.id}`,
+    ).then((data) => {
+      if (data.ready) setOverlay(data);
+    }).catch(() => {
+      // Never interfere with native MP4 playback if the optional JSON fails.
+    });
+  }, [session.version, camera.id]);
 
   useEffect(() => {
     let disposed = false;
@@ -58,12 +79,12 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
     let disposed = false;
     setOverlay(null);
     setLiveMode(false);
-    if (!camera.is_monitored || !startedAt) return;
+    if (!camera.is_monitored || !startedAt || !n001) return;
     void (async () => {
       let enabled = false;
       try {
         const mode = await requestWebApi<{ enabled: boolean }>(session.version,
-          `/api/demo/v5/live-boxes/${camera.id}`);
+          `/api/demo/v5/n001-live-boxes/${camera.id}`);
         enabled = mode.enabled;
       } catch { /* Older API: preserve the existing explicitly labelled replay. */ }
       if (disposed) return;
@@ -184,16 +205,17 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
             동기화 영상 재생 준비 중…
           </p>
         )}
-        {liveMode && url && startedAt && (
-          <LiveBboxOverlay key={`${camera.id}:${startedAt}:${attempt}`} videoRef={videoRef}
-            cameraId={camera.id} sessionVersion={session.version} />
+        {liveMode && n001 && url && startedAt && (
+          <RealtimeJsonOverlay key={`${camera.id}:${startedAt}:${attempt}`}
+            videoRef={videoRef} fetchFrames={fetchN001Frames}
+            onUnavailable={restoreN001Overlay} />
         )}
         {!liveMode && n001 && url && startedAt && overlay?.ready && (
           <N001BboxOverlay videoRef={videoRef} data={overlay} />
         )}
         <div className="camera-overlay-label">
           DEMO · {camera.external_cctv_id}
-          {liveMode ? " · 실시간 YOLO · 동기화 대기 시 박스 숨김" : n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
+          {liveMode && n001 ? " · 실제 YOLO JSON" : n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
         </div>
       </div>
       {error && <p role="alert">{error}</p>}
@@ -201,7 +223,7 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
       {!compact && (
         <>
           {liveMode ? (
-            <p>실제 분석 결과 중 영상 시각과 일치하는 박스만 표시합니다. 분석 지연 시 영상만 재생합니다.</p>
+            <p>실제 YOLO가 분석 중 생성한 JSON을 표시합니다. 영상은 기존 속도로 재생되고, 표시용 분석은 사건 생성과 분리되어 있습니다.</p>
           ) : n001 ? (
             <p>MP4 시점에 맞춘 사전 YOLO 결과입니다.</p>
           ) : (

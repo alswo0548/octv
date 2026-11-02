@@ -228,3 +228,49 @@ def live_boxes(cctv_id: int, _admin=Depends(require_control_admin)):
     except Exception:
         frames = []
     return {"enabled": True, "frames": frames}
+
+
+@router.get("/n001-live-boxes/{cctv_id}")
+def n001_live_boxes(cctv_id: int, _admin=Depends(require_control_admin)):
+    """N001-only, read-only JSON from the isolated optional display worker.
+
+    No inference, DB mutation, camera activation or incident side effects.
+    The authorized administrator and active DEMO-N001 session are required.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    if os.getenv("OCTV_N001_LIVE_BBOX_ENABLED", "0").strip() != "1":
+        return {"enabled": False, "frames": []}
+    source = _file_for_active_demo(cctv_id)
+    if source.name != "N001_demo.mp4":
+        return {"enabled": False, "frames": []}
+    from ai.demo_v5.session_pipeline import active_session
+    from ai.demo_v5.telemetry import client
+    key = "octv:n001:display:bbox:v1"  # display-only ephemeral Redis namespace
+
+    started = active_session(cctv_id)
+    if started is None:
+        return {"enabled": False, "frames": []}
+    try:
+        raw = client().get(key)
+        # Sidecar stopped or TTL expired: the UI can switch back to the
+        # original N001 overlay without restarting production API/CCTV.
+        if not raw:
+            return {"enabled": False, "frames": []}
+        payload = json.loads(raw)
+        captured = datetime.fromisoformat(payload["captured_at"])
+        generated = datetime.fromisoformat(payload["generated_at"])
+        now = datetime.now(timezone.utc)
+        age = (now - generated).total_seconds()
+        if payload.get("session") != started.isoformat() or captured < started:
+            return {"enabled": False, "frames": []}
+        if not 0 <= age <= 3 or payload["frame"]["width"] <= 0 or payload["frame"]["height"] <= 0:
+            return {"enabled": True, "frames": []}
+        frame = payload["frame"]
+        if not isinstance(frame.get("boxes"), list):
+            return {"enabled": True, "frames": []}
+        return {"enabled": True, "frames": [{**frame, "age_sec": age}]}
+    except Exception:
+        # Inference-sidecar downtime cannot break native MP4 or incident API.
+        return {"enabled": True, "frames": []}
