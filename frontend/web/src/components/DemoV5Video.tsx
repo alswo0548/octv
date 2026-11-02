@@ -193,7 +193,7 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
         )}
         <div className="camera-overlay-label">
           DEMO · {camera.external_cctv_id}
-          {liveMode ? " · 실시간 YOLO · 동기화 대기 시 박스 숨김" : n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
+          {liveMode ? " · 실제 YOLO + 화면 추적 · 불일치 시 박스 숨김" : n001 && overlay?.ready ? " · 사전 YOLO 박스" : " · 원본 영상"}
         </div>
       </div>
       {error && <p role="alert">{error}</p>}
@@ -201,7 +201,7 @@ export function DemoV5Video({ session, camera, startedAt, compact = false }: {
       {!compact && (
         <>
           {liveMode ? (
-            <p>실제 분석 결과 중 영상 시각과 일치하는 박스만 표시합니다. 분석 지연 시 영상만 재생합니다.</p>
+            <p>청록색은 실제 YOLO 분석, 노란색은 그 결과를 기준으로 한 영상 추적입니다. 시각 불일치·추적 실패 시 박스를 숨기고 영상만 재생합니다.</p>
           ) : n001 ? (
             <p>MP4 시점에 맞춘 사전 YOLO 결과입니다.</p>
           ) : (

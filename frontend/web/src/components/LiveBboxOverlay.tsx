@@ -1,7 +1,17 @@
-/** Actual sampled YOLO metadata. Missing/late results hide boxes, never seek video. */
+/** Real sampled YOLO anchors + bounded browser-only visual tracking.
+ * MP4 playback is independent. Lost/late anchors never become invented detections.
+ */
 import { useEffect, useRef, type RefObject } from "react";
 import { requestWebApi } from "../incidentData";
-import { selectLiveFrame, type LiveFrame } from "./liveBboxTiming";
+import type { LiveFrame } from "./liveBboxTiming";
+import {
+  grayscale,
+  reconcileVisualTrack,
+  SNAPSHOT_HISTORY_SEC,
+  SNAPSHOT_INTERVAL_MS,
+  type GraySnapshot,
+  type VisualTrack,
+} from "./liveBboxTracking";
 
 export function LiveBboxOverlay({
   videoRef,
@@ -14,16 +24,89 @@ export function LiveBboxOverlay({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
     let disposed = false;
     let timer = 0;
     let animation = 0;
+    let videoFrameId = 0;
     let frames: LiveFrame[] = [];
-    let received = 0;
+    let receivedAt = 0;
+    let frameRevision = 0;
+    let metadataRevision = 0;
+    let computedFrameRevision = -1;
+    let computedMetadataRevision = -1;
+    let visual: VisualTrack | null = null;
+    let visualAnchor: LiveFrame | null = null;
     let lastDraw = 0;
+    let lastCaptured = 0;
+    let lastMediaTime = -1;
+    let browserLoop = 0;
+    const snapshots: GraySnapshot[] = [];
+    const scaled = document.createElement("canvas");
+    scaled.width = 256;
+    scaled.height = 144;
+    const captureContext = scaled.getContext("2d", { willReadFrequently: true });
+
     const clear = () => {
       frames = [];
+      receivedAt = 0;
+      metadataRevision++;
+      snapshots.length = 0;
+      frameRevision++;
+      visual = null;
+      visualAnchor = null;
     };
+
+    // The video stays at its native FPS. Only a small 256x144 grayscale copy
+    // is sampled for visualization, at <= 8Hz, with bounded memory and CPU.
+    const capture = (now: number, mediaTime: number) => {
+      if (disposed || document.hidden || video.paused || video.seeking ||
+          video.readyState < 2 || !captureContext ||
+          !Number.isFinite(mediaTime)) return;
+      if (lastMediaTime >= 0 && mediaTime < lastMediaTime - 0.15) {
+        browserLoop++;
+        clear(); // Never track across a seek or MP4 loop.
+      }
+      lastMediaTime = mediaTime;
+      if (now - lastCaptured < SNAPSHOT_INTERVAL_MS) return;
+      if (snapshots.length && mediaTime <= snapshots[snapshots.length - 1].time) return;
+      lastCaptured = now;
+      try {
+        captureContext.drawImage(video, 0, 0, scaled.width, scaled.height);
+        const pixels = grayscale(
+          captureContext.getImageData(0, 0, scaled.width, scaled.height).data,
+        );
+        snapshots.push({
+          time: mediaTime,
+          loop: browserLoop,
+          width: scaled.width,
+          height: scaled.height,
+          pixels,
+        });
+        while (snapshots.length &&
+               mediaTime - snapshots[0].time > SNAPSHOT_HISTORY_SEC) {
+          snapshots.shift();
+        }
+        frameRevision++;
+      } catch {
+        // Canvas/security/performance failure hides optional boxes only.
+        snapshots.length = 0;
+        visual = null;
+      }
+    };
+
+    const onVideoFrame = (now: number, metadata: VideoFrameCallbackMetadata) => {
+      capture(now, metadata.mediaTime);
+      if (!disposed) videoFrameId = video.requestVideoFrameCallback(onVideoFrame);
+    };
+    const hasVideoFrameCallback = typeof video.requestVideoFrameCallback === "function";
+    if (hasVideoFrameCallback) {
+      videoFrameId = video.requestVideoFrameCallback(onVideoFrame);
+    }
+
     const poll = async () => {
+      // Include network latency in age; never assume a received result is new.
       const sent = performance.now();
       try {
         if (!document.hidden) {
@@ -32,32 +115,33 @@ export function LiveBboxOverlay({
             frames: LiveFrame[];
           }>(sessionVersion, `/api/demo/v5/live-boxes/${cameraId}`);
           if (disposed) return;
-          // Include full request latency conservatively; do not trust client wall clock.
-          frames =
-            data.enabled && Array.isArray(data.frames) ? data.frames : [];
-          received = sent;
+          frames = data.enabled && Array.isArray(data.frames) ? data.frames : [];
+          receivedAt = sent;
+          metadataRevision++;
         } else clear();
       } catch {
         clear();
       }
-      if (!disposed)
-        timer = window.setTimeout(() => {
-          void poll();
-        }, 500);
+      if (!disposed) timer = window.setTimeout(() => void poll(), 500);
     };
-    const video = videoRef.current;
-    video?.addEventListener("seeking", clear);
-    video?.addEventListener("waiting", clear);
-    video?.addEventListener("emptied", clear);
-    let previousTime = -1;
+
+    const reset = () => {
+      clear();
+      lastMediaTime = -1;
+      lastCaptured = 0;
+      browserLoop++;
+    };
+    video.addEventListener("seeking", reset);
+    video.addEventListener("waiting", reset);
+    video.addEventListener("emptied", reset);
+
     const draw = (now: number) => {
       const canvas = canvasRef.current;
-      if (canvas && video && now - lastDraw >= 50) {
+      if (canvas && now - lastDraw >= 50) {
         lastDraw = now;
-        if (video.currentTime < previousTime) clear(); // loop/seek boundary
-        previousTime = video.currentTime;
-        const w = video.clientWidth,
-          h = video.clientHeight;
+        if (!hasVideoFrameCallback) capture(now, video.currentTime);
+        const w = video.clientWidth;
+        const h = video.clientHeight;
         if (canvas.width !== w) canvas.width = w;
         if (canvas.height !== h) canvas.height = h;
         canvas.style.left = `${video.offsetLeft}px`;
@@ -65,58 +149,59 @@ export function LiveBboxOverlay({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, w, h);
-          const frame =
-            !video.paused &&
-            !video.seeking &&
-            !document.hidden &&
-            video.readyState >= 3
-              ? selectLiveFrame(
-                  frames,
-                  video.currentTime,
-                  (now - received) / 1000,
-                )
-              : null;
-          if (frame) {
-            const ratio = Math.min(w / frame.width, h / frame.height);
-            const dx = (w - frame.width * ratio) / 2,
-              dy = (h - frame.height * ratio) / 2;
-            ctx.strokeStyle = "#42e8ed";
-            ctx.fillStyle = "#42e8ed";
-            ctx.lineWidth = 2;
-            ctx.font = "bold 14px sans-serif";
-            for (const box of frame.boxes.slice(0, 100)) {
-              const b = box.bbox;
-              if (
-                !Array.isArray(b) ||
-                b.length !== 4 ||
-                !b.every(Number.isFinite) ||
-                b[0] < 0 ||
-                b[1] < 0 ||
-                b[2] > frame.width ||
-                b[3] > frame.height ||
-                b[2] <= b[0] ||
-                b[3] <= b[1] ||
-                !Number.isFinite(box.confidence)
-              )
-                continue;
-              const x = dx + b[0] * ratio,
-                y = dy + b[1] * ratio;
-              ctx.strokeRect(
-                x,
-                y,
-                (b[2] - b[0]) * ratio,
-                (b[3] - b[1]) * ratio,
+          const canShow = !video.paused && !video.seeking &&
+            !document.hidden && video.readyState >= 3 &&
+            receivedAt > 0 && snapshots.length > 0;
+          if (canShow &&
+              (frameRevision !== computedFrameRevision ||
+               metadataRevision !== computedMetadataRevision)) {
+            computedFrameRevision = frameRevision;
+            computedMetadataRevision = metadataRevision;
+            visual = null;
+            visualAnchor = null;
+            const elapsed = (now - receivedAt) / 1000;
+            // A newer YOLO "no object" supersedes an older positive result.
+            const newest = [...frames]
+              .filter((frame) => frame.t <= video.currentTime)
+              .sort((a, b) => b.t - a.t)[0];
+            if (newest) {
+              visual = reconcileVisualTrack(
+                newest, snapshots, video.currentTime, elapsed,
               );
+              visualAnchor = visual ? newest : null;
+            }
+          }
+          const current = canShow && visual && visualAnchor &&
+            now - receivedAt <= 3600 &&
+            Math.abs(snapshots[snapshots.length - 1].time - video.currentTime) <= 0.18
+              ? visual : null;
+          if (current && visualAnchor) {
+            const ratio = Math.min(w / visualAnchor.width, h / visualAnchor.height);
+            const dx = (w - visualAnchor.width * ratio) / 2;
+            const dy = (h - visualAnchor.height * ratio) / 2;
+            ctx.lineWidth = 2;
+            ctx.font = "bold 13px sans-serif";
+            const tracked = current.kind === "visual-track";
+            ctx.strokeStyle = tracked ? "#ffd07b" : "#42e8ed";
+            ctx.fillStyle = ctx.strokeStyle;
+            for (const box of current.boxes) {
+              const b = box.bbox;
+              if (!b.every(Number.isFinite) || b[0] < 0 || b[1] < 0 ||
+                  b[2] > visualAnchor.width || b[3] > visualAnchor.height ||
+                  b[2] <= b[0] || b[3] <= b[1]) continue;
+              const x = dx + b[0] * ratio;
+              const y = dy + b[1] * ratio;
+              ctx.strokeRect(x, y, (b[2] - b[0]) * ratio, (b[3] - b[1]) * ratio);
               ctx.fillText(
-                `${box.hazard_type} ${(box.confidence * 100).toFixed(1)}%`,
-                x,
-                Math.max(14, y - 5),
+                tracked ? `${box.hazard_type} · 화면 추적` :
+                  `${box.hazard_type} ${(box.confidence * 100).toFixed(1)}% · YOLO`,
+                x, Math.max(14, y - 5),
               );
             }
           }
         }
       }
-      animation = requestAnimationFrame(draw);
+      if (!disposed) animation = requestAnimationFrame(draw);
     };
     void poll();
     animation = requestAnimationFrame(draw);
@@ -124,15 +209,16 @@ export function LiveBboxOverlay({
       disposed = true;
       window.clearTimeout(timer);
       cancelAnimationFrame(animation);
-      video?.removeEventListener("seeking", clear);
-      video?.removeEventListener("waiting", clear);
-      video?.removeEventListener("emptied", clear);
+      if (hasVideoFrameCallback) video.cancelVideoFrameCallback(videoFrameId);
+      video.removeEventListener("seeking", reset);
+      video.removeEventListener("waiting", reset);
+      video.removeEventListener("emptied", reset);
     };
   }, [videoRef, cameraId, sessionVersion]);
   return (
     <canvas
       ref={canvasRef}
-      aria-label="실제 YOLO 분석 프레임과 시각이 일치할 때만 표시"
+      aria-label="실제 YOLO 탐지와 구분되는 영상 기반 추적 시각화"
       style={{ position: "absolute", pointerEvents: "none", zIndex: 1 }}
     />
   );
