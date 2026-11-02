@@ -6,7 +6,7 @@ Windows CMD에서 기존 프로젝트 루트 `C:\KDT2604\최종 프로젝트\oct
 
 ```bat
 git fetch origin fix/live-bbox-visual-tracking-20261102
-git worktree add ..\octv-bbox-preview origin/fix/live-bbox-visual-tracking-20261102
+git worktree add --detach ..\octv-bbox-preview FETCH_HEAD
 cd /d "C:\KDT2604\최종 프로젝트\octv-bbox-preview"
 tools\run_live_bbox_preview.bat
 ```
